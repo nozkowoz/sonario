@@ -75,11 +75,21 @@ create table if not exists sonario.songs (
   voicing text not null default '',
   status text not null default 'learning' check (status in ('learning', 'performance_ready', 'retired')),
   sheet_music_url text not null default '',
-  recording_url text not null default '',
   notes text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- One recording link per voice part rather than a single generic one — the choir wants each
+-- part's own practice track findable at a glance, not just "a recording" of unclear provenance.
+-- A fixed set of columns (not a separate per-part table) since the parts themselves are a small,
+-- rarely-changing list — matches js/repertoire.js's VOICE_PARTS. Migrates any earlier deploy that
+-- still has the old single `recording_url` column.
+alter table sonario.songs drop column if exists recording_url;
+alter table sonario.songs add column if not exists recording_url_soprano text not null default '';
+alter table sonario.songs add column if not exists recording_url_alto text not null default '';
+alter table sonario.songs add column if not exists recording_url_tenor text not null default '';
+alter table sonario.songs add column if not exists recording_url_baritone text not null default '';
 
 -- Notice board: a flat feed, same loose trust model as a small-group chat — anyone can post,
 -- anyone can delete (RLS-level), the UI just hides the delete control unless you're the author

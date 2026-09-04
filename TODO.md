@@ -7,7 +7,7 @@
 - [x] Fill in `SUPABASE_URL` / `SUPABASE_ANON_KEY` in `js/config.js`
 - [x] Set real `MEMBER_PASSPHRASE` / `SUPER_PASSPHRASE` values in `js/config.js` (PURPLEHEART / SUPERPURPLEHEART — super shared with Amy, Jo, Sean, Sass, Nina, Gemma)
 - [x] Verified end-to-end against the real database: rehearsals, social events, repertoire, notices, RSVPs, and the super/member permission split all confirmed working
-- [ ] Push to GitHub + connect to Vercel
+- [x] Push to GitHub + connect to Vercel — live at https://sonario-three.vercel.app
 - [ ] Swap the placeholder "S" icon for something more Sonario (icons/*)
 
 ## Possible next features (not started)

@@ -4,15 +4,28 @@ import { supabase } from './supabaseClient.js';
 const STATUS_LABEL = { learning: 'Learning', performance_ready: 'Performance-ready', retired: 'Retired' };
 const STATUS_ORDER = ['performance_ready', 'learning', 'retired'];
 
+// Fixed set rather than an editable list — a small, rarely-changing set of parts (Baritone was
+// only just added). Adding a new part later is a one-line change here plus a matching db column.
+const VOICE_PARTS = [
+  { key: 'soprano', label: 'Soprano' },
+  { key: 'alto', label: 'Alto' },
+  { key: 'tenor', label: 'Tenor' },
+  { key: 'baritone', label: 'Baritone' },
+];
+
 function SongForm({ existing, onDone }) {
   const [title, setTitle] = useState(existing?.title || '');
   const [composer, setComposer] = useState(existing?.composer || '');
   const [voicing, setVoicing] = useState(existing?.voicing || '');
   const [status, setStatus] = useState(existing?.status || 'learning');
   const [sheetMusicUrl, setSheetMusicUrl] = useState(existing?.sheet_music_url || '');
-  const [recordingUrl, setRecordingUrl] = useState(existing?.recording_url || '');
+  const [recordingUrls, setRecordingUrls] = useState(
+    Object.fromEntries(VOICE_PARTS.map((p) => [p.key, existing?.[`recording_url_${p.key}`] || '']))
+  );
   const [notes, setNotes] = useState(existing?.notes || '');
   const [saving, setSaving] = useState(false);
+
+  const setRecordingUrl = (key, value) => setRecordingUrls((prev) => ({ ...prev, [key]: value }));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -20,7 +33,8 @@ function SongForm({ existing, onDone }) {
     setSaving(true);
     const payload = {
       title: title.trim(), composer, voicing, status,
-      sheet_music_url: sheetMusicUrl, recording_url: recordingUrl, notes,
+      sheet_music_url: sheetMusicUrl, notes,
+      ...Object.fromEntries(VOICE_PARTS.map((p) => [`recording_url_${p.key}`, recordingUrls[p.key]])),
     };
     if (existing) {
       await supabase.from('songs').update(payload).eq('id', existing.id);
@@ -45,9 +59,13 @@ function SongForm({ existing, onDone }) {
           </select>
         </label>
       </div>
+      <label>Sheet music link<input type="url" value=${sheetMusicUrl} onInput=${(e) => setSheetMusicUrl(e.target.value)} placeholder="https://…" /></label>
       <div class="form-row">
-        <label>Sheet music link<input type="url" value=${sheetMusicUrl} onInput=${(e) => setSheetMusicUrl(e.target.value)} placeholder="https://…" /></label>
-        <label>Recording link<input type="url" value=${recordingUrl} onInput=${(e) => setRecordingUrl(e.target.value)} placeholder="https://…" /></label>
+        ${VOICE_PARTS.map((p) => html`
+          <label key=${p.key}>${p.label} recording
+            <input type="url" value=${recordingUrls[p.key]} onInput=${(e) => setRecordingUrl(p.key, e.target.value)} placeholder="https://…" />
+          </label>
+        `)}
       </div>
       <label>Notes<textarea value=${notes} onInput=${(e) => setNotes(e.target.value)} placeholder="Part-learning notes, tricky bars, etc." /></label>
       <div class="form-actions">
@@ -84,7 +102,10 @@ function SongCard({ song, canManage }) {
       <div class="song-meta">
         ${song.voicing ? html`<span>${song.voicing}</span>` : null}
         ${song.sheet_music_url ? html`<a href=${song.sheet_music_url} target="_blank" rel="noopener">Sheet music</a>` : null}
-        ${song.recording_url ? html`<a href=${song.recording_url} target="_blank" rel="noopener">Recording</a>` : null}
+        ${VOICE_PARTS.map((p) => {
+          const url = song[`recording_url_${p.key}`];
+          return url ? html`<a key=${p.key} href=${url} target="_blank" rel="noopener">${p.label} recording</a>` : null;
+        })}
       </div>
       ${song.notes ? html`<p class="song-notes">${song.notes}</p>` : null}
     </div>
