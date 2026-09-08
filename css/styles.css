@@ -168,6 +168,33 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .notice-message { font-size: 14px; margin: 10px 0 0; white-space: pre-wrap; }
 .notice-card .card-admin-actions { margin-top: 12px; }
 
+/* Check-in */
+.checkin-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.checkin-badge { font-size: 13px; font-weight: 700; padding: 7px 12px; border-radius: var(--radius-sm); display: inline-block; width: fit-content; }
+.checkin-badge.checkin-green { background: #e3f6ea; color: #1f7a44; }
+.checkin-badge.checkin-orange { background: #fdf0d9; color: #a06c05; }
+.checkin-badge.checkin-red { background: #fbe6e3; color: #a13c30; }
+.checkin-badge.checkin-none { background: var(--purple-light); color: var(--purple-dark); }
+.checkin-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.checkin-dot { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 5px; }
+.checkin-dot::before { content: ''; width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.checkin-dot.checkin-green { background: #e3f6ea; color: #1f7a44; }
+.checkin-dot.checkin-green::before { background: #2f9e63; }
+.checkin-dot.checkin-orange { background: #fdf0d9; color: #a06c05; }
+.checkin-dot.checkin-orange::before { background: #e0a318; }
+.checkin-dot.checkin-red { background: #fbe6e3; color: #a13c30; }
+.checkin-dot.checkin-red::before { background: #c85a4e; }
+.checkin-dot.checkin-none { background: var(--purple-light); color: var(--purple-dark); }
+.checkin-dot.checkin-none::before { background: var(--purple); }
+
+/* Leaderboard */
+.leaderboard-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.leaderboard-row:last-child { border-bottom: none; }
+.leaderboard-rank { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 16px; color: var(--purple-dark); width: 22px; flex-shrink: 0; }
+.leaderboard-name { font-weight: 700; font-size: 14px; flex: 1; }
+.leaderboard-stat { font-size: 13px; color: var(--ink-soft); text-align: right; }
+.leaderboard-tiers { margin-left: 6px; }
+
 @media (max-width: 480px) {
   .app-header-inner { padding: 14px 16px 6px; }
   .app-main { padding: 16px; }

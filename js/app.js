@@ -1,11 +1,12 @@
 import { html, render, useState } from './lib.js';
 import { supabase } from './supabaseClient.js';
-import { useSession, displayNameOf, isSuper, useRehearsals, useRsvps, useSocialEvents, useSocialRsvps, useSongs, useNotices } from './store.js';
+import { useSession, displayNameOf, isSuper, useRehearsals, useRsvps, useCheckins, useSocialEvents, useSocialRsvps, useSongs, useNotices } from './store.js';
 import { AuthGate } from './auth.js';
 import { Rehearsals } from './rehearsals.js';
 import { Social } from './social.js';
 import { Repertoire } from './repertoire.js';
 import { NoticeBoard } from './noticeboard.js';
+import { Leaderboard } from './leaderboard.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
 function App() {
@@ -24,6 +25,7 @@ function Main({ session }) {
   const [tab, setTab] = useState('rehearsals');
   const { rehearsals } = useRehearsals();
   const { rsvps } = useRsvps();
+  const { checkins } = useCheckins();
   const { socialEvents } = useSocialEvents();
   const { socialRsvps } = useSocialRsvps();
   const { songs } = useSongs();
@@ -47,6 +49,7 @@ function Main({ session }) {
         </div>
         <nav class="tab-row">
           <button class=${'tab-btn' + (tab === 'rehearsals' ? ' active' : '')} onClick=${() => setTab('rehearsals')}>Rehearsals</button>
+          <button class=${'tab-btn' + (tab === 'leaderboard' ? ' active' : '')} onClick=${() => setTab('leaderboard')}>Leaderboard</button>
           <button class=${'tab-btn' + (tab === 'social' ? ' active' : '')} onClick=${() => setTab('social')}>Social</button>
           <button class=${'tab-btn' + (tab === 'repertoire' ? ' active' : '')} onClick=${() => setTab('repertoire')}>Repertoire</button>
           <button class=${'tab-btn' + (tab === 'notices' ? ' active' : '')} onClick=${() => setTab('notices')}>Notice board</button>
@@ -54,7 +57,9 @@ function Main({ session }) {
       </header>
       <main class="app-main">
         ${tab === 'rehearsals'
-          ? html`<${Rehearsals} rehearsals=${rehearsals} rsvps=${rsvps} displayName=${displayName} canManage=${canManage} />`
+          ? html`<${Rehearsals} rehearsals=${rehearsals} rsvps=${rsvps} checkins=${checkins} displayName=${displayName} canManage=${canManage} />`
+          : tab === 'leaderboard'
+          ? html`<${Leaderboard} rehearsals=${rehearsals} checkins=${checkins} />`
           : tab === 'social'
           ? html`<${Social} socialEvents=${socialEvents} socialRsvps=${socialRsvps} displayName=${displayName} canManage=${canManage} />`
           : tab === 'repertoire'

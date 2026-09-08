@@ -18,4 +18,4 @@ export const SUPER_PASSPHRASE = 'SUPERPURPLEHEART';
 
 // Shown in the footer so people can check they're on the latest build — useful given the PWA
 // caching quirks (see sw.js). Bump this by one on every deploy that ships a real change.
-export const APP_VERSION = 'v5';
+export const APP_VERSION = 'v6';

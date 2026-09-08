@@ -44,6 +44,19 @@ create table if not exists sonario.rehearsal_rsvps (
   unique (rehearsal_id, member_name)
 );
 
+-- Who actually showed up, and when — distinct from rehearsal_rsvps (intent) which only tells you
+-- who SAID they were coming. Timestamp lets the app compute a punctuality tier (green/orange/red
+-- vs. the rehearsal's start_time) for the "Most punctual" leaderboard. Read/insert open to any
+-- authenticated member (checking yourself in isn't a super-only action), unique per person per
+-- rehearsal so a second tap can't overwrite the original arrival time.
+create table if not exists sonario.rehearsal_checkins (
+  id uuid primary key default gen_random_uuid(),
+  rehearsal_id uuid not null references sonario.rehearsals(id) on delete cascade,
+  member_name text not null,
+  checked_in_at timestamptz not null default now(),
+  unique (rehearsal_id, member_name)
+);
+
 -- Social events (~4/year, roughly one per term) — same shape as rehearsals but with a title,
 -- since "End of Term 3 Trivia Night" needs a name in a way "the weekly rehearsal" doesn't.
 create table if not exists sonario.social_events (
@@ -113,6 +126,7 @@ create table if not exists sonario.members (
 
 create index if not exists rehearsal_rsvps_rehearsal_id_idx on sonario.rehearsal_rsvps(rehearsal_id);
 create index if not exists rehearsals_date_idx on sonario.rehearsals(rehearsal_date);
+create index if not exists rehearsal_checkins_rehearsal_id_idx on sonario.rehearsal_checkins(rehearsal_id);
 create index if not exists social_rsvps_event_id_idx on sonario.social_rsvps(event_id);
 create index if not exists social_events_date_idx on sonario.social_events(event_date);
 create index if not exists notices_pinned_created_idx on sonario.notices(pinned desc, created_at desc);
@@ -158,6 +172,7 @@ create trigger songs_set_updated_at
 -- split here. The notice board keeps the looser everyone-can-delete trust model instead.
 alter table sonario.rehearsals enable row level security;
 alter table sonario.rehearsal_rsvps enable row level security;
+alter table sonario.rehearsal_checkins enable row level security;
 alter table sonario.social_events enable row level security;
 alter table sonario.social_rsvps enable row level security;
 alter table sonario.songs enable row level security;
@@ -184,6 +199,11 @@ drop policy if exists "members write rsvps" on sonario.rehearsal_rsvps;
 create policy "members write rsvps" on sonario.rehearsal_rsvps for insert with check (auth.role() = 'authenticated');
 drop policy if exists "members update rsvps" on sonario.rehearsal_rsvps;
 create policy "members update rsvps" on sonario.rehearsal_rsvps for update using (auth.role() = 'authenticated');
+
+drop policy if exists "members read checkins" on sonario.rehearsal_checkins;
+create policy "members read checkins" on sonario.rehearsal_checkins for select using (auth.role() = 'authenticated');
+drop policy if exists "members write checkins" on sonario.rehearsal_checkins;
+create policy "members write checkins" on sonario.rehearsal_checkins for insert with check (auth.role() = 'authenticated');
 
 drop policy if exists "members read social_events" on sonario.social_events;
 create policy "members read social_events" on sonario.social_events for select using (auth.role() = 'authenticated');
@@ -234,7 +254,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['rehearsals', 'rehearsal_rsvps', 'social_events', 'social_rsvps', 'songs', 'notices', 'members']
+  foreach t in array array['rehearsals', 'rehearsal_rsvps', 'rehearsal_checkins', 'social_events', 'social_rsvps', 'songs', 'notices', 'members']
   loop
     if not exists (
       select 1 from pg_publication_tables

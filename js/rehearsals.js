@@ -1,5 +1,7 @@
-import { html, useState, todayStr, localDateStr } from './lib.js';
+import { html, useState, todayStr, localDateStr, checkinTier } from './lib.js';
 import { supabase } from './supabaseClient.js';
+
+const TIER_LABEL = { green: 'On time', orange: 'A bit late', red: 'Late' };
 
 function formatDate(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -38,6 +40,38 @@ function RsvpRow({ rehearsal, rsvps, displayName }) {
         `)}
       </div>
       <div class="rsvp-counts">${counts.yes} going · ${counts.maybe} maybe · ${counts.no} can't make it</div>
+    </div>
+  `;
+}
+
+async function checkIn(rehearsalId, memberName) {
+  const { error } = await supabase.from('rehearsal_checkins').insert({ rehearsal_id: rehearsalId, member_name: memberName });
+  // A unique-violation here just means "already checked in" — not an error worth surfacing,
+  // and importantly not something to retry as an update (that would overwrite the real arrival
+  // time with whatever time the second tap happened).
+  if (error && error.code !== '23505') throw error;
+}
+
+// Only shown on today's rehearsal — check-in isn't meaningful for a future or past one.
+function CheckinRow({ rehearsal, checkins, displayName }) {
+  if (rehearsal.rehearsal_date !== todayStr()) return null;
+  const mine = checkins.find((c) => c.rehearsal_id === rehearsal.id && c.member_name === displayName);
+  const others = checkins.filter((c) => c.rehearsal_id === rehearsal.id);
+
+  return html`
+    <div class="checkin-row">
+      ${mine
+        ? html`<span class=${'checkin-badge checkin-' + (checkinTier(rehearsal, mine.checked_in_at) || 'none')}>
+            ✓ Checked in ${checkinTier(rehearsal, mine.checked_in_at) ? `— ${TIER_LABEL[checkinTier(rehearsal, mine.checked_in_at)]}` : ''}
+          </span>`
+        : html`<button class="btn btn-primary" onClick=${() => checkIn(rehearsal.id, displayName)}>I'm here</button>`}
+      ${others.length > 0 ? html`
+        <div class="checkin-list">
+          ${others.map((c) => html`
+            <span key=${c.member_name} class=${'checkin-dot checkin-' + (checkinTier(rehearsal, c.checked_in_at) || 'none')}>${c.member_name}</span>
+          `)}
+        </div>
+      ` : null}
     </div>
   `;
 }
@@ -158,7 +192,7 @@ function WeeklyGeneratorForm({ existingRehearsals, onDone }) {
   `;
 }
 
-function RehearsalCard({ rehearsal, rsvps, displayName, canManage }) {
+function RehearsalCard({ rehearsal, rsvps, checkins, displayName, canManage }) {
   const [editing, setEditing] = useState(false);
 
   if (editing) {
@@ -189,11 +223,12 @@ function RehearsalCard({ rehearsal, rsvps, displayName, canManage }) {
       </div>
       ${rehearsal.focus ? html`<p class="rehearsal-focus">${rehearsal.focus}</p>` : null}
       <${RsvpRow} rehearsal=${rehearsal} rsvps=${rsvps} displayName=${displayName} />
+      <${CheckinRow} rehearsal=${rehearsal} checkins=${checkins} displayName=${displayName} />
     </div>
   `;
 }
 
-export function Rehearsals({ rehearsals, rsvps, displayName, canManage }) {
+export function Rehearsals({ rehearsals, rsvps, checkins, displayName, canManage }) {
   const [adding, setAdding] = useState(false);
   const [generating, setGenerating] = useState(false);
   const today = todayStr();
@@ -214,11 +249,11 @@ export function Rehearsals({ rehearsals, rsvps, displayName, canManage }) {
       ${adding ? html`<${RehearsalForm} onDone=${() => setAdding(false)} />` : null}
       ${generating ? html`<${WeeklyGeneratorForm} existingRehearsals=${rehearsals} onDone=${() => setGenerating(false)} />` : null}
       ${upcoming.length === 0 ? html`<p class="empty-state">No rehearsals scheduled yet.</p>` : null}
-      ${upcoming.map((r) => html`<${RehearsalCard} key=${r.id} rehearsal=${r} rsvps=${rsvps} displayName=${displayName} canManage=${canManage} />`)}
+      ${upcoming.map((r) => html`<${RehearsalCard} key=${r.id} rehearsal=${r} rsvps=${rsvps} checkins=${checkins} displayName=${displayName} canManage=${canManage} />`)}
 
       ${past.length > 0 ? html`
         <h2 class="section-header-secondary">Past rehearsals</h2>
-        ${past.map((r) => html`<${RehearsalCard} key=${r.id} rehearsal=${r} rsvps=${rsvps} displayName=${displayName} canManage=${canManage} />`)}
+        ${past.map((r) => html`<${RehearsalCard} key=${r.id} rehearsal=${r} rsvps=${rsvps} checkins=${checkins} displayName=${displayName} canManage=${canManage} />`)}
       ` : null}
     </div>
   `;

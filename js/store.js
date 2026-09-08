@@ -47,7 +47,7 @@ function useLiveTable(table, { select = '*', orderFn } = {}) {
 
     const channel = supabase
       .channel(`${table}-changes`)
-      .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'sonario', table }, (payload) => {
         setRows((prev) => {
           let next = prev;
           if (payload.eventType === 'INSERT') {
@@ -84,6 +84,11 @@ export function useRehearsals() {
 export function useRsvps() {
   const { rows, loading } = useLiveTable('rehearsal_rsvps');
   return { rsvps: rows, loading };
+}
+
+export function useCheckins() {
+  const { rows, loading } = useLiveTable('rehearsal_checkins');
+  return { checkins: rows, loading };
 }
 
 export function useSocialEvents() {
