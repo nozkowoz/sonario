@@ -102,9 +102,16 @@ returns boolean as $$
   select coalesce((select role from sonario.current_membership()) = 'super', false);
 $$ language sql stable security definer set search_path = '';
 
+-- NOT `current_membership() is not null` — Postgres composite-type IS NOT NULL is field-wise
+-- (true only if EVERY field is non-null), and decided_at/decided_by are legitimately nullable on
+-- an active row (e.g. one approved by direct SQL rather than through the future approval UI).
+-- That form silently returns false for a real, found row whenever any nullable field is null.
+-- EXISTS sidesteps the composite-null trap entirely. Caught via live adversarial testing in
+-- Checkpoint 2 — this function is used by nearly every RLS policy in this schema, so the bug
+-- would have quietly broken most member-facing access if it had shipped.
 create or replace function sonario.is_active_member()
 returns boolean as $$
-  select sonario.current_membership() is not null;
+  select exists (select 1 from sonario.memberships where profile_id = auth.uid() and status = 'active');
 $$ language sql stable security definer set search_path = '';
 
 revoke execute on function sonario.current_membership() from public;
@@ -222,7 +229,10 @@ create table if not exists sonario.checkins (
   id uuid primary key default gen_random_uuid(),
   rehearsal_id uuid not null references sonario.rehearsals(id) on delete cascade,
   profile_id uuid not null references sonario.profiles(id) on delete cascade,
-  checked_in_at timestamptz,
+  -- default now(), not client-supplied — the brief requires a server-generated timestamp, and a
+  -- live check-in insert should simply omit this column entirely rather than pass a client clock
+  -- value. A friend-confirmed row explicitly passes null instead, overriding the default.
+  checked_in_at timestamptz default now(),
   source text not null check (source in ('live', 'friend_confirmed')),
   -- A friend-confirmed row can never carry a real arrival time — there isn't one to record, and
   -- fabricating one would corrupt punctuality stats. Enforced by the database, not app convention.
