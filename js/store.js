@@ -23,16 +23,27 @@ export function useSession() {
 export function useMyMembership(session) {
   const [membership, setMembership] = useState(undefined);
   const [profile, setProfile] = useState(undefined);
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!session) { setMembership(session === null ? null : undefined); setProfile(session === null ? null : undefined); return; }
     let cancelled = false;
 
     const load = () => {
+      setError(null);
       supabase.from('memberships').select('*').eq('profile_id', session.user.id).maybeSingle()
-        .then(({ data }) => { if (!cancelled) setMembership(data ?? null); });
+        .then(({ data, error: err }) => {
+          if (cancelled) return;
+          if (err) { setError(err.message); return; }
+          setMembership(data ?? null);
+        });
       supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
-        .then(({ data }) => { if (!cancelled) setProfile(data ?? null); });
+        .then(({ data, error: err }) => {
+          if (cancelled) return;
+          if (err) { setError(err.message); return; }
+          setProfile(data ?? null);
+        });
     };
     load();
 
@@ -42,9 +53,9 @@ export function useMyMembership(session) {
       .subscribe();
 
     return () => { cancelled = true; supabase.removeChannel(channel); };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, reloadKey]);
 
-  return { membership, profile };
+  return { membership, profile, error, retry: () => setReloadKey((k) => k + 1) };
 }
 
 export function displayNameOf(profile) {
