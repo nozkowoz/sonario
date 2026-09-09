@@ -54,7 +54,7 @@ from the `esm.sh` CDN (see `js/lib.js`). Same pattern as Nina's other app, "Page
 
 **Important directories/files:**
 ```
-index.html                 Currently a STATIC MAINTENANCE SCREEN (see §7) — no script tags, no auth
+index.html                 Loads the real app (`js/app.js` into `#root`) — the rebuild's maintenance screen came down at the end of Step C, per Decision 9. Its markup is in git history if ever needed
 css/styles.css              All styling — CSS custom properties for the visual system (§5)
 js/config.js                 Supabase URL/anon key + choir name + APP_VERSION (no secrets beyond the public anon key)
 js/supabaseClient.js          Supabase client, pinned to the `sonario` Postgres schema
@@ -95,9 +95,9 @@ and (planned) bucket policy level. No Storage bucket exists yet.
 **Hosting/deployment:** Vercel, project presumed named `sonario` under Nina's account, auto-
 deploys on push to `main` of GitHub repo `nozkowoz/sonario`. **Important:** the local git history
 is currently **5 commits ahead of `origin/main`** — Nina has not pushed since Checkpoint 2, so
-whatever is live on Vercel right now reflects only the Checkpoint 2 migration + the maintenance
-screen, not Checkpoints 3–4's work. This is low-risk (the maintenance screen hasn't changed), but
-don't assume "deployed" matches "committed locally" — see §10.
+as of 2026-09-09 local and `origin/main` are in step at `8358564` and the live deployment serves
+the real app. That can drift again at any time, because Claude commits locally and Nina pushes
+herself — so don't assume "deployed" matches "committed locally", check it. See §10.
 
 **Environment/config structure:** `js/config.js` holds `SUPABASE_URL` and `SUPABASE_ANON_KEY`
 (the anon key is meant to be public — RLS is the real boundary) plus `CHOIR_NAME` and
@@ -198,13 +198,17 @@ execution rather than the `apply_migration` tool, so Supabase's migration ledger
 mirror the files in `supabase/migrations/`. The `.sql` files in the repo are the accurate,
 readable record; don't rely on Supabase's migration list alone to reconstruct history.
 
-**Live data as of 2026-09-09:** `profiles`: 0 rows. `memberships`: 0 rows. `terms`: 0. `rehearsals`:
-0. Zero real product data exists yet. `auth.users` has **182 anonymous users** and **zero real
-(Google) users** — these anonymous rows are leftover test identities from adversarial RLS testing
-throughout the rebuild (each promoted to a test role via direct SQL, meant to be cleaned up after
-each test, evidently not all were). They carry no membership/profile rows and can't reach any
-real data, so they're not a security issue, just database clutter — worth a cleanup pass at some
-point, not urgent, not done as part of this handover per the "no changes" instruction.
+**Live data as of 2026-09-09 (second pass):** `profiles`: 8. `memberships`: 8. `terms`: 2.
+`rehearsals`: 11. `rehearsal_absences`: 5. `checkins`: 21. **All of it is seed/test data** created
+by `supabase/seed_test_data.sql` (Step E) — eight fake members with no password and no identity
+row, so none of them can sign in. There is still **zero real product data** and no real Google
+user. Re-running that file rebuilds the set; its teardown block removes it.
+
+`auth.users` now holds exactly those 8 seeded rows and **no anonymous users**. The ~182 leftover
+anonymous test identities that earlier sessions had accumulated (each promoted to a test role by
+direct SQL and not always cleaned up afterwards) were deleted on 2026-09-09 with Nina's
+agreement, scoped to anonymous users having no `profiles` row. Keep cleaning test identities up
+per test rather than letting that build again.
 
 ### Planned / not yet implemented
 - Storage buckets (Checkpoint 7).
@@ -229,13 +233,13 @@ point, not urgent, not done as part of this handover per the "no changes" instru
 | Membership approval queue (approve/decline/deactivate/reactivate, bulk-approve) | Implemented and verified live (via anonymous test identities) |
 | App shell: bottom nav (Home/Calendar/More), header, visual system (`#7052CD`) | Implemented and verified live (screenshotted through all three tabs as a super test identity) |
 | Loading/empty/error state components (`js/shell.js`) | Loading and empty states verified live; **error state built but not exercised live** (would need a simulated network failure) |
-| Unified event model schema (`event_type`, `counts_towards_attendance` on `rehearsals`) | Schema implemented and verified (columns confirmed live); **no UI built yet** — that's the next step |
+| Unified event model (`event_type`, `counts_towards_attendance` on `rehearsals`) | Schema and UI both implemented and verified live — all four event types render, and `counts_towards_attendance` is shown independently of type |
 | Away-dates privacy correction | Implemented and verified (RLS policy confirmed live via `pg_policies` query) |
-| Home tab | Placeholder only (empty state) — real content is the next build step |
-| Calendar tab | Placeholder only (empty state) — real content is the next build step |
-| Admin event management (create/edit/cancel/reschedule) | Not started |
-| Check-in / attendance UI | Not started |
-| Seed/test data | Not started |
+| Home tab | Implemented (Step C) and verified live: greeting, next non-cancelled event, absence toggle, check-in on the day, organiser shortcuts for supers |
+| Calendar tab | Implemented (Step C) and verified live: Coming up / Earlier grouping, all event types, relative day labels, cancelled events, term banner |
+| Admin event management (create/edit/cancel/reschedule) | Implemented (Step C) and verified live, including that an RLS-blocked write (no error, zero rows) is reported as a failure rather than silent success |
+| Check-in / attendance UI | Implemented (Step D) and verified live: member self check-in, one-hour undo (policy-enforced), super attendance view via `member_directory()`. Migration `0003` applied |
+| Seed/test data | Implemented (Step E): `supabase/seed_test_data.sql`, applied live, re-runnable, dates relative to today |
 | Repertoire, recordings, practice mode, leaderboard, Message a Friend, recaps, push, social/notices/More, profile photo | All planned only — deliberately deferred past MVP |
 
 ---
@@ -363,80 +367,127 @@ use these rather than inventing ad hoc "no data" messaging.
     tested adversarially multiple times across this project. Any new feature must be checked
     against this before being called done.
 
+13. **Check-in is only possible on the day of the event, and never for a cancelled one.** Added
+    2026-09-09 during Step D — this is the one rule in the decision log that was *not* previously
+    agreed with Nina, so it's the one most open to revision. Reason: Checkpoint 2's insert policy
+    let any active member check in to any event on any date, which makes attendance data
+    meaningless (you could check in to next month's concert today). Enforced in
+    `0003_checkin_undo_window.sql` as `rehearsal_date = (now() at time zone
+    'Australia/Melbourne')::date and status <> 'cancelled'`, and mirrored in the UI by
+    `isCheckInDay()` in `js/checkin.js`. The timezone is hardcoded because this is one choir in
+    one city. **If the choir wants a grace window ("check in the morning after"), that date test
+    is the single line to relax** — change it in the migration and in `isCheckInDay()` together.
+
+14. **The check-in timestamp belongs to the server, and supers get no override on `checkins`.**
+    Two halves of one decision, both from Step D:
+    * `checked_in_at` was client-suppliable (the column merely *defaulted* to `now()`), and
+      punctuality is computed from it. A `before insert` trigger now overwrites it
+      unconditionally. This is what turns Decision 8 from a convention into an enforced
+      constraint: peer verification's "approximate arrival time" cannot reach this column even if
+      the code that eventually writes it is wrong.
+    * There is deliberately **no update policy and no super delete** on `checkins`. A super
+      correcting somebody else's attendance is the job of `attendance_corrections`, which already
+      exists and carries an audit trail (who corrected what, and why). A silent super delete now
+      would route around exactly the table that exists to keep that record honest — so if
+      super-side corrections are built later, build them through that table.
+
 ---
 
 ## 7. Current work / exact stopping point
 
-**Most recent milestone:** Mid-way through a compressed "MVP run" that re-scopes the original
-16-checkpoint plan down to the shortest safe path to something Nina can actually open and test
-end-to-end. This MVP run was proposed and agreed 2026-09-09, replacing (for now) the strict
-one-checkpoint-at-a-time pacing with a leaner internal sequence:
+**Updated 2026-09-09 (second pass), after Steps C, D and E were built and verified live.** The
+compressed "MVP run" that re-scoped the original 16-checkpoint plan is now essentially complete
+on the build side; what remains is Nina's own hands-on test.
 
 - **Step A — unified event model + away-dates privacy fix.** DONE. Migration
   `0002_events_and_privacy.sql` applied live and verified (see §3).
 - **Step B — app shell (bottom nav, visual system, loading/empty/error states).** DONE. Commit
-  `2d6d0cb`. Verified live via a temporary anonymous test identity promoted to active/super role,
-  screenshotted through Home/Calendar/More tabs; cleaned up afterward (test identity deleted,
-  temporary preview harness file deleted, no residue in the repo).
+  `2d6d0cb`.
 - **Step C — simplified Home, Calendar/My Term event list, admin event CRUD, member absence
-  marking.** **NOT STARTED.** This was the very next task about to begin when this handover was
-  requested — the only work done toward it was one exploratory `grep` on the old, dead
-  `js/rehearsals.js` file (no changes made, purely inspection).
-- **Step D — basic check-in (self check-in + admin view + one-hour undo window).** Not started.
-- **Step E — realistic seed/test data.** Not started; likely folds into Step C or D rather than
-  needing its own pass.
+  marking.** DONE. Commit `7e44be1`. Verified live in a later session as an active member and as
+  a super, including adversarially (a plain member cannot create/edit/cancel/delete an event, and
+  cannot read anyone else's absence row). `index.html`'s maintenance screen came down as part of
+  this commit, per Decision 9.
+- **Step D — check-in (member self check-in, super attendance view, one-hour undo).** DONE.
+  Commit `8358564`, migration `0003_checkin_undo_window.sql` applied live. See §6 Decision 13 for
+  the one new rule this step introduced.
+- **Step E — realistic seed/test data.** DONE, same commit. `supabase/seed_test_data.sql`
+  (applied live, re-runnable, teardown block at the bottom).
 
-**What was just completed:** Step B (the app shell), including live verification. Commit history
-for this MVP run: `a24f712` (Step A) → `2d6d0cb` (Step B).
+**What was just completed:** Steps C, D and E, all verified live against the real database rather
+than by code review. Commit history for the MVP run: `a24f712` (Step A) → `2d6d0cb` (Step B) →
+`7e44be1` (Step C) → `8358564` (Steps D+E).
 
 **What has NOT been tested:**
-- Real Google sign-in (only anonymous-identity stand-ins have been used for all testing so far —
-  see §9). Whether the Google Cloud OAuth client / Supabase Google provider are actually
-  configured correctly is **unconfirmed**.
-- The error state component (`ErrorState` in `js/shell.js`) — built, wired into `Gated()` in
-  `js/app.js` for a membership/profile load failure, but not exercised against a real failure.
-- Anything from Step C onward (not built yet).
+- **Real Google sign-in.** Still the big one. Every test to date has used
+  `signInAnonymously()` stand-ins promoted by SQL (§9). Whether the Google Cloud OAuth client and
+  the Supabase Auth Google provider are correctly configured is *still* unconfirmed, and it is now
+  the last thing standing between the app and being genuinely usable.
+- The `ErrorState` component against a real network failure (built, wired into `Gated()`, never
+  exercised).
+- Nina's own end-to-end pass as a real user. That's the immediate next thing.
 
-**Known bugs/blockers:** None currently known in what's built. No genuine blocker is currently
-open — Step C was ready to start with no outstanding decision needed from Nina.
+**Known bugs/blockers:** none known. Three things a new session should know rather than
+rediscover:
 
-**Configuration changes Nina has made manually:** None recorded as manual/dashboard-side changes
-in this session specifically. Whether Google OAuth provider setup in the Supabase dashboard and
-the Google Cloud Console project have been completed is unconfirmed — flagged as an open item
-since the very end of Checkpoint 3 and still not explicitly confirmed as done.
+1. **The first real super has to be created by SQL.** `memberships`'s update policy is
+   `is_super() AND profile_id <> auth.uid()`, so nobody can approve or promote themselves, and
+   the seeded super (`Marguerite Okafor`) has no password and cannot log in to approve anyone.
+   After Nina's first Google sign-in she will be `pending` with no way out of it until someone
+   runs:
+   ```sql
+   update sonario.memberships set status = 'active', role = 'super'
+    where profile_id = (select id from auth.users where email = '<her google address>');
+   ```
+2. **The approval queue shows "Unknown" for a second** before the profiles lookup resolves
+   (`useProfilesById` in `js/approvals.js` fires after the memberships list arrives). Cosmetic,
+   pre-existing since Checkpoint 3, deliberately not fixed as part of Steps C–E.
+3. **A stale JWT for a deleted account** lands on `MembershipStatusScreen`'s default "we couldn't
+   find a membership request" branch, not a crash. Signing out recovers. This is only reachable
+   in testing, when a test identity's `auth.users` row is deleted underneath an open tab.
 
-**Anything awaiting Nina's confirmation:** Nothing is currently blocked awaiting her input — the
-MVP roadmap and all the decisions in §6 were her explicit agreement on 2026-09-09.
+**Configuration changes Nina has made manually:** still none recorded. Google OAuth provider
+setup (Supabase dashboard + Google Cloud Console) remains the open unverified item from
+Checkpoint 3.
 
-**The very next task:** Build Step C — simplified Home content, a real Calendar/My Term event
-list reading from `sonario.rehearsals` (all event types), admin event create/edit/cancel/
-reschedule UI, and member "can't make it" (absence) marking. This is what a fresh session should
-start on once it has re-verified current state per §13.
+**Anything awaiting Nina's confirmation:** one thing, and it is optional — Decision 13's
+check-in-only-on-the-day rule was a call made while building Step D rather than a previously
+agreed decision. It's flagged in the migration's own comments as a one-line relaxation if the
+choir wants a grace window.
+
+**The very next task:** Nina's own hands-on test — real Google sign-in, promoted to super by the
+SQL above, then clicking through Home, Calendar and More against the seed data. Nothing new
+should be built until that has happened and she's said what she wants changed.
 
 ---
 
 ## 8. Remaining roadmap
 
-**Required for the agreed MVP (in order):**
-1. Step C — Home + Calendar + admin event management + member absence marking
-2. Step D — basic check-in (member self check-in, admin view, one-hour undo window + its RLS
-   policy — not yet applied to the database)
-3. Step E — seed/test data (a term, ~10 mixed-type events, a few test memberships, some
-   absences/check-ins) so Nina has something real to click through
-4. Swap `index.html` back to the real app (end of Step C, per Decision 9 in §6)
+**The agreed MVP is built.** Steps C, D and E and the `index.html` swap are all done (§7). What
+is left before anything new starts:
 
-**Explicitly deferred past the first hands-on test (do not build early):**
+1. **Push.** Local `main` is ahead of `origin/main` (§10) — Nina runs `git push` herself, and
+   that push is what takes the maintenance screen down on Vercel.
+2. **Real Google sign-in, verified.** The one genuinely unproven part of the system.
+3. **Promote Nina's real account to active/super by SQL** (§7, note 1).
+4. **Nina's hands-on pass**, and whatever she wants changed as a result.
+
+**Explicitly deferred past that first hands-on test (do not build early):**
 - Profile photo upload (Checkpoint 15) — the underlying `avatar_url` column + self-update RLS
   already exist, only the upload UI is deferred
-- Peer attendance verification / "Message a Friend" (Checkpoint 11)
-- Punctuality tiers, push-based reminder windows, all push notification infrastructure
-  (Checkpoints 9's full scope, 14)
+- Peer attendance verification / "Message a Friend" (Checkpoint 11) — note that Decision 8's
+  constraint is now enforced by the database rather than by convention, see §6 Decision 14
+- Punctuality tiers and the leaderboard (Checkpoints 9/10) — the seed data deliberately contains
+  a spread of early/on-time/late arrival times so there is something real to colour when this is
+  built
+- All push notification infrastructure (Checkpoint 14)
 - Public-holiday detection (Checkpoint 5's original scope, now deferred)
 - Repertoire, per-part recordings, practice mode (Checkpoints 6–8)
-- Leaderboard + "Choir in Full Voice" personal attendance visual (Checkpoint 10)
+- Super-side attendance *corrections* — `attendance_corrections` exists with an audit trail and
+  is the intended path; Step D deliberately gave supers no delete/override on `checkins` so that
+  path stays the only one
 - Rehearsal recaps (Checkpoint 13)
-- Away-dates UI (declare/confirm away — the schema+RLS exist, no UI planned yet even though it's
-  not explicitly in the deferred list; treat as not-MVP unless Nina says otherwise)
+- Away-dates UI (declare/confirm away — schema+RLS exist, no UI)
 - Social events/notices rebuild onto `profile_id` + More-tab UI (Checkpoint 15)
 - Final launch check (Checkpoint 16) — cross-device/timezone/accessibility/security pass
 
@@ -485,16 +536,18 @@ Nina's consistent, explicitly repeated instruction throughout the project.
 
 - **Branch:** `main`
 - **Working tree:** clean as of this handover (nothing uncommitted)
-- **Local main is 5 commits ahead of `origin/main`** — Nina has not run `git push` since
-  Checkpoint 2. Latest local commits, newest first:
+- **Pushed to `origin/main` on 2026-09-09** (`ed5e5af..8358564`), by Nina, after Steps D and E
+  landed. That push is what took the maintenance screen down on the live Vercel deployment, so
+  "deployed" and "committed" are in step as of that moment — but re-check rather than assuming,
+  since the convention below means local can run ahead again at any time. Latest commits,
+  newest first:
   ```
+  8358564 Step D: check-in with a one-hour undo window, plus Step E seed data
+  7e44be1 Step C: Home, Calendar/My Term, admin event management, absence marking
+  c282294 Add handover doc for Claude account switch (documentation only, no product changes)
   2d6d0cb Checkpoint 4: app shell, bottom nav (Home/Calendar/More), loading/empty/error states
-  a24f712 Checkpoint 4 prep: unified event model columns on rehearsals + away_dates own-row-or-super privacy fix
+  a24f712 Checkpoint 4 prep: unified event model columns + away_dates privacy fix
   3f5a874 Checkpoint 3: Google sign-in + membership approval queue
-  be83661 Checkpoint 2: fix two bugs found via live adversarial testing
-  b2be53a Checkpoint 2 correction: absence-only model, private checkins/absences
-  ed5e5af Checkpoint 2: database foundation migration + rollback + maintenance screen   ← origin/main is HERE
-  904ca9a Add rehearsal check-in ... (v6)   ← last commit before the rebuild started
   ```
 - **Remote:** `origin` → `https://github.com/nozkowoz/sonario.git`
 - **Pushing is Nina's own step** — established convention throughout this project is that Claude
@@ -517,11 +570,17 @@ serve`. Use the Browser-pane preview tool with `{name: "sonario"}` rather than r
 http.server` (README.md's instruction is pre-rebuild and still works, but the launch.json entry
 is already wired up).
 
-**Because `index.html` is still the maintenance screen (Decision 9, §6), it won't load the real
-app.** To test the real app locally before Checkpoint/Step C's maintenance-screen swap, create a
-throwaway local HTML file (not committed — this repo has done this before as
-`test-cp3.html`/`test-cp4.html`, always deleted after use) that loads `js/app.js` directly against
-`#root`, same pattern as `index.html`'s eventual real version.
+**`index.html` now loads the real app**, so the dev server serves the actual thing — no
+throwaway harness file is needed any more (earlier sessions used `test-cp3.html`/`test-cp4.html`
+for this while the maintenance screen was up, and always deleted them afterwards; don't
+reintroduce the pattern without need).
+
+**Note on the dev server:** port 5501 may already be held by another chat's dev server, in which
+case `preview_start` refuses and the existing server can simply be navigated to at
+`http://localhost:5501` instead. Also worth knowing: the Browser pane can be *hidden*, in which
+case coordinate clicks and screenshots fail outright — drive the page through `javascript_tool`
+(dispatching real `.click()` on DOM nodes works fine with Preact) and read it with `read_page` /
+`get_page_text`.
 
 **Testing a real sign-in/role locally:** see §9's anonymous-identity pattern — there is currently
 no way to test Google sign-in itself without Nina's own Google account and confirmed OAuth setup.
@@ -583,10 +642,12 @@ end-to-end testing against the real Supabase project (see §9), not unit/integra
 2. **Verify current state before changing anything** — don't trust this file's snapshot blindly
    either, it's a point-in-time document. At minimum: run `git log --oneline -10` and `git
    status`; check the live Supabase `sonario` schema's tables/row counts if you're about to touch
-   data; confirm `index.html` is still the maintenance screen before assuming otherwise.
-3. **Current milestone:** mid-way through the compressed MVP run (§7/§8). Steps A and B are done
-   and verified; Step C (Home + Calendar + admin event management + absence marking) has not been
-   started — that's the next intended task.
+   data. `index.html` now loads the real app — confirm rather than assume, in either direction.
+3. **Current milestone:** the compressed MVP run (§7/§8) is **built** — Steps A through E are all
+   done and verified live, and the app is deployed. The next thing is not a build task: it's
+   Nina's own hands-on test with a real Google sign-in, which is still the one unproven part of
+   the system. Do not start new features before that; see §7 for the three things that trip up a
+   first real sign-in (chiefly: the first super has to be promoted by SQL).
 4. **Respect existing product/design decisions (§5, §6) rather than redesigning them.** In
    particular: the three-tab bottom nav (Home/Calendar/More), the `#7052CD` visual system, the
    unified-event-model-without-renaming-the-table decision, and the absence-only/private-attendance
