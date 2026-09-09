@@ -4,22 +4,76 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Sonario</title>
-<meta name="description" content="Rehearsals, repertoire and notices for Sonario." />
-<meta name="theme-color" content="#6a4fd6" />
-<link rel="manifest" href="manifest.webmanifest" />
+<meta name="description" content="Sonario is getting a big upgrade." />
+<meta name="theme-color" content="#7052CD" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-<link rel="stylesheet" href="css/styles.css" />
+<!--
+  Temporary maintenance screen — deployed for Checkpoint 2 of the Sonario rebuild.
+  No script tags, no auth, no data access: nothing here for anyone to exploit while the database
+  is mid-migration. The real app (js/*.js, css/styles.css) is untouched on disk and in git, just
+  not loaded from this page for now. Swapped back at the end of Checkpoint 5 (Google sign-in +
+  shell + Home + rehearsals + RSVPs all working together) — see the rebuild plan.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background: #F1EEFA;
+    color: #000;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+  }
+  .wordmark {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-weight: 900;
+    font-stretch: condensed;
+    letter-spacing: 1px;
+    font-size: 40px;
+    text-transform: uppercase;
+    color: #000;
+    margin: 0 0 24px;
+  }
+  .badge {
+    display: inline-block;
+    background: #7052CD;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 12px;
+  }
+  p {
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333;
+    margin: 0;
+  }
+</style>
 </head>
 <body>
-<div id="root"></div>
-<script type="module" src="js/app.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    });
-  }
-</script>
+  <div class="card">
+    <div class="wordmark">Sonario</div>
+    <span class="badge">Upgrading</span>
+    <h1>We're building something better.</h1>
+    <p>Sonario's getting a big upgrade — proper logins, attendance tracking, a practice player and
+    more. Back soon. Check with a Sonario organiser if you need anything in the meantime.</p>
+  </div>
 </body>
 </html>
