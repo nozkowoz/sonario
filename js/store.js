@@ -17,16 +17,54 @@ export function useSession() {
   return session;
 }
 
-export function displayNameOf(session) {
-  return session?.user?.user_metadata?.display_name || '';
+// The current user's own profile + membership — role/status now live only in the database
+// (sonario.memberships), never in JWT/user_metadata. `undefined` = still loading, `null` = the
+// signup trigger hasn't run yet (shouldn't happen in practice, but don't crash if it hasn't).
+export function useMyMembership(session) {
+  const [membership, setMembership] = useState(undefined);
+  const [profile, setProfile] = useState(undefined);
+
+  useEffect(() => {
+    if (!session) { setMembership(session === null ? null : undefined); setProfile(session === null ? null : undefined); return; }
+    let cancelled = false;
+
+    const load = () => {
+      supabase.from('memberships').select('*').eq('profile_id', session.user.id).maybeSingle()
+        .then(({ data }) => { if (!cancelled) setMembership(data ?? null); });
+      supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+        .then(({ data }) => { if (!cancelled) setProfile(data ?? null); });
+    };
+    load();
+
+    const channel = supabase
+      .channel(`membership-${session.user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'sonario', table: 'memberships', filter: `profile_id=eq.${session.user.id}` }, load)
+      .subscribe();
+
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [session?.user?.id]);
+
+  return { membership, profile };
 }
 
-export function isSuper(session) {
-  return session?.user?.user_metadata?.role === 'super';
+export function displayNameOf(profile) {
+  return profile?.display_name || '';
 }
 
-export async function addMember(name) {
-  await supabase.from('members').insert({ name }).select();
+export function isSuper(membership) {
+  return membership?.role === 'super';
+}
+
+// Super-only: the pending-approval queue + every membership for management (deactivate/reactivate).
+export function useAllMemberships() {
+  const { rows, loading } = useLiveTable('memberships');
+  return { memberships: rows, loading };
+}
+
+export async function decideMembership(profileId, { status, role }, decidedBy) {
+  const patch = { status, decided_at: new Date().toISOString(), decided_by: decidedBy };
+  if (role) patch.role = role;
+  return supabase.from('memberships').update(patch).eq('profile_id', profileId).select();
 }
 
 // Generic live-synced table hook — fetch once, then patch in place from postgres_changes so

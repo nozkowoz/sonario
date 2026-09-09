@@ -1,97 +1,61 @@
-import { html, useEffect, useState } from './lib.js';
+import { html } from './lib.js';
 import { supabase } from './supabaseClient.js';
-import { MEMBER_PASSPHRASE, SUPER_PASSPHRASE, CHOIR_NAME } from './config.js';
-import { addMember } from './store.js';
+import { CHOIR_NAME } from './config.js';
 
-// No email, no password — this app is for a small private choir, not a public product. Two
-// shared passphrases (a "please don't" speed bump against a random stranger stumbling on the
-// URL, not real cryptographic security — both are shipped in this public JS bundle) decide
-// whether you sign in as a regular member or with super access. Uses Supabase's anonymous
-// sign-in under the hood, with the role stashed in user_metadata so RLS can actually enforce it
-// (see supabase/schema.sql), not just hide buttons in the UI.
-export function AuthGate() {
-  const [phrase, setPhrase] = useState('');
-  const [showPhrase, setShowPhrase] = useState(false);
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const [signing, setSigning] = useState(false);
-  const [knownNames, setKnownNames] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    supabase.from('members').select('name').order('name').then(({ data, error: fetchError }) => {
-      if (cancelled || fetchError || !data) return;
-      setKnownNames(data.map((m) => m.name));
+// No more shared passphrase — every member signs in with their own Google account. Signing in
+// *is* requesting: a database trigger (sonario.handle_new_auth_user) creates a profile + a
+// pending membership automatically on first sign-in, so there's no separate "join flow" screen
+// here. What screen shows next depends entirely on that membership's status (see Gate below),
+// never on anything the client itself claims.
+export function SignInScreen() {
+  const signIn = () => {
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
     });
-    return () => { cancelled = true; };
-  }, []);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    const trimmedPhrase = phrase.trim();
-    let role;
-    if (trimmedPhrase === SUPER_PASSPHRASE) role = 'super';
-    else if (trimmedPhrase === MEMBER_PASSPHRASE) role = 'member';
-    else { setError("That's not quite it — check with the choir."); return; }
-
-    const finalName = name.trim();
-    if (!finalName) return;
-
-    setSigning(true);
-    setError('');
-    const { error: signInError } = await supabase.auth.signInAnonymously();
-    if (signInError) { setSigning(false); setError(signInError.message); return; }
-    await supabase.auth.updateUser({ data: { display_name: finalName, role } });
-    // updateUser() updates the in-memory session's user object immediately (which is why the
-    // header shows the right name/role straight away), but the JWT already sitting in this
-    // session was minted before that call — it still carries the OLD user_metadata. RLS policies
-    // read auth.jwt(), not the in-memory user object, so without a forced refresh here every
-    // super-only write gets silently 403'd until the token happens to refresh on its own later.
-    await supabase.auth.refreshSession();
-    try { await addMember(finalName); } catch (e) {}
-    // onAuthStateChange picks up the new session + name/role and moves on to the app.
   };
 
   return html`
     <div class="auth-shell">
       <div class="auth-card">
         <h1 class="auth-title">${CHOIR_NAME}</h1>
-        <p class="auth-sub">Enter the choir passphrase and your name to get in.</p>
-        <form onSubmit=${submit} class="auth-form">
-          <div style=${{ position: 'relative' }}>
-            <input
-              type=${showPhrase ? 'text' : 'password'}
-              required
-              placeholder="Passphrase"
-              value=${phrase}
-              onInput=${(e) => setPhrase(e.target.value)}
-              class="auth-input"
-              spellcheck="false"
-              autocorrect="off"
-              autocapitalize="off"
-              style=${{ width: '100%', boxSizing: 'border-box', paddingRight: '54px' }}
-            />
-            <button type="button" onClick=${() => setShowPhrase(!showPhrase)} class="auth-toggle-visibility">
-              ${showPhrase ? 'Hide' : 'Show'}
-            </button>
-          </div>
+        <p class="auth-sub">Sign in with Google to request access.</p>
+        <button class="btn btn-primary" onClick=${signIn} style=${{ width: '100%' }}>
+          Continue with Google
+        </button>
+      </div>
+    </div>
+  `;
+}
 
-          <input
-            type="text"
-            required
-            placeholder="Your name"
-            value=${name}
-            onInput=${(e) => setName(e.target.value)}
-            class="auth-input"
-            list="known-names"
-          />
-          <datalist id="known-names">
-            ${knownNames.map((n) => html`<option key=${n} value=${n} />`)}
-          </datalist>
+// Shown once signed in but not yet an active member — covers pending/declined/deactivated so
+// there's one place that reads as "here's where you stand", not a dead end or a confusing error.
+export function MembershipStatusScreen({ status, onSignOut }) {
+  const copy = {
+    pending: {
+      heading: "You're nearly in!",
+      body: 'Your request has been sent to a Sonario organiser. Check back once someone approves it.',
+    },
+    declined: {
+      heading: "This request wasn't approved",
+      body: 'If you think this is a mistake, reach out to a Sonario organiser.',
+    },
+    deactivated: {
+      heading: 'Your access has been deactivated',
+      body: 'Contact a Sonario organiser if you have questions.',
+    },
+  }[status] || {
+    heading: 'Something went wrong',
+    body: "We couldn't find a membership request for your account. Try signing out and back in, or contact a Sonario organiser.",
+  };
 
-          <button type="submit" class="btn btn-primary" disabled=${signing}>${signing ? 'Signing in…' : 'Join'}</button>
-          ${error ? html`<div class="auth-error">${error}</div>` : null}
-        </form>
+  return html`
+    <div class="auth-shell">
+      <div class="auth-card">
+        <h1 class="auth-title">${CHOIR_NAME}</h1>
+        <p class="auth-sub" style=${{ fontWeight: 700, color: 'var(--ink)' }}>${copy.heading}</p>
+        <p class="auth-sub">${copy.body}</p>
+        <button class="btn btn-outline" onClick=${onSignOut} style=${{ width: '100%' }}>Sign out</button>
       </div>
     </div>
   `;

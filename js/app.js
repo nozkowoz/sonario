@@ -1,14 +1,14 @@
-import { html, render, useState } from './lib.js';
+import { html, render } from './lib.js';
 import { supabase } from './supabaseClient.js';
-import { useSession, displayNameOf, isSuper, useRehearsals, useRsvps, useCheckins, useSocialEvents, useSocialRsvps, useSongs, useNotices } from './store.js';
-import { AuthGate } from './auth.js';
-import { Rehearsals } from './rehearsals.js';
-import { Social } from './social.js';
-import { Repertoire } from './repertoire.js';
-import { NoticeBoard } from './noticeboard.js';
-import { Leaderboard } from './leaderboard.js';
+import { useSession, useMyMembership, useAllMemberships, displayNameOf, isSuper } from './store.js';
+import { SignInScreen, MembershipStatusScreen } from './auth.js';
+import { ApprovalQueue } from './approvals.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
+// Checkpoint 3 scope only: Google sign-in, membership-state routing, the super approval queue.
+// Everything else (Home, Rehearsals, Repertoire, ...) is rebuilt against the new schema starting
+// Checkpoint 5 — this shell deliberately doesn't try to render any of the old passphrase-era
+// feature components, which no longer match the current tables.
 function App() {
   const session = useSession();
 
@@ -16,23 +16,26 @@ function App() {
     return html`<div class="loading-shell">Loading…</div>`;
   }
   if (!session) {
-    return html`<${AuthGate} />`;
+    return html`<${SignInScreen} />`;
   }
-  return html`<${Main} session=${session} />`;
+  return html`<${Gated} session=${session} />`;
 }
 
-function Main({ session }) {
-  const [tab, setTab] = useState('rehearsals');
-  const { rehearsals } = useRehearsals();
-  const { rsvps } = useRsvps();
-  const { checkins } = useCheckins();
-  const { socialEvents } = useSocialEvents();
-  const { socialRsvps } = useSocialRsvps();
-  const { songs } = useSongs();
-  const { notices } = useNotices();
+function Gated({ session }) {
+  const { membership, profile } = useMyMembership(session);
 
-  const displayName = displayNameOf(session);
-  const canManage = isSuper(session);
+  if (membership === undefined || profile === undefined) {
+    return html`<div class="loading-shell">Loading…</div>`;
+  }
+  if (!membership || membership.status !== 'active') {
+    return html`<${MembershipStatusScreen} status=${membership?.status} onSignOut=${() => supabase.auth.signOut()} />`;
+  }
+  return html`<${Main} session=${session} membership=${membership} profile=${profile} />`;
+}
+
+function Main({ session, membership, profile }) {
+  const canManage = isSuper(membership);
+  const { memberships } = useAllMemberships();
 
   return html`
     <div>
@@ -43,28 +46,23 @@ function Main({ session }) {
             ${canManage ? html`<p class="app-subtitle">Super access</p>` : null}
           </div>
           <div class="app-user">
-            <span>${displayName}</span>
+            <span>${displayNameOf(profile)}</span>
             <button class="btn-icon" onClick=${() => supabase.auth.signOut()}>Sign out</button>
           </div>
         </div>
-        <nav class="tab-row">
-          <button class=${'tab-btn' + (tab === 'rehearsals' ? ' active' : '')} onClick=${() => setTab('rehearsals')}>Rehearsals</button>
-          <button class=${'tab-btn' + (tab === 'leaderboard' ? ' active' : '')} onClick=${() => setTab('leaderboard')}>Leaderboard</button>
-          <button class=${'tab-btn' + (tab === 'social' ? ' active' : '')} onClick=${() => setTab('social')}>Social</button>
-          <button class=${'tab-btn' + (tab === 'repertoire' ? ' active' : '')} onClick=${() => setTab('repertoire')}>Repertoire</button>
-          <button class=${'tab-btn' + (tab === 'notices' ? ' active' : '')} onClick=${() => setTab('notices')}>Notice board</button>
-        </nav>
       </header>
       <main class="app-main">
-        ${tab === 'rehearsals'
-          ? html`<${Rehearsals} rehearsals=${rehearsals} rsvps=${rsvps} checkins=${checkins} displayName=${displayName} canManage=${canManage} />`
-          : tab === 'leaderboard'
-          ? html`<${Leaderboard} rehearsals=${rehearsals} checkins=${checkins} />`
-          : tab === 'social'
-          ? html`<${Social} socialEvents=${socialEvents} socialRsvps=${socialRsvps} displayName=${displayName} canManage=${canManage} />`
-          : tab === 'repertoire'
-          ? html`<${Repertoire} songs=${songs} canManage=${canManage} />`
-          : html`<${NoticeBoard} notices=${notices} displayName=${displayName} canManage=${canManage} />`}
+        ${canManage
+          ? html`<${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} />`
+          : html`
+            <div class="tab-content">
+              <h2>You're in!</h2>
+              <p class="empty-state">
+                Sonario's rebuild is happening one piece at a time — rehearsals, repertoire and
+                everything else lands in the next few checkpoints. Check back soon.
+              </p>
+            </div>
+          `}
       </main>
       <footer class="app-footer">${CHOIR_NAME} · ${APP_VERSION}</footer>
     </div>
