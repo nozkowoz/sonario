@@ -144,10 +144,15 @@ button { font: inherit; }
 .btn-icon:hover { border-color: var(--purple); color: var(--purple-dark); }
 
 /* Header / nav */
-.app-header { background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
-.app-header-inner { max-width: 780px; margin: 0 auto; padding: 16px 20px 8px; display: flex; align-items: center; justify-content: space-between; }
-.app-title { font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 24px; margin: 0; color: var(--ink); }
-.app-subtitle { margin: 0; font-size: 12px; color: var(--purple-dark); font-weight: 600; }
+/* Purple header bar, per the mockup's Option B. It's one component, so this applies on every
+   tab — the alternative would be a header that changes colour as you move between them. */
+.app-header {
+  background: linear-gradient(180deg, var(--purple) 0%, #6547be 100%);
+  position: sticky; top: 0; z-index: 5;
+}
+.app-header-inner { max-width: 780px; margin: 0 auto; padding: 14px 20px 14px; display: flex; align-items: center; justify-content: space-between; }
+.app-title { font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 24px; margin: 0; color: #fff; }
+.app-subtitle { margin: 0; font-size: 12px; color: rgba(255, 255, 255, 0.82); font-weight: 600; }
 .app-user { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-soft); }
 .tab-row { max-width: 780px; margin: 0 auto; display: flex; gap: 4px; padding: 0 20px; overflow-x: auto; }
 .tab-btn {
@@ -299,58 +304,68 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 
 /* --- Avatar in the header ------------------------------------------------ */
 .avatar-btn { border: none; background: none; padding: 0; cursor: pointer; border-radius: 50%; flex-shrink: 0; }
-.avatar-btn:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.avatar-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .avatar {
   display: grid; place-items: center;
   width: 38px; height: 38px; border-radius: 50%;
   object-fit: cover; background: var(--purple-light);
-  border: 1.5px solid var(--border);
+  border: 2px solid rgba(255, 255, 255, 0.75);
 }
 .avatar-initials { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px; color: var(--purple-dark); }
 
-/* --- Home hero ----------------------------------------------------------- */
-/* The member's whole state in one block: who you are, what's next, the one action. */
-.hero {
-  background: linear-gradient(155deg, var(--purple) 0%, #5c3fb8 100%);
-  color: #fff;
-  border-radius: var(--radius-lg);
-  padding: 22px 22px 24px;
-  box-shadow: 0 10px 30px -12px rgba(92, 63, 184, 0.55);
-  margin-bottom: 16px;
+/* --- Home: the next event, date-led (mockup Option B) -------------------- */
+/* The date is set as a big numeral beside the details rather than inside a coloured card, so the
+   single most useful fact on the screen — which day — is legible at arm's length. */
+.next-block { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 18px; }
+.bigdate {
+  display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+  padding-right: 18px; border-right: 1px solid var(--border); align-self: stretch;
 }
-.hero-quiet { background: linear-gradient(155deg, #8878cf 0%, #6b5bb0 100%); }
-.hero-eyebrow { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
-.hero-headline {
-  font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase;
-  font-size: 40px; line-height: 0.98; letter-spacing: -0.5px; margin: 0 0 10px;
-  overflow-wrap: break-word;
+.bigdate-day {
+  font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 30px;
+  letter-spacing: 1.5px; line-height: 1; color: var(--ink);
 }
-.hero-sub { margin: 0; font-size: 15px; font-weight: 500; color: rgba(255, 255, 255, 0.92); }
-.hero-where { margin: 2px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.78); }
-.hero-note { margin: 12px 0 0; font-size: 14px; font-weight: 600; color: #fff; }
-.hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-.hero-tag {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
-  padding: 3px 9px; border-radius: 10px;
-  background: rgba(255, 255, 255, 0.18); color: #fff;
+.bigdate-num { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 66px; line-height: 0.85; color: var(--ink); }
+.next-info { flex: 1; min-width: 0; }
+.eyebrow-sm {
+  font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--ink-soft); margin: 0 0 5px;
 }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
-.hero-error { margin: 0; font-size: 13px; font-weight: 600; color: #ffd9d4; flex-basis: 100%; }
-.btn-on-hero { background: #fff; border-color: #fff; color: var(--purple-dark); box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.3); }
-.btn-on-hero:hover { background: #fff; transform: translateY(-1px); }
-.btn-on-hero:disabled { background: rgba(255, 255, 255, 0.6); border-color: transparent; color: var(--purple-dark); cursor: default; }
-.btn-ghost-hero { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.5); color: #fff; font-size: 14px; padding: 9px 15px; }
-.btn-ghost-hero:hover { background: rgba(255, 255, 255, 0.24); }
-.btn-ghost-hero:disabled { opacity: 0.6; cursor: default; }
+.next-title { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.25; }
+.next-time { margin: 3px 0 0; font-size: 16px; }
+.next-loc { margin: 3px 0 0; font-size: 15px; color: var(--ink-soft); }
+.next-rel { margin: 8px 0 0; font-size: 13px; font-weight: 700; color: var(--purple-dark); }
+/* Full-width stacked actions, so the two things a member can do read as one pair of choices
+   rather than as buttons scattered through a card. */
+.next-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.next-actions .checkin-row, .next-actions .absence-row {
+  margin: 0; padding: 0; border-top: 0; width: 100%; align-items: stretch; gap: 8px;
+}
+.next-actions .btn { width: 100%; font-size: 15px; padding: 12px 18px; }
+.next-actions .btn-icon { align-self: flex-start; }
+.next-actions .absence-noted { font-size: 14px; }
+
+/* --- Note band ----------------------------------------------------------- */
+/* The event's own notes, given the mockup's banner treatment. Not a separate "venue update"
+   feature — it's the `description` column that admins already fill in on the event form. */
+.note-band {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--purple-light); border-radius: var(--radius-md);
+  padding: 14px 16px; margin-bottom: 4px;
+}
+.note-band-icon { color: var(--ink); flex-shrink: 0; display: grid; place-items: center; margin-top: 1px; }
+.note-band .eyebrow-sm { margin-bottom: 2px; }
+.note-band-body { margin: 0; font-size: 14px; white-space: pre-wrap; }
+
+.home-rule { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.home-link-btn { width: 100%; }
+.home-admin { margin-top: 0; }
+.home-admin .eyebrow { margin-top: 0; }
+.home-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 /* The dark pill from the mockup's admin header — deliberately not purple, so "add" reads as a
    primary action distinct from everything else on a purple-accented screen. */
 .btn-dark { background: var(--ink); border-color: var(--ink); color: #fff; }
 .btn-dark:hover { background: #322c47; transform: translateY(-1px); }
-
-.home-link-btn { width: 100%; }
-.home-admin { margin-top: 8px; }
-.home-admin .eyebrow { margin-top: 24px; }
-.home-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* --- Promo card ---------------------------------------------------------- */
 .promo-card { display: flex; gap: 14px; align-items: center; background: var(--purple-light); box-shadow: none; }
@@ -447,9 +462,11 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   .app-header-inner { padding: 14px 16px 6px; }
   .app-main { padding: 16px; }
   .tab-row { padding: 0 16px; }
-  .hero { padding: 20px 18px 22px; }
-  .hero-headline { font-size: 34px; }
   .detail-date { font-size: 28px; }
+  .next-block { gap: 14px; }
+  .bigdate { padding-right: 14px; }
+  .bigdate-day { font-size: 26px; }
+  .bigdate-num { font-size: 56px; }
   .event-row { padding: 13px 8px 13px 13px; gap: 11px; }
   .date-rail { width: 48px; }
 }

@@ -65,3 +65,9 @@ export const IconUsers = ({ size }) => svg(html`
   <path d="M3.5 20c0-3 2.5-5.2 5.5-5.2s5.5 2.2 5.5 5.2" />
   <path d="M16 5.6a3.2 3.2 0 0 1 0 6.3M17.5 14.9c2.1.5 3.5 2.3 3.5 4.4" />
 `, { size });
+
+export const IconAlert = ({ size }) => svg(html`
+  <circle cx="12" cy="12" r="9" fill="currentColor" stroke="none" />
+  <path d="M12 7.5v5.5" stroke="#fff" stroke-width="2" />
+  <circle cx="12" cy="16.4" r="1.15" fill="#fff" stroke="none" />
+`, { size });

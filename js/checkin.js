@@ -32,10 +32,7 @@ export const timeOfDay = (iso) =>
 // ---------------------------------------------------------------------------
 // Member self check-in
 // ---------------------------------------------------------------------------
-// `variant` only swaps presentation. On the Home hero the surrounding purple card already states
-// "Checked in at 7:28pm" in its headline, so the hero variant renders the action alone and leaves
-// the copy to the hero — same mutations, same RLS-empty-result guard, both places.
-export function CheckInPanel({ event, myCheckin, myAbsence, profileId, variant = 'card' }) {
+export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const now = useNow();
@@ -68,31 +65,15 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId, variant =
     return res;
   });
 
-  const onHero = variant === 'hero';
   const undoLabel = busy ? 'Saving…' : `Undo (${Math.max(1, Math.round(msLeft / 60000))} min left)`;
-  const errorLine = error
-    ? html`<p class=${onHero ? 'hero-error' : 'absence-error'}>${error}</p>`
-    : null;
+  const errorLine = error ? html`<p class="absence-error">${error}</p>` : null;
 
   if (!myCheckin) {
     return html`
-      <div class=${onHero ? 'hero-actions' : 'checkin-row'}>
-        <button class=${onHero ? 'btn btn-on-hero' : 'btn btn-primary btn-sm'}
-          disabled=${busy} onClick=${doCheckIn}>
+      <div class="checkin-row">
+        <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${doCheckIn}>
           ${busy ? 'Checking in…' : "I'm here"}
         </button>
-        ${errorLine}
-      </div>
-    `;
-  }
-
-  if (onHero) {
-    return html`
-      <div class="hero-actions">
-        ${canUndo ? html`
-          <button class="btn btn-ghost-hero" disabled=${busy}
-            onClick=${() => run(() => undoCheckIn(event.id, profileId))}>${undoLabel}</button>
-        ` : null}
         ${errorLine}
       </div>
     `;

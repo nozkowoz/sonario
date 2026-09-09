@@ -42,7 +42,7 @@ export function nextEvent(events) {
 // member ever takes is telling the choir they can't make it. Undoing that is deleting the row,
 // with no time limit (the one-hour window is a check-in rule, not an absence rule).
 // ---------------------------------------------------------------------------
-export function AbsenceToggle({ event, myAbsence, profileId, variant = 'card' }) {
+export function AbsenceToggle({ event, myAbsence, profileId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -58,25 +58,23 @@ export function AbsenceToggle({ event, myAbsence, profileId, variant = 'card' })
     setBusy(false);
   };
 
-  const onHero = variant === 'hero';
-
   return html`
-    <div class=${onHero ? 'hero-actions' : 'absence-row'}>
+    <div class="absence-row">
       ${myAbsence
         ? html`
-          ${onHero ? null : html`<p class="absence-noted">You've let us know you can't make this one.</p>`}
-          <button class=${onHero ? 'btn btn-ghost-hero' : 'btn-icon'} disabled=${busy}
+          <p class="absence-noted">You've let us know you can't make this one.</p>
+          <button class="btn-icon" disabled=${busy}
             onClick=${() => run(() => clearAbsence(event.id, profileId))}>
             ${busy ? 'Saving…' : 'Actually, I can make it'}
           </button>
         `
         : html`
-          <button class=${onHero ? 'btn btn-ghost-hero' : 'btn btn-outline btn-sm'} disabled=${busy}
+          <button class="btn btn-outline btn-sm" disabled=${busy}
             onClick=${() => run(() => markAbsent(event.id, profileId))}>
             ${busy ? 'Saving…' : "I can't make it"}
           </button>
         `}
-      ${error ? html`<p class=${onHero ? 'hero-error' : 'absence-error'}>${error}</p>` : null}
+      ${error ? html`<p class="absence-error">${error}</p>` : null}
     </div>
   `;
 }
