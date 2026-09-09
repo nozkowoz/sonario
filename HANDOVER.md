@@ -256,49 +256,70 @@ per test rather than letting that build again.
 
 ## 5. Current UI / product design
 
-**Navigation:** Bottom nav, three tabs only: **Home / Calendar / More**. This was an explicit
-correction from an earlier plan draft that had a top tab row with more sections (Rehearsals/
-Repertoire/More) — the current, confirmed nav is the three-tab bottom bar. "Repertoire" is not a
-nav destination at MVP stage; when it's built (post-MVP) it likely lives under **More**.
+**Updated 2026-09-09 (evening) — the UI was substantially restyled towards mockups Nina supplied,
+so anything written about it before that date is out of date.**
+
+**Navigation:** Bottom nav, three tabs, now with icons: **Home / Calendar / More**. Nina's mockups
+show a fourth **Repertoire** tab; it is deliberately absent because there is no screen behind it
+(a nav item leading nowhere is worse than one that isn't there). She confirmed on 2026-09-09 that
+it stays at three for now. **Worth knowing if it's ever picked up: the repertoire schema already
+exists and is empty** — `songs` (title/composer/voicing/status/notes), `song_assignments`,
+`rehearsal_songs` (setlists), `recordings`, and the seeded `part_labels` — all with RLS. A songs
+list and per-event setlists would need *no* database work. Recordings would, because that table
+is built around Supabase **Storage** (`storage_path`, `mime_type`, a 50MB `file_size_bytes` cap)
+rather than the pasted URLs the pre-rebuild app used, so it needs a bucket plus bucket policies
+mirroring the RLS model.
+
+**Header:** a purple bar (`--purple` gradient) with the choir name in white, "Super access"
+beneath it for supers, and the member's avatar top-right. The avatar is the Google `avatar_url`
+captured at sign-in, falling back to initials for an email sign-in — this is **not** the deferred
+profile-photo *upload*, just what the provider already returned. Tapping it opens More.
 
 **Screen structure (as built):**
-- **Home** — simplified per-member landing screen. Content not yet built beyond a greeting +
-  empty state; per the architecture plan this is meant to eventually show the next
-  rehearsal/event and a quick check-in action, with admin shortcuts for supers. Exact layout not
-  yet decided beyond that.
-- **Calendar** — "My Term" event list. Not yet built beyond an empty state. Will list events from
-  the unified `rehearsals` table (all event types).
-- **More** — currently hosts the membership Approval Queue for supers (moved here from being the
-  entire app in Checkpoint 3). For ordinary members it's currently an empty placeholder. Longer
-  term this is where Repertoire, profile, and other secondary features are expected to live,
-  though that hasn't been explicitly confirmed with Nina — don't assume it without asking.
+- **Home** — follows mockup "Option B": no greeting line, a large weekday/day numeral beside the
+  next event's details, then the two member actions stacked full width ("I'm here" once it's the
+  day; "I can't make it" otherwise). Below that, the event's `description` rendered as a banner
+  with an alert icon (labelled "Tonight" on the day, "Note" otherwise — it is *not* a separate
+  "venue update" field), a link to the calendar, the static "Same voices. Brighter together."
+  card, and organiser shortcuts for supers. **Home is shorter than the mockup on purpose:** its
+  "TERM 3 / 8 of 9 eligible rehearsals / 89% attendance / usually 2 minutes early" block is
+  Checkpoint 10's attendance visual plus punctuality tiers, and "LATEST RECAP" is Checkpoint 13.
+- **Calendar** — "My term" (or "Calendar" out of term), a term card, then compact event rows
+  grouped "Coming up" / "Earlier". Each row is a date rail (`WED` over `9 SEP`), title, time,
+  location and a type pill, plus flags for your own check-in/absence. Supers get a dark
+  "+ Add event" pill and a **⋮** menu per row (Edit / Reschedule / Cancel or Reinstate);
+  Reschedule opens the same form as Edit but focuses the date field.
+- **Event detail** — tapping a row opens it: back arrow, full date ("Wednesday" over
+  "16 September"), time, location, type/term pills, a "Your status" block ("✓ You're expected",
+  or your check-in with its Undo, or your noted absence), the notes, and for supers the
+  attendance or who-can't-make-it view. Opening the admin form always returns to the list, so a
+  form never floats over a detail screen with two meanings of "back".
+- **More** — the membership Approval Queue for supers, an empty placeholder for members, and the
+  Account block with Sign out (moved here from the header).
 
-**Visual system / colours:** Primary purple **`#7052CD`** (confirmed by Nina explicitly for
-Checkpoint 4 — this superseded an earlier, slightly different purple `#6a4fd6` that was used in
-the pre-rebuild app and is still what `manifest.webmanifest`'s `theme_color` says; that file
-hasn't been updated to match). CSS custom properties in `css/styles.css`: `--purple: #7052CD`,
-`--purple-dark: #5b3fac`, `--purple-light: #F1EEFA`, plus existing `--ink`/`--ink-soft`/`--border`/
-`--bg` tokens carried over from the pre-rebuild visual system (headings in Oswald condensed/bold,
-body in Inter — unchanged). New tokens added in Checkpoint 4: `--error`/`--error-bg` for the
-error state, `--bottom-nav-h` for layout spacing.
+**Visual system / colours:** Primary purple **`#7052CD`** with `--purple-dark: #5b3fac` and
+`--purple-light: #F1EEFA`; headings Oswald condensed/bold, body Inter. Event-type pills keep
+distinct colours per type (purple/blue/amber/green) rather than the mockups' single accent — the
+distinction is useful and was already built. `manifest.webmanifest`'s `theme_color` is now
+correct (`#7052CD`).
 
-**Terminology/labels in the UI:** "Continue with Google" (sign-in button). Membership status
-copy is exact, agreed wording — see `js/auth.js` (`MembershipStatusScreen`) for the pending/
-declined/deactivated text, do not casually reword it. Bottom nav labels are simply "Home",
-"Calendar", "More".
+**Terminology/labels in the UI:** "Continue with Google" and "Use my email address instead" on
+sign-in (the Google button only appears when the provider is actually enabled — see §7).
+Membership status copy is exact, agreed wording — see `js/auth.js`, don't casually reword it.
 
 **Interaction behaviour:**
-- Signing in *is* requesting access — there's no separate "request to join" screen or button.
+- Signing in *is* requesting access — no separate "request to join" screen.
 - A pending member sees a holding screen, not the app shell.
-- Admin ("super") status shows as a small "Super access" label under the app title in the header.
+- Check-in only appears on the day of a non-cancelled event (§6 decision 13).
+- Once you've checked in, the "I can't make it" action disappears — turning up settles it.
 
-**Admin vs member behaviour:** Currently the only implemented differentiation is: supers see the
-Approval Queue under More; members see an empty placeholder there instead. Home/Calendar content
-differentiation (e.g. admin shortcuts on Home) is planned but not yet built.
+**Empty/loading/error states:** reusable components in `js/shell.js` (`LoadingState`,
+`EmptyState`, `ErrorState`) remain the established pattern; new screens should use them.
 
-**Empty/loading/error states:** Reusable components exist (`js/shell.js`: `LoadingState`,
-`EmptyState`, `ErrorState`) and are the established pattern going forward — new screens should
-use these rather than inventing ad hoc "no data" messaging.
+**Component map for the UI built on 2026-09-09:** `js/icons.js` (inline SVG, inherits
+`currentColor`), `js/home.js` (Option B layout), `js/events.js` (`EventRow`, `EventDetail`,
+`EventForm`, `KebabMenu`, `AbsenceToggle`), `js/checkin.js` (`CheckInPanel`,
+`AttendanceSummary`).
 
 ---
 
