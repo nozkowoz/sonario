@@ -107,6 +107,11 @@ button { font: inherit; }
   margin: 0 0 6px;
 }
 .auth-sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 22px; }
+/* Email sign-in fields. Left-aligned inside a centred card, because a label sitting centred
+   above its own input reads as a heading rather than as part of the field. */
+.auth-field { display: flex; flex-direction: column; gap: 6px; text-align: left; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
+.auth-field input { width: 100%; }
+.auth-error { margin: 14px 0 0; font-size: 13px; color: var(--error); }
 .auth-form { display: flex; flex-direction: column; gap: 12px; }
 .auth-input { width: 100%; }
 .auth-toggle-visibility {
