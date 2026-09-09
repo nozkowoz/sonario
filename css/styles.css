@@ -264,6 +264,20 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .absence-summary { margin: 12px 0 0; font-size: 13px; color: var(--ink-soft); }
 .absence-summary strong { color: var(--ink); }
 
+/* Check-in — only ever rendered on the day of an event (see isCheckInDay). Shares the
+   absence-row divider so a card with both actions reads as one block, not two. */
+.checkin-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+/* The absence toggle sits directly under a check-in panel when both show; one divider is enough. */
+.checkin-row + .absence-row { margin-top: 8px; padding-top: 0; border-top: 0; }
+.checkin-noted { margin: 0; font-size: 15px; font-weight: 700; color: var(--purple-dark); display: flex; align-items: center; gap: 8px; }
+.checkin-tick { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--purple); color: #fff; font-size: 13px; flex-shrink: 0; }
+
+/* Super-only attendance view, from the day of the event onwards. */
+.attendance-summary { margin: 12px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.attendance-line { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.attendance-line strong { color: var(--ink); }
+.attendance-missing strong { color: var(--error); }
+
 .btn-sm { font-size: 13px; padding: 8px 14px; white-space: nowrap; }
 .form-heading { font-family: 'Oswald', sans-serif; font-size: 16px; text-transform: uppercase; letter-spacing: 0.3px; margin: 0; }
 .checkbox-label { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); font-weight: 500; }

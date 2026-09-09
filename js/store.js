@@ -130,16 +130,11 @@ export function useRehearsals() {
   return { rehearsals: rows, loading };
 }
 
-export function useRsvps() {
-  const { rows, loading } = useLiveTable('rehearsal_rsvps');
-  return { rsvps: rows, loading };
-}
-
-export function useCheckins() {
-  const { rows, loading } = useLiveTable('rehearsal_checkins');
-  return { checkins: rows, loading };
-}
-
+// The pre-rebuild `useRsvps`/`useCheckins` hooks that used to sit here are gone: they pointed at
+// `rehearsal_rsvps` and `rehearsal_checkins`, neither of which exists in the current schema
+// (RSVPs became the absence-only model, and check-ins live in `checkins`). Nothing imported
+// them — the dead components query those old tables directly — and the name `useCheckins` is now
+// the real Step D hook further down.
 export function useSocialEvents() {
   const { rows, loading } = useLiveTable('social_events', {
     orderFn: (a, b) => a.event_date.localeCompare(b.event_date),
@@ -267,4 +262,32 @@ export async function markAbsent(eventId, profileId) {
 export async function clearAbsence(eventId, profileId) {
   return supabase.from('rehearsal_absences').delete()
     .eq('rehearsal_id', eventId).eq('profile_id', profileId);
+}
+
+// --- Check-in (Step D) -----------------------------------------------------
+
+// Same single-hook-for-both-audiences reasoning as useAbsences: `checkins` is own-row-or-super
+// under RLS, so a member gets only their own row back and a super gets the whole event's.
+export function useCheckins() {
+  const { rows, loading } = useLiveTable('checkins');
+  return { checkins: rows, loading };
+}
+
+// `checked_in_at` is deliberately not sent: a BEFORE INSERT trigger (migration 0003) overwrites
+// it with the server clock, so passing a client time would be pointless as well as wrong.
+// `source: 'live'` is the only value a member is allowed to insert — 'friend_confirmed' belongs
+// to peer verification, which is a later checkpoint.
+export async function checkIn(eventId, profileId) {
+  return supabase.from('checkins')
+    .insert({ rehearsal_id: eventId, profile_id: profileId, source: 'live' })
+    .select().maybeSingle();
+}
+
+// Undo is a delete, allowed by policy only within an hour of the check-in. Outside the window
+// the delete matches no rows rather than failing loudly, which is why the caller treats an empty
+// result as a failure.
+export async function undoCheckIn(eventId, profileId) {
+  return supabase.from('checkins').delete()
+    .eq('rehearsal_id', eventId).eq('profile_id', profileId)
+    .select();
 }

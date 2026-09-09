@@ -2,7 +2,7 @@ import { html, render } from './lib.js';
 import { supabase } from './supabaseClient.js';
 import {
   useSession, useMyMembership, useAllMemberships, displayNameOf, isSuper,
-  useEvents, useTerms, useAbsences, useMemberDirectory,
+  useEvents, useTerms, useAbsences, useCheckins, useMemberDirectory,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
 import { ApprovalQueue } from './approvals.js';
@@ -11,9 +11,10 @@ import { HomeTab } from './home.js';
 import { CalendarTab } from './events.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
-// Step C scope: Home (next event + absence marking), Calendar/My Term (full event list + admin
-// event management), and member absence marking. Check-in is Step D; repertoire/recordings/
-// leaderboard/social remain later checkpoints and are deliberately not wired up here.
+// Steps C+D: Home (next event, absence marking, check-in on the day), Calendar/My Term (full
+// event list, admin event management, super attendance view), member absence marking and
+// self check-in. Repertoire/recordings/leaderboard/social remain later checkpoints and are
+// deliberately not wired up here.
 function App() {
   const session = useSession();
 
@@ -49,12 +50,13 @@ function Main({ session, membership, profile }) {
   const canManage = isSuper(membership);
   const [tab, setTab] = useActiveTab('home');
 
-  // Events/terms/absences load once here rather than per tab: both Home and Calendar need the
+  // Events/terms/absences/check-ins load once here rather than per tab: both Home and Calendar need the
   // same rows, useLiveTable names its realtime channel after the table, and switching tabs
   // shouldn't tear down and re-open a subscription (or briefly re-show a loading state).
   const { events, loading: eventsLoading } = useEvents();
   const { terms } = useTerms();
   const { absences } = useAbsences();
+  const { checkins } = useCheckins();
   // Only supers ever render another member's name, so members don't call the directory at all.
   const { directory } = useMemberDirectory(canManage);
 
@@ -76,7 +78,8 @@ function Main({ session, membership, profile }) {
         ${tab === 'home' ? html`
           <${HomeTab}
             profile=${profile} canManage=${canManage}
-            events=${events} loading=${eventsLoading} terms=${terms} absences=${absences}
+            events=${events} loading=${eventsLoading} terms=${terms}
+            absences=${absences} checkins=${checkins}
             onNavigate=${setTab}
           />
         ` : null}
@@ -84,7 +87,7 @@ function Main({ session, membership, profile }) {
           <${CalendarTab}
             profileId=${profile.id} canManage=${canManage}
             events=${events} loading=${eventsLoading} terms=${terms}
-            absences=${absences} directory=${directory}
+            absences=${absences} checkins=${checkins} directory=${directory}
           />
         ` : null}
         ${tab === 'more' ? html`<${MoreTab} session=${session} canManage=${canManage} />` : null}

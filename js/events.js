@@ -2,6 +2,7 @@ import { html, useState, useMemo } from './lib.js';
 import { formatEventDate, formatEventDateLong, formatTimeRange, relativeDayLabel, todayStr } from './lib.js';
 import { EVENT_TYPES, createEvent, updateEvent, setEventStatus, markAbsent, clearAbsence } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
+import { CheckInPanel, AttendanceSummary, isCheckInDay } from './checkin.js';
 
 // The unified event model in product language. `event_type` is purely what kind of thing it is;
 // whether it counts towards attendance is a separate, independent flag on the same row (a
@@ -100,8 +101,8 @@ function AbsenceSummary({ event, absencesForEvent, directory }) {
 // Event card
 // ---------------------------------------------------------------------------
 export function EventCard({
-  event, term, myAbsence, absencesForEvent = [], canManage, profileId, directory = {},
-  onEdit, showRelative = false,
+  event, term, myAbsence, myCheckin, absencesForEvent = [], checkinsForEvent = [],
+  canManage, profileId, directory = {}, onEdit, showRelative = false,
 }) {
   const [busy, setBusy] = useState(false);
   const [adminError, setAdminError] = useState(null);
@@ -154,11 +155,19 @@ export function EventCard({
         : null}
 
       ${cancelled ? null : html`
-        <${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId} />
+        <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence} profileId=${profileId} />
+        ${myCheckin
+          // Once you've checked in, "I can't make it" is no longer a question worth asking.
+          ? null
+          : html`<${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId} />`}
       `}
-      ${canManage
-        ? html`<${AbsenceSummary} event=${event} absencesForEvent=${absencesForEvent} directory=${directory} />`
-        : null}
+      ${canManage ? (!cancelled && (isPast(event) || isCheckInDay(event))
+        // On the day and afterwards, who turned up is the useful view; before then, the only
+        // thing there is to know is who has said they can't come.
+        ? html`<${AttendanceSummary} checkinsForEvent=${checkinsForEvent}
+            absencesForEvent=${absencesForEvent} directory=${directory} />`
+        : html`<${AbsenceSummary} event=${event} absencesForEvent=${absencesForEvent} directory=${directory} />`
+      ) : null}
     </div>
   `;
 }
@@ -278,7 +287,7 @@ export function EventForm({ event, terms, onDone }) {
 // Calendar / My Term
 // ---------------------------------------------------------------------------
 export function CalendarTab({
-  profileId, canManage, events, loading, terms, absences, directory,
+  profileId, canManage, events, loading, terms, absences, checkins, directory,
 }) {
   const [editing, setEditing] = useState(null); // null | 'new' | event row
 
@@ -299,6 +308,20 @@ export function CalendarTab({
     return map;
   }, [absences]);
 
+  // Both maps are RLS-shaped the same way as absences: a member's `checkins` rows are only ever
+  // their own, so the "mine" lookup is exact and the per-event list is meaningful only to supers.
+  const myCheckinByEvent = useMemo(() => {
+    const map = {};
+    for (const c of checkins) if (c.profile_id === profileId) map[c.rehearsal_id] = c;
+    return map;
+  }, [checkins, profileId]);
+
+  const checkinsByEvent = useMemo(() => {
+    const map = {};
+    for (const c of checkins) (map[c.rehearsal_id] ||= []).push(c);
+    return map;
+  }, [checkins]);
+
   const today = todayStr();
   const upcoming = events.filter((e) => e.rehearsal_date >= today);
   const past = events.filter((e) => e.rehearsal_date < today).slice().reverse();
@@ -307,7 +330,9 @@ export function CalendarTab({
     event: e,
     term: e.term_id ? termsById[e.term_id] : null,
     myAbsence: myAbsenceByEvent[e.id],
+    myCheckin: myCheckinByEvent[e.id],
     absencesForEvent: absencesByEvent[e.id] || [],
+    checkinsForEvent: checkinsByEvent[e.id] || [],
     canManage,
     profileId,
     directory,

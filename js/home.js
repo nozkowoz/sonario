@@ -2,17 +2,22 @@ import { html, useMemo } from './lib.js';
 import { formatEventDate, formatTimeRange, relativeDayLabel } from './lib.js';
 import { displayNameOf } from './store.js';
 import { EVENT_TYPE_LABEL, eventTitle, nextEvent, AbsenceToggle } from './events.js';
+import { CheckInPanel } from './checkin.js';
 import { LoadingState, EmptyState } from './shell.js';
 
 // Home stays deliberately simple: who you are, what's next, and the one action a member ever
 // needs to take before an event ("I can't make it"). Everything else — the full list, admin
 // management — is one tap away on Calendar rather than crowded in here. Check-in lands here at
 // Step D; nothing else is planned for this screen at MVP.
-export function HomeTab({ profile, canManage, events, loading, terms, absences, onNavigate }) {
+export function HomeTab({ profile, canManage, events, loading, terms, absences, checkins, onNavigate }) {
   const next = useMemo(() => nextEvent(events), [events]);
   const myAbsence = useMemo(
     () => (next ? absences.find((a) => a.rehearsal_id === next.id && a.profile_id === profile.id) : null),
     [absences, next, profile.id],
+  );
+  const myCheckin = useMemo(
+    () => (next ? checkins.find((c) => c.rehearsal_id === next.id && c.profile_id === profile.id) : null),
+    [checkins, next, profile.id],
   );
   const term = useMemo(
     () => (next?.term_id ? terms.find((t) => t.id === next.term_id) : null),
@@ -56,7 +61,10 @@ export function HomeTab({ profile, canManage, events, loading, terms, absences, 
             ${term ? html`<span class="event-type-badge event-type-neutral">${term.name}</span>` : null}
           </div>
           ${next.description ? html`<p class="event-description">${next.description}</p>` : null}
-          <${AbsenceToggle} event=${next} myAbsence=${myAbsence} profileId=${profile.id} />
+          <${CheckInPanel} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence} profileId=${profile.id} />
+          ${myCheckin
+            ? null
+            : html`<${AbsenceToggle} event=${next} myAbsence=${myAbsence} profileId=${profile.id} />`}
         </div>
 
         <button class="btn btn-outline home-link-btn" onClick=${() => onNavigate('calendar')}>
