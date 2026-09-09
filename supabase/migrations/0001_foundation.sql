@@ -1,5 +1,5 @@
 -- Sonario rebuild — Checkpoint 2: Database foundation
--- Scope: profiles/memberships/roles/RLS foundation, rehearsals + RSVPs + check-ins + away dates +
+-- Scope: profiles/memberships/roles/RLS foundation, rehearsals + absence-marking + check-ins + away dates +
 -- attendance confirmation/corrections, repertoire (songs/part_labels/song_assignments/recordings),
 -- rehearsal songs/recaps (structure only, publishing logic is Checkpoint 13), push_subscriptions +
 -- notification_log (inert tables only — nothing reads/writes them until Checkpoint 14, per the
@@ -79,6 +79,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function sonario.handle_new_auth_user();
 
+-- Trigger functions default to EXECUTE granted to PUBLIC in Postgres (only caught by security
+-- review after the fact, not applied at creation time above) — revoked here for the same
+-- minimal-permissions reason as every other function in this file. Calling these directly
+-- outside their trigger context wouldn't do anything harmful, but there's no reason to leave
+-- the door open.
+revoke execute on function sonario.handle_new_auth_user() from public;
+
 -- ============================================================================
 -- 3. Helper functions — every RLS policy that checks role/status goes through these,
 --    never a bare JWT claim. Fixed empty search_path on every one (Nina's requirement):
@@ -138,6 +145,7 @@ begin
   return new;
 end;
 $$ language plpgsql security definer set search_path = '';
+revoke execute on function sonario.set_updated_at() from public;
 
 -- ============================================================================
 -- 4. profiles / memberships RLS
@@ -180,7 +188,7 @@ drop policy if exists "super manage terms" on sonario.terms;
 create policy "super manage terms" on sonario.terms for all using (sonario.is_super()) with check (sonario.is_super());
 
 -- ============================================================================
--- 6. rehearsals + rsvps + checkins + attendance confirmation/corrections + away_dates
+-- 6. rehearsals + absence-marking + checkins + attendance confirmation/corrections + away_dates
 -- ============================================================================
 create table if not exists sonario.rehearsals (
   id uuid primary key default gen_random_uuid(),
@@ -194,16 +202,19 @@ create table if not exists sonario.rehearsals (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists sonario.rehearsal_rsvps (
+-- No conventional Going/Maybe/Not-going RSVP. Every active member is assumed attending by
+-- default; a member only ever needs to act to say they CAN'T make it. The mere existence of a
+-- row here is the entire signal — "I can make it after all" is just deleting the row, not a
+-- status flip. This is deliberately not a single-value status column on a generic RSVP table
+-- (a status enum with one possible value is a smell) — a dedicated absence table is the clean
+-- fit for "presence of a row = absence" semantics. 'away' is still not represented here —
+-- away_dates stays the single source of truth for that, computed at read time, same reasoning
+-- as before.
+create table if not exists sonario.rehearsal_absences (
   id uuid primary key default gen_random_uuid(),
   rehearsal_id uuid not null references sonario.rehearsals(id) on delete cascade,
   profile_id uuid not null references sonario.profiles(id) on delete cascade,
-  -- 'away' is deliberately NOT a valid status here — away_dates is the single source of truth
-  -- (requirement from Nina's review). A stored 'away' RSVP could drift out of sync if the away
-  -- date is later edited or cancelled; computing it at read time from away_dates can't drift.
-  status text not null check (status in ('yes', 'no', 'maybe')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
+  noted_at timestamptz not null default now(),
   unique (rehearsal_id, profile_id)
 );
 
@@ -255,7 +266,7 @@ create table if not exists sonario.away_dates (
 );
 
 create index if not exists rehearsals_date_idx on sonario.rehearsals(rehearsal_date);
-create index if not exists rehearsal_rsvps_rehearsal_id_idx on sonario.rehearsal_rsvps(rehearsal_id);
+create index if not exists rehearsal_absences_rehearsal_id_idx on sonario.rehearsal_absences(rehearsal_id);
 create index if not exists checkins_rehearsal_id_idx on sonario.checkins(rehearsal_id);
 create index if not exists attendance_confirmation_requests_rehearsal_id_idx on sonario.attendance_confirmation_requests(rehearsal_id);
 create index if not exists away_dates_profile_id_idx on sonario.away_dates(profile_id);
@@ -264,12 +275,11 @@ create index if not exists away_dates_range_idx on sonario.away_dates(starts_on,
 drop trigger if exists rehearsals_set_updated_at on sonario.rehearsals;
 create trigger rehearsals_set_updated_at before update on sonario.rehearsals
   for each row execute function sonario.set_updated_at();
-drop trigger if exists rehearsal_rsvps_set_updated_at on sonario.rehearsal_rsvps;
-create trigger rehearsal_rsvps_set_updated_at before update on sonario.rehearsal_rsvps
-  for each row execute function sonario.set_updated_at();
+-- No updated_at trigger needed on rehearsal_absences — it's insert (mark absent) / delete
+-- (reversal) only, never an in-place update.
 
 alter table sonario.rehearsals enable row level security;
-alter table sonario.rehearsal_rsvps enable row level security;
+alter table sonario.rehearsal_absences enable row level security;
 alter table sonario.checkins enable row level security;
 alter table sonario.attendance_confirmation_requests enable row level security;
 alter table sonario.attendance_corrections enable row level security;
@@ -280,18 +290,30 @@ create policy "members read rehearsals" on sonario.rehearsals for select using (
 drop policy if exists "super manage rehearsals" on sonario.rehearsals;
 create policy "super manage rehearsals" on sonario.rehearsals for all using (sonario.is_super()) with check (sonario.is_super());
 
-drop policy if exists "members read rsvps" on sonario.rehearsal_rsvps;
-create policy "members read rsvps" on sonario.rehearsal_rsvps for select using (sonario.is_active_member());
--- The core fix vs. the old free-text model: you can only ever write an RSVP as YOURSELF.
-drop policy if exists "members write own rsvp" on sonario.rehearsal_rsvps;
-create policy "members write own rsvp" on sonario.rehearsal_rsvps for insert
-  with check (sonario.is_active_member() and profile_id = auth.uid());
-drop policy if exists "members update own rsvp" on sonario.rehearsal_rsvps;
-create policy "members update own rsvp" on sonario.rehearsal_rsvps for update
-  using (profile_id = auth.uid());
+-- Privacy rule: ordinary members must not see who else has said they can't make it — no
+-- expected-attendee counts, no pre-rehearsal attendance list visible to anyone but super users.
+-- A member CAN see their own row (to render "you've let us know" / the reversal button), and can
+-- write/delete only their own row. Super sees and can act on everyone's, e.g. marking someone
+-- absent on their behalf after a phone call.
+drop policy if exists "own absence or super reads" on sonario.rehearsal_absences;
+create policy "own absence or super reads" on sonario.rehearsal_absences for select
+  using (profile_id = auth.uid() or sonario.is_super());
+drop policy if exists "members mark own absence" on sonario.rehearsal_absences;
+create policy "members mark own absence" on sonario.rehearsal_absences for insert
+  with check (sonario.is_active_member() and (profile_id = auth.uid() or sonario.is_super()));
+drop policy if exists "members reverse own absence" on sonario.rehearsal_absences;
+create policy "members reverse own absence" on sonario.rehearsal_absences for delete
+  using (profile_id = auth.uid() or sonario.is_super());
 
-drop policy if exists "members read checkins" on sonario.checkins;
-create policy "members read checkins" on sonario.checkins for select using (sonario.is_active_member());
+-- Privacy correction: raw checkins are NOT broadly readable. Members see the term's public
+-- top-3 leaderboards only (a safe aggregate RPC, built in Checkpoint 10 alongside the rest of
+-- the leaderboard logic — not built here, but this lockdown is what makes it necessary and
+-- correct when it lands); super users see everyone's complete records. Unrestricted read access
+-- would let anyone reconstruct full attendance/punctuality history by querying raw rows directly,
+-- regardless of what the interface chooses to display.
+drop policy if exists "own checkin or super reads" on sonario.checkins;
+create policy "own checkin or super reads" on sonario.checkins for select
+  using (profile_id = auth.uid() or sonario.is_super());
 -- Same fix: nobody can check in as another member. Live check-ins only via the app (source is
 -- constrained; friend_confirmed rows are written by a separate, more restrictive path below once
 -- that feature exists — for now this policy only actually permits 'live' inserts in practice,
@@ -397,6 +419,8 @@ drop trigger if exists song_assignments_enforce_assignable on sonario.song_assig
 create trigger song_assignments_enforce_assignable
   before insert or update on sonario.song_assignments
   for each row execute function sonario.enforce_assignable_part();
+
+revoke execute on function sonario.enforce_assignable_part() from public;
 
 create table if not exists sonario.recordings (
   id uuid primary key default gen_random_uuid(),
@@ -562,7 +586,7 @@ declare
   t text;
 begin
   foreach t in array array[
-    'rehearsals', 'rehearsal_rsvps', 'checkins', 'attendance_confirmation_requests', 'away_dates',
+    'rehearsals', 'rehearsal_absences', 'checkins', 'attendance_confirmation_requests', 'away_dates',
     'songs', 'song_assignments', 'recordings', 'rehearsal_songs', 'rehearsal_recaps', 'rehearsal_recap_items',
     'memberships'
   ]

@@ -21,7 +21,7 @@ drop table if exists sonario.away_dates cascade;
 drop table if exists sonario.attendance_corrections cascade;
 drop table if exists sonario.attendance_confirmation_requests cascade;
 drop table if exists sonario.checkins cascade;
-drop table if exists sonario.rehearsal_rsvps cascade;
+drop table if exists sonario.rehearsal_absences cascade;
 drop table if exists sonario.rehearsals cascade;
 drop table if exists sonario.terms cascade;
 drop table if exists sonario.memberships cascade;
