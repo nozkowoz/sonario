@@ -1,4 +1,5 @@
 import { html, useState } from './lib.js';
+import { IconHome, IconCalendar, IconMore } from './icons.js';
 
 // Reusable states so every tab handles loading/empty/error the same way, rather than each
 // screen inventing its own copy and layout.
@@ -31,10 +32,12 @@ export function ErrorState({ title = 'Something went wrong', body, onRetry }) {
   `;
 }
 
+// Three tabs, not the mockup's four: Repertoire has no screen behind it yet (Checkpoints 6-8), and
+// a nav item that leads nowhere is worse than one that isn't there. Add it when it has content.
 const TABS = [
-  { key: 'home', label: 'Home' },
-  { key: 'calendar', label: 'Calendar' },
-  { key: 'more', label: 'More' },
+  { key: 'home', label: 'Home', Icon: IconHome },
+  { key: 'calendar', label: 'Calendar', Icon: IconCalendar },
+  { key: 'more', label: 'More', Icon: IconMore },
 ];
 
 export function useActiveTab(initial = 'home') {
@@ -52,8 +55,8 @@ export function BottomNav({ active, onChange }) {
           aria-current=${active === t.key ? 'page' : 'false'}
           onClick=${() => onChange(t.key)}
         >
-          <span class="bottom-nav-dot"></span>
-          ${t.label}
+          <${t.Icon} />
+          <span class="bottom-nav-label">${t.label}</span>
         </button>
       `)}
     </nav>

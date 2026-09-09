@@ -24,13 +24,18 @@ function useNow(intervalMs = 30000) {
   return now;
 }
 
-const timeOfDay = (iso) =>
+// Exported so the Home hero can put the arrival time in its own headline block without
+// duplicating the formatting (or the 12-hour/am-pm handling) there.
+export const timeOfDay = (iso) =>
   new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
 
 // ---------------------------------------------------------------------------
 // Member self check-in
 // ---------------------------------------------------------------------------
-export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
+// `variant` only swaps presentation. On the Home hero the surrounding purple card already states
+// "Checked in at 7:28pm" in its headline, so the hero variant renders the action alone and leaves
+// the copy to the hero — same mutations, same RLS-empty-result guard, both places.
+export function CheckInPanel({ event, myCheckin, myAbsence, profileId, variant = 'card' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const now = useNow();
@@ -63,13 +68,32 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
     return res;
   });
 
+  const onHero = variant === 'hero';
+  const undoLabel = busy ? 'Saving…' : `Undo (${Math.max(1, Math.round(msLeft / 60000))} min left)`;
+  const errorLine = error
+    ? html`<p class=${onHero ? 'hero-error' : 'absence-error'}>${error}</p>`
+    : null;
+
   if (!myCheckin) {
     return html`
-      <div class="checkin-row">
-        <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${doCheckIn}>
+      <div class=${onHero ? 'hero-actions' : 'checkin-row'}>
+        <button class=${onHero ? 'btn btn-on-hero' : 'btn btn-primary btn-sm'}
+          disabled=${busy} onClick=${doCheckIn}>
           ${busy ? 'Checking in…' : "I'm here"}
         </button>
-        ${error ? html`<p class="absence-error">${error}</p>` : null}
+        ${errorLine}
+      </div>
+    `;
+  }
+
+  if (onHero) {
+    return html`
+      <div class="hero-actions">
+        ${canUndo ? html`
+          <button class="btn btn-ghost-hero" disabled=${busy}
+            onClick=${() => run(() => undoCheckIn(event.id, profileId))}>${undoLabel}</button>
+        ` : null}
+        ${errorLine}
       </div>
     `;
   }
@@ -82,11 +106,9 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
       </p>
       ${canUndo ? html`
         <button class="btn-icon" disabled=${busy}
-          onClick=${() => run(() => undoCheckIn(event.id, profileId))}>
-          ${busy ? 'Saving…' : `Undo (${Math.max(1, Math.round(msLeft / 60000))} min left)`}
-        </button>
+          onClick=${() => run(() => undoCheckIn(event.id, profileId))}>${undoLabel}</button>
       ` : null}
-      ${error ? html`<p class="absence-error">${error}</p>` : null}
+      ${errorLine}
     </div>
   `;
 }

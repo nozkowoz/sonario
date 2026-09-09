@@ -83,8 +83,9 @@ button { font: inherit; }
   font-size: 12px; font-weight: 600; color: var(--ink-soft);
 }
 .bottom-nav-btn.active { color: var(--purple-dark); }
-.bottom-nav-dot { width: 5px; height: 5px; border-radius: 50%; background: transparent; }
-.bottom-nav-btn.active .bottom-nav-dot { background: var(--purple); }
+.bottom-nav-btn svg { display: block; }
+.bottom-nav-label { font-size: 11px; letter-spacing: 0.2px; }
+.bottom-nav-btn.active svg { stroke-width: 2.1; }
 
 /* Auth */
 .auth-shell { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
@@ -289,21 +290,166 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .checkbox-label input { width: auto; }
 .term-banner { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
 
-/* Home — deliberately simple: greeting, next event, one action. */
-.tab-content h2.home-greeting { font-family: 'Oswald', sans-serif; font-size: 22px; text-transform: none; letter-spacing: 0; margin: 0 0 16px; }
-.next-event-card { border: 1px solid var(--purple); }
-.next-event-label { margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--purple-dark); }
-.next-event-title { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.15; }
-.next-event-when { font-size: 15px; font-weight: 600; margin-top: 6px; }
-.next-event-where { font-size: 14px; color: var(--ink-soft); margin-top: 2px; }
-.next-event-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+/* Small-caps section label, used everywhere a group of cards needs naming. */
+.eyebrow {
+  font-family: 'Oswald', sans-serif; font-size: 13px; text-transform: uppercase;
+  letter-spacing: 0.7px; color: var(--ink-soft); margin: 24px 0 10px;
+}
+.eyebrow-tight { margin: 0 0 4px; color: var(--purple-dark); }
+
+/* --- Avatar in the header ------------------------------------------------ */
+.avatar-btn { border: none; background: none; padding: 0; cursor: pointer; border-radius: 50%; flex-shrink: 0; }
+.avatar-btn:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.avatar {
+  display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 50%;
+  object-fit: cover; background: var(--purple-light);
+  border: 1.5px solid var(--border);
+}
+.avatar-initials { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px; color: var(--purple-dark); }
+
+/* --- Home hero ----------------------------------------------------------- */
+/* The member's whole state in one block: who you are, what's next, the one action. */
+.hero {
+  background: linear-gradient(155deg, var(--purple) 0%, #5c3fb8 100%);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 22px 22px 24px;
+  box-shadow: 0 10px 30px -12px rgba(92, 63, 184, 0.55);
+  margin-bottom: 16px;
+}
+.hero-quiet { background: linear-gradient(155deg, #8878cf 0%, #6b5bb0 100%); }
+.hero-eyebrow { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
+.hero-headline {
+  font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase;
+  font-size: 40px; line-height: 0.98; letter-spacing: -0.5px; margin: 0 0 10px;
+  overflow-wrap: break-word;
+}
+.hero-sub { margin: 0; font-size: 15px; font-weight: 500; color: rgba(255, 255, 255, 0.92); }
+.hero-where { margin: 2px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.78); }
+.hero-note { margin: 12px 0 0; font-size: 14px; font-weight: 600; color: #fff; }
+.hero-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.hero-tag {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18); color: #fff;
+}
+.hero-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
+.hero-error { margin: 0; font-size: 13px; font-weight: 600; color: #ffd9d4; flex-basis: 100%; }
+.btn-on-hero { background: #fff; border-color: #fff; color: var(--purple-dark); box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.3); }
+.btn-on-hero:hover { background: #fff; transform: translateY(-1px); }
+.btn-on-hero:disabled { background: rgba(255, 255, 255, 0.6); border-color: transparent; color: var(--purple-dark); cursor: default; }
+.btn-ghost-hero { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.5); color: #fff; font-size: 14px; padding: 9px 15px; }
+.btn-ghost-hero:hover { background: rgba(255, 255, 255, 0.24); }
+.btn-ghost-hero:disabled { opacity: 0.6; cursor: default; }
+/* The dark pill from the mockup's admin header — deliberately not purple, so "add" reads as a
+   primary action distinct from everything else on a purple-accented screen. */
+.btn-dark { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-dark:hover { background: #322c47; transform: translateY(-1px); }
+
 .home-link-btn { width: 100%; }
-.home-admin { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
-.home-admin-title { font-family: 'Oswald', sans-serif; font-size: 14px; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; }
+.home-admin { margin-top: 8px; }
+.home-admin .eyebrow { margin-top: 24px; }
 .home-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* --- Promo card ---------------------------------------------------------- */
+.promo-card { display: flex; gap: 14px; align-items: center; background: var(--purple-light); box-shadow: none; }
+.promo-icon { color: var(--purple-dark); flex-shrink: 0; display: grid; place-items: center; }
+.promo-title { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.15; margin: 0; color: var(--ink); }
+.promo-body { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+
+/* --- Term card ----------------------------------------------------------- */
+.term-card { padding: 16px 20px; }
+.term-card-range { margin: 0; font-size: 15px; font-weight: 600; }
+.term-card-count { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+
+/* --- Event list rows ----------------------------------------------------- */
+.event-list { display: flex; flex-direction: column; gap: 10px; }
+.event-row {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-card);
+  padding: 14px 12px 14px 16px; cursor: pointer;
+  transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.event-row:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(32,28,46,0.05), 0 12px 26px -10px rgba(32,28,46,0.16); }
+.event-row:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.event-row-cancelled { opacity: 0.68; }
+.event-row-cancelled .event-row-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+/* Fixed-width rail so titles line up down the list regardless of date length. */
+.date-rail {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 54px; flex-shrink: 0; padding-top: 2px;
+  border-right: 1px solid var(--border); align-self: stretch;
+}
+.date-rail-day { font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 0.6px; color: var(--ink-soft); }
+.date-rail-date { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 14px; color: var(--purple-dark); letter-spacing: 0.2px; }
+.event-row-body { flex: 1; min-width: 0; }
+.event-row-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; }
+.event-row-meta { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+.event-row-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.badge-in { background: #e3f6ea; color: #1f7a44; }
+
+/* --- Icon buttons and the ⋮ menu ---------------------------------------- */
+.icon-btn {
+  border: none; background: none; cursor: pointer; color: var(--ink-soft);
+  padding: 6px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+}
+.icon-btn:hover { background: var(--purple-light); color: var(--purple-dark); }
+.icon-btn:focus-visible { outline: 2px solid var(--purple); outline-offset: 1px; }
+.kebab-wrap { position: relative; flex-shrink: 0; }
+.kebab-menu {
+  position: absolute; right: 0; top: 100%; z-index: 20; min-width: 168px;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px -8px rgba(32, 28, 46, 0.28); padding: 6px; margin-top: 2px;
+}
+.kebab-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: none; background: none; cursor: pointer; text-align: left;
+  padding: 9px 10px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500; color: var(--ink);
+}
+.kebab-item:hover { background: var(--purple-light); }
+.kebab-item:disabled { opacity: 0.5; cursor: default; }
+.kebab-item svg { color: var(--ink-soft); flex-shrink: 0; }
+.kebab-item-danger { color: var(--error); }
+.kebab-item-danger svg { color: var(--error); }
+.kebab-item-danger:hover { background: var(--error-bg); }
+
+/* --- Event detail screen ------------------------------------------------- */
+.detail-head { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+.detail-head .icon-btn { margin-left: -6px; }
+.detail-title {
+  font-family: 'Oswald', sans-serif; font-size: 15px; text-transform: uppercase;
+  letter-spacing: 0.8px; margin: 0; flex: 1; min-width: 0; color: var(--ink-soft);
+}
+.detail-when { background: var(--purple-light); box-shadow: none; padding: 20px; }
+.detail-weekday { margin: 0; font-size: 15px; font-weight: 600; color: var(--purple-dark); }
+.detail-date { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 32px; line-height: 1.05; margin: 2px 0 8px; }
+.detail-time { margin: 0; font-size: 17px; font-weight: 600; }
+.detail-loc { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; font-size: 14px; color: var(--ink-soft); }
+.detail-loc svg { flex-shrink: 0; }
+.detail-status .checkin-row:first-child, .detail-status .absence-row:first-child { margin-top: 12px; padding-top: 12px; }
+.status-line { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 16px; font-weight: 700; }
+.status-muted { font-weight: 600; color: var(--ink-soft); }
+.status-tick {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--purple); color: #fff; flex-shrink: 0;
+}
+.detail-notes { display: flex; gap: 12px; align-items: flex-start; }
+.detail-notes svg { color: var(--ink-soft); flex-shrink: 0; margin-top: 2px; }
+.detail-notes p { margin: 0; font-size: 15px; white-space: pre-wrap; }
+
+/* --- More tab account block --------------------------------------------- */
+.more-account { margin-top: 8px; }
+.more-account-name { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
 
 @media (max-width: 480px) {
   .app-header-inner { padding: 14px 16px 6px; }
   .app-main { padding: 16px; }
   .tab-row { padding: 0 16px; }
+  .hero { padding: 20px 18px 22px; }
+  .hero-headline { font-size: 34px; }
+  .detail-date { font-size: 28px; }
+  .event-row { padding: 13px 8px 13px 13px; gap: 11px; }
+  .date-rail { width: 48px; }
 }

@@ -39,6 +39,22 @@ export function parseLocalDate(dateStr) {
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+  'September', 'October', 'November', 'December'];
+
+// The event-detail screen sets the date in full ("Wednesday" over "16 September"), so the day
+// being talked about is unmistakable on the one screen where it matters most.
+export const formatWeekdayLong = (dateStr) => DAYS_LONG[parseLocalDate(dateStr).getDay()];
+export function formatDayMonthLong(dateStr) {
+  const d = parseLocalDate(dateStr);
+  return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]}`;
+}
+// Uppercased weekday + month for the compact date rail on a list row ("TUE" over "15 SEP").
+export function formatDateRail(dateStr) {
+  const d = parseLocalDate(dateStr);
+  return { day: DAYS[d.getDay()].toUpperCase(), date: `${d.getDate()} ${MONTHS[d.getMonth()].toUpperCase()}` };
+}
 
 // "Tue 15 Sep" — day-of-week first because that's how the choir talks about rehearsals.
 export function formatEventDate(dateStr) {

@@ -68,10 +68,15 @@ function Main({ session, membership, profile }) {
             <h1 class="app-title">${CHOIR_NAME}</h1>
             ${canManage ? html`<p class="app-subtitle">Super access</p>` : null}
           </div>
-          <div class="app-user">
-            <span>${displayNameOf(profile)}</span>
-            <button class="btn-icon" onClick=${() => supabase.auth.signOut()}>Sign out</button>
-          </div>
+          <button class="avatar-btn" title=${displayNameOf(profile)}
+            aria-label=${`${displayNameOf(profile)} — open More`} onClick=${() => setTab('more')}>
+            ${profile.avatar_url
+              // Google gives us this on sign-in, so the mockup's avatar costs nothing. This is not
+              // the deferred profile-photo *upload* — there's no upload here, just what Google
+              // already returned. Initials cover an email sign-in, which has no picture.
+              ? html`<img class="avatar" src=${profile.avatar_url} alt="" referrerpolicy="no-referrer" />`
+              : html`<span class="avatar avatar-initials">${initialsOf(profile)}</span>`}
+          </button>
         </div>
       </header>
       <main class="app-main">
@@ -90,7 +95,7 @@ function Main({ session, membership, profile }) {
             absences=${absences} checkins=${checkins} directory=${directory}
           />
         ` : null}
-        ${tab === 'more' ? html`<${MoreTab} session=${session} canManage=${canManage} />` : null}
+        ${tab === 'more' ? html`<${MoreTab} session=${session} canManage=${canManage} profile=${profile} />` : null}
       </main>
       <p class="app-footer">${APP_VERSION}</p>
       <${BottomNav} active=${tab} onChange=${setTab} />
@@ -98,7 +103,7 @@ function Main({ session, membership, profile }) {
   `;
 }
 
-function MoreTab({ session, canManage }) {
+function MoreTab({ session, canManage, profile }) {
   const { memberships } = useAllMemberships();
 
   return html`
@@ -107,8 +112,20 @@ function MoreTab({ session, canManage }) {
       ${canManage
         ? html`<${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} />`
         : html`<${EmptyState} title="Nothing here yet" body="Repertoire, recordings and settings land in later builds." />`}
+      <div class="more-account">
+        <p class="eyebrow">Account</p>
+        <p class="more-account-name">${displayNameOf(profile)}</p>
+        <button class="btn btn-outline btn-sm" onClick=${() => supabase.auth.signOut()}>Sign out</button>
+      </div>
     </div>
   `;
+}
+
+// First letters of the first two words — "Nina Kowalski" becomes NK.
+function initialsOf(profile) {
+  const parts = (displayNameOf(profile) || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
 }
 
 render(html`<${App} />`, document.getElementById('root'));
