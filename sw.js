@@ -5,7 +5,7 @@
 // not one designed to accept offline writes.
 //
 // Bump CACHE_VERSION on any meaningful change to force a clean cache.
-const CACHE_VERSION = 'sonario-v2';
+const CACHE_VERSION = 'sonario-v3';
 const SHELL_URLS = [
   './',
   './index.html',
@@ -13,14 +13,13 @@ const SHELL_URLS = [
   './js/app.js',
   './js/lib.js',
   './js/store.js',
-  './js/auth.js',
-  './js/rehearsals.js',
-  './js/leaderboard.js',
-  './js/social.js',
-  './js/repertoire.js',
-  './js/noticeboard.js',
-  './js/config.js',
   './js/supabaseClient.js',
+  './js/config.js',
+  './js/auth.js',
+  './js/shell.js',
+  './js/approvals.js',
+  './js/home.js',
+  './js/events.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -27,3 +27,67 @@ export function checkinTier(rehearsal, checkedInAt) {
   if (minutesLate <= 10) return 'orange';
   return 'red';
 }
+
+// Same reason as localDateStr above, in the other direction: `new Date('2026-09-15')` is parsed
+// as UTC midnight, which renders as the 14th anywhere behind UTC and can render as the 15th at
+// a wrong local time everywhere else. Building from explicit components keeps a stored `date`
+// column meaning exactly the calendar day it says.
+export function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// "Tue 15 Sep" — day-of-week first because that's how the choir talks about rehearsals.
+export function formatEventDate(dateStr) {
+  const d = parseLocalDate(dateStr);
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+export function formatEventDateLong(dateStr) {
+  const d = parseLocalDate(dateStr);
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Postgres `time` comes back as 'HH:MM:SS'. Render 12-hour with the am/pm only on the end of a
+// range when both halves share it ("7:30 – 9:30pm"), which is how a rehearsal time reads.
+function timeParts(t) {
+  if (!t) return null;
+  const [hStr, mStr] = t.split(':');
+  const h24 = Number(hStr);
+  const suffix = h24 < 12 ? 'am' : 'pm';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return { text: `${h12}:${mStr}`, suffix };
+}
+
+export function formatTime(t) {
+  const p = timeParts(t);
+  return p ? `${p.text}${p.suffix}` : '';
+}
+
+export function formatTimeRange(start, end) {
+  const a = timeParts(start);
+  const b = timeParts(end);
+  if (!a) return '';
+  if (!b) return `${a.text}${a.suffix}`;
+  if (a.suffix === b.suffix) return `${a.text} – ${b.text}${b.suffix}`;
+  return `${a.text}${a.suffix} – ${b.text}${b.suffix}`;
+}
+
+// "in 3 days" / "today" / "tomorrow" for the next-event card on Home. Whole calendar days
+// apart, computed from local date strings so it never disagrees with the date shown next to it.
+export function daysUntil(dateStr) {
+  const then = parseLocalDate(dateStr);
+  const now = parseLocalDate(todayStr());
+  return Math.round((then - now) / 86400000);
+}
+
+export function relativeDayLabel(dateStr) {
+  const n = daysUntil(dateStr);
+  if (n === 0) return 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n > 1 && n < 7) return `In ${n} days`;
+  return '';
+}

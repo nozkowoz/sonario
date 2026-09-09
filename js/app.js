@@ -1,15 +1,19 @@
 import { html, render } from './lib.js';
 import { supabase } from './supabaseClient.js';
-import { useSession, useMyMembership, useAllMemberships, displayNameOf, isSuper } from './store.js';
+import {
+  useSession, useMyMembership, useAllMemberships, displayNameOf, isSuper,
+  useEvents, useTerms, useAbsences, useMemberDirectory,
+} from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
 import { ApprovalQueue } from './approvals.js';
 import { LoadingState, ErrorState, EmptyState, BottomNav, useActiveTab } from './shell.js';
+import { HomeTab } from './home.js';
+import { CalendarTab } from './events.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
-// Checkpoint 4 scope only: app shell (header, bottom nav, loading/empty/error states). Home and
-// Calendar are placeholders until Checkpoint 5 builds real event data against them — this shell
-// deliberately doesn't pull in repertoire/recordings/leaderboard/social, all still later
-// checkpoints.
+// Step C scope: Home (next event + absence marking), Calendar/My Term (full event list + admin
+// event management), and member absence marking. Check-in is Step D; repertoire/recordings/
+// leaderboard/social remain later checkpoints and are deliberately not wired up here.
 function App() {
   const session = useSession();
 
@@ -45,6 +49,15 @@ function Main({ session, membership, profile }) {
   const canManage = isSuper(membership);
   const [tab, setTab] = useActiveTab('home');
 
+  // Events/terms/absences load once here rather than per tab: both Home and Calendar need the
+  // same rows, useLiveTable names its realtime channel after the table, and switching tabs
+  // shouldn't tear down and re-open a subscription (or briefly re-show a loading state).
+  const { events, loading: eventsLoading } = useEvents();
+  const { terms } = useTerms();
+  const { absences } = useAbsences();
+  // Only supers ever render another member's name, so members don't call the directory at all.
+  const { directory } = useMemberDirectory(canManage);
+
   return html`
     <div>
       <header class="app-header">
@@ -60,37 +73,24 @@ function Main({ session, membership, profile }) {
         </div>
       </header>
       <main class="app-main">
-        ${tab === 'home' ? html`<${HomeTab} profile=${profile} canManage=${canManage} />` : null}
-        ${tab === 'calendar' ? html`<${CalendarTab} />` : null}
+        ${tab === 'home' ? html`
+          <${HomeTab}
+            profile=${profile} canManage=${canManage}
+            events=${events} loading=${eventsLoading} terms=${terms} absences=${absences}
+            onNavigate=${setTab}
+          />
+        ` : null}
+        ${tab === 'calendar' ? html`
+          <${CalendarTab}
+            profileId=${profile.id} canManage=${canManage}
+            events=${events} loading=${eventsLoading} terms=${terms}
+            absences=${absences} directory=${directory}
+          />
+        ` : null}
         ${tab === 'more' ? html`<${MoreTab} session=${session} canManage=${canManage} />` : null}
       </main>
+      <p class="app-footer">${APP_VERSION}</p>
       <${BottomNav} active=${tab} onChange=${setTab} />
-    </div>
-  `;
-}
-
-function HomeTab({ profile, canManage }) {
-  return html`
-    <div class="tab-content">
-      <h2>Hi ${displayNameOf(profile) || 'there'}</h2>
-      <${EmptyState}
-        title="Home is coming together"
-        body=${canManage
-          ? "Your next rehearsal, quick check-in and admin shortcuts land here in the next build."
-          : "Your next rehearsal and quick check-in will show up here shortly."}
-      />
-    </div>
-  `;
-}
-
-function CalendarTab() {
-  return html`
-    <div class="tab-content">
-      <h2>Calendar</h2>
-      <${EmptyState}
-        title="No events yet"
-        body="Rehearsals, workshops and performances will appear here once they're scheduled."
-      />
     </div>
   `;
 }

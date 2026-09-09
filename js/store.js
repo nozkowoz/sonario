@@ -165,3 +165,106 @@ export function useNotices() {
   });
   return { notices: rows, loading };
 }
+
+// ===========================================================================
+// Step C — unified events, terms, absences, member directory.
+//
+// "Events" are rows in `sonario.rehearsals`: the table keeps its original name (decision 5 in
+// HANDOVER.md §6) but holds every event type via `event_type`. Everything below says "event" in
+// product language and `rehearsal_*` at the wire level; that mismatch is deliberate and agreed.
+// ===========================================================================
+
+const byDateThenStart = (a, b) =>
+  a.rehearsal_date.localeCompare(b.rehearsal_date) ||
+  String(a.start_time || '').localeCompare(String(b.start_time || ''));
+
+export function useEvents() {
+  const { rows, loading } = useLiveTable('rehearsals', { orderFn: byDateThenStart });
+  return { events: rows, loading };
+}
+
+export function useTerms() {
+  const { rows, loading } = useLiveTable('terms', {
+    orderFn: (a, b) => b.starts_on.localeCompare(a.starts_on),
+  });
+  return { terms: rows, loading };
+}
+
+// One hook for both audiences, because RLS already draws the line: "own absence or super reads"
+// means an ordinary member gets back only their own rows here and a super gets everybody's.
+// The client never has to decide who's allowed to see what — it just renders what came back.
+export function useAbsences() {
+  const { rows, loading } = useLiveTable('rehearsal_absences');
+  return { absences: rows, loading };
+}
+
+// The ONLY way member-facing UI may resolve another member's name. `profiles` is own-row-or-super
+// under RLS, so a direct `profiles` select silently returns nothing for a non-super — see
+// HANDOVER.md §3. This RPC returns id/display_name/avatar_url for active members only, and only
+// to an active caller. `enabled` is here so member-facing screens that never need other people's
+// names don't call it at all.
+export function useMemberDirectory(enabled = true) {
+  const [byId, setById] = useState({});
+  const [loading, setLoading] = useState(enabled);
+
+  useEffect(() => {
+    if (!enabled) { setById({}); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    supabase.rpc('member_directory').then(({ data, error }) => {
+      if (cancelled) return;
+      if (!error && data) setById(Object.fromEntries(data.map((m) => [m.id, m])));
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [enabled]);
+
+  return { directory: byId, loading };
+}
+
+// --- Event mutations (super only — enforced by the "super manage rehearsals" policy, not by
+// --- whether the client chose to render the button). -------------------------------------
+
+export const EVENT_TYPES = ['rehearsal', 'workshop', 'performance', 'social'];
+
+export async function createEvent(fields) {
+  return supabase.from('rehearsals').insert(eventPayload(fields)).select().maybeSingle();
+}
+
+export async function updateEvent(id, fields) {
+  return supabase.from('rehearsals').update(eventPayload(fields)).eq('id', id).select().maybeSingle();
+}
+
+// Cancelling is a status flip, never a delete: absences and (later) check-ins hang off this row
+// by FK with `on delete cascade`, so deleting an event would silently destroy attendance history.
+// Matches the archive-don't-delete pattern used elsewhere in this schema.
+export async function setEventStatus(id, status) {
+  return supabase.from('rehearsals').update({ status }).eq('id', id).select().maybeSingle();
+}
+
+// Whitelist rather than spreading the form state straight through, so a stray field (or a
+// client-supplied created_at/updated_at) can never reach the table.
+function eventPayload(f) {
+  return {
+    event_type: f.event_type,
+    title: f.title?.trim() ? f.title.trim() : null,
+    description: f.description?.trim() || '',
+    rehearsal_date: f.rehearsal_date,
+    start_time: f.start_time,
+    end_time: f.end_time,
+    location: f.location?.trim() || '',
+    term_id: f.term_id || null,
+    counts_towards_attendance: !!f.counts_towards_attendance,
+  };
+}
+
+// --- Absence marking (the whole "can't make it" model — a row exists or it doesn't) -------
+
+export async function markAbsent(eventId, profileId) {
+  return supabase.from('rehearsal_absences').insert({ rehearsal_id: eventId, profile_id: profileId }).select().maybeSingle();
+}
+
+export async function clearAbsence(eventId, profileId) {
+  return supabase.from('rehearsal_absences').delete()
+    .eq('rehearsal_id', eventId).eq('profile_id', profileId);
+}

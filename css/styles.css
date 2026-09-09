@@ -233,6 +233,56 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .leaderboard-stat { font-size: 13px; color: var(--ink-soft); text-align: right; }
 .leaderboard-tiers { margin-left: 6px; }
 
+/* Events (unified event model: rehearsal/workshop/performance/social all render the same) */
+.event-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.event-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.event-meta { color: var(--ink-soft); font-size: 13px; margin-top: 3px; }
+.event-relative { color: var(--purple-dark); font-weight: 600; }
+.event-term { font-size: 12px; }
+.event-description { font-size: 14px; margin: 12px 0 0; color: var(--ink); white-space: pre-wrap; }
+.event-note { font-size: 12px; color: var(--ink-soft); margin: 8px 0 0; font-style: italic; }
+.event-card.event-cancelled { opacity: 0.72; }
+.event-card.event-cancelled .event-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.event-type-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 10px; white-space: nowrap;
+  background: var(--purple-light); color: var(--purple-dark);
+}
+.event-type-rehearsal { background: var(--purple-light); color: var(--purple-dark); }
+.event-type-workshop { background: #e5f0fb; color: #24608f; }
+.event-type-performance { background: #fdf0d9; color: #8a5c04; }
+.event-type-social { background: #e3f6ea; color: #1f7a44; }
+.event-type-neutral { background: var(--bg); color: var(--ink-soft); }
+.event-cancelled-badge { background: var(--error-bg); color: var(--error); }
+
+/* Absence marking ("I can't make it" — there is no going/maybe/not-going RSVP) */
+.absence-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.absence-noted { margin: 0; font-size: 14px; font-weight: 600; color: var(--purple-dark); }
+.absence-error { margin: 0; font-size: 13px; color: var(--error); }
+/* Super-only line. Members never see anyone else's absence (RLS returns only their own row). */
+.absence-summary { margin: 12px 0 0; font-size: 13px; color: var(--ink-soft); }
+.absence-summary strong { color: var(--ink); }
+
+.btn-sm { font-size: 13px; padding: 8px 14px; white-space: nowrap; }
+.form-heading { font-family: 'Oswald', sans-serif; font-size: 16px; text-transform: uppercase; letter-spacing: 0.3px; margin: 0; }
+.checkbox-label { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); font-weight: 500; }
+.checkbox-label input { width: auto; }
+.term-banner { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+
+/* Home — deliberately simple: greeting, next event, one action. */
+.tab-content h2.home-greeting { font-family: 'Oswald', sans-serif; font-size: 22px; text-transform: none; letter-spacing: 0; margin: 0 0 16px; }
+.next-event-card { border: 1px solid var(--purple); }
+.next-event-label { margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--purple-dark); }
+.next-event-title { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.15; }
+.next-event-when { font-size: 15px; font-weight: 600; margin-top: 6px; }
+.next-event-where { font-size: 14px; color: var(--ink-soft); margin-top: 2px; }
+.next-event-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.home-link-btn { width: 100%; }
+.home-admin { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
+.home-admin-title { font-family: 'Oswald', sans-serif; font-size: 14px; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; }
+.home-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 @media (max-width: 480px) {
   .app-header-inner { padding: 14px 16px 6px; }
   .app-main { padding: 16px; }
