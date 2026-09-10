@@ -734,12 +734,19 @@ Nina's consistent, explicitly repeated instruction throughout the project.
 
 - **Branch:** `main`
 - **Working tree:** clean as of this handover (nothing uncommitted)
-- **Pushed to `origin/main` on 2026-09-09** (`ed5e5af..8358564`), by Nina, after Steps D and E
-  landed. That push is what took the maintenance screen down on the live Vercel deployment, so
-  "deployed" and "committed" are in step as of that moment — but re-check rather than assuming,
-  since the convention below means local can run ahead again at any time. Latest commits,
-  newest first:
+- **Nina pushes; Claude never does.** She last pushed on 2026-09-10 after the Home rebuild.
+  **3 commit(s) are currently unpushed**, so "committed" and "deployed on Vercel" are NOT
+  in step — check `git status` rather than trusting this number, which is only true as of the
+  moment this file was written.
+- **DON'T HAND-MAINTAIN THIS LIST.** It drifted twice on 2026-09-10 because a placeholder was
+  edited by hand after the commit it named. Regenerate it instead:
   ```
+  git log --oneline -14 --no-decorate
+  ```
+  As of this handover:
+  ```
+  09903ea Rebuild Calendar as a week strip with a month-grouped list
+  05c5086 HANDOVER: record the icon commit hash
   02ca7d5 Re-render the app icons from Big Shoulders Display 900
   dc8b56d Correct the claim that Repertoire needs a schema from scratch
   06f4ebe HANDOVER: record the Home rebuild commit hash
@@ -747,12 +754,11 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   d90de73 Pin a "last week of term" notice to Home
   1836779 Shrink the calendar chrome so the event list is actually visible
   f3da37d HANDOVER: keep the Leave Test identity, it isn't residue
-  8358564 Step D: check-in with a one-hour undo window, plus Step E seed data
-  7e44be1 Step C: Home, Calendar/My Term, admin event management, absence marking
-  c282294 Add handover doc for Claude account switch (documentation only, no product changes)
-  2d6d0cb Checkpoint 4: app shell, bottom nav (Home/Calendar/More), loading/empty/error states
-  a24f712 Checkpoint 4 prep: unified event model columns + away_dates privacy fix
-  3f5a874 Checkpoint 3: Google sign-in + membership approval queue
+  65f0083 Migration 0005 applied: members can now cancel their own pending leave
+  190d102 Migration 0005 (NOT APPLIED): members cannot actually cancel their own leave
+  da6b5d6 Calendar pass: month grid with semantic dots, log leave, add-to-calendar
+  9598170 Home redesign per the 2026-09-10 mockup, and lock in the design rules
+  354ea1b Add fabricated Term 3 attendance for Nina's profile (dev data, not applied)
   ```
 - **Remote:** `origin` → `https://github.com/nozkowoz/sonario.git`
 - **Pushing is Nina's own step** — established convention throughout this project is that Claude
