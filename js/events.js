@@ -3,6 +3,7 @@ import { formatEventDate, formatEventDateLong, formatTimeRange, relativeDayLabel
   formatWeekdayLong, formatDayMonthLong, formatDateRail } from './lib.js';
 import { EVENT_TYPES, createEvent, updateEvent, setEventStatus, markAbsent, clearAbsence } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
+import { CHOIR_NAME } from './config.js';
 import { CheckInPanel, AttendanceStatus, AttendanceSummary, isCheckInDay } from './checkin.js';
 import { IconKebab, IconPin, IconBack, IconCheck, IconNote, IconEdit, IconReschedule, IconCancel } from './icons.js';
 
@@ -102,6 +103,57 @@ function AbsenceSummary({ event, absencesForEvent, directory }) {
   `;
 }
 
+// --- Add to calendar --------------------------------------------------------
+// Per-event, not a whole-calendar subscription: the rules removed the global Subscribe button.
+//
+// These build an INSTANT from the event's local date and time, so `toISOString()` is correct here
+// — the usual warning against it applies to calendar *dates*, where converting to UTC shifts the
+// day. A moment in time genuinely wants UTC.
+function eventInstants(event) {
+  const [y, m, d] = event.rehearsal_date.split('-').map(Number);
+  const [sh, sm] = String(event.start_time || '00:00').split(':').map(Number);
+  const [eh, em] = String(event.end_time || '00:00').split(':').map(Number);
+  const start = new Date(y, m - 1, d, sh, sm);
+  let end = new Date(y, m - 1, d, eh, em);
+  if (end <= start) end = new Date(start.getTime() + 60 * 60 * 1000);  // guard a bad row
+  return { start, end };
+}
+
+const utcStamp = (dt) => `${dt.toISOString().replace(/[-:]/g, '').split('.')[0]}Z`;
+
+function icsHref(event, term) {
+  const { start, end } = eventInstants(event);
+  const desc = [event.description, term ? term.name : null].filter(Boolean).join(' — ');
+  // CRLF line endings and escaped commas/semicolons: iCalendar is fussy, and Apple Calendar
+  // silently rejects a file that gets this wrong rather than telling you why.
+  const esc = (t) => String(t || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Sonario//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${event.id}@sonario`,
+    `DTSTAMP:${utcStamp(new Date())}`,
+    `DTSTART:${utcStamp(start)}`,
+    `DTEND:${utcStamp(end)}`,
+    `SUMMARY:${esc(`${eventTitle(event)} — ${CHOIR_NAME}`)}`,
+    `LOCATION:${esc(event.location)}`,
+    `DESCRIPTION:${esc(desc)}`,
+    'END:VEVENT', 'END:VCALENDAR',
+  ];
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`;
+}
+
+function googleCalHref(event) {
+  const { start, end } = eventInstants(event);
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `${eventTitle(event)} — ${CHOIR_NAME}`,
+    dates: `${utcStamp(start)}/${utcStamp(end)}`,
+    location: event.location || '',
+    details: event.description || '',
+  });
+  return `https://calendar.google.com/calendar/render?${p.toString()}`;
+}
+
 // ---------------------------------------------------------------------------
 // Admin actions menu (the mockup's ⋮). Collapsing Edit/Reschedule/Cancel behind one control is
 // what lets a list row stay a row — three inline buttons per event is what made the old card tall.
@@ -181,7 +233,7 @@ function adminMenuItems(event, { onEdit, onReschedule, flip, busy }) {
 // Tapping it opens the detail screen; everything that used to be expanded inline lives there now.
 // ---------------------------------------------------------------------------
 export function EventRow({
-  event, myAbsence, myCheckin, canManage, onOpen, onEdit, onReschedule, onManage,
+  event, myAbsence, myCheckin, myAway, canManage, onOpen, onEdit, onReschedule, onManage,
   showRelative = false,
 }) {
   const { busy, error, flip } = useStatusFlip(event);
@@ -208,7 +260,8 @@ export function EventRow({
           <span class="event-type-badge event-type-${event.event_type}">${EVENT_TYPE_LABEL[event.event_type]}</span>
           ${cancelled ? html`<span class="event-type-badge event-cancelled-badge">Cancelled</span>` : null}
           ${myCheckin ? html`<span class="event-type-badge badge-in">Checked in</span>` : null}
-          ${!myCheckin && myAbsence ? html`<span class="event-type-badge event-type-neutral">Can't make it</span>` : null}
+          ${!myCheckin && myAway ? html`<span class="event-type-badge event-type-neutral">You're away</span>` : null}
+          ${!myCheckin && !myAway && myAbsence ? html`<span class="event-type-badge event-type-neutral">Can't make it</span>` : null}
         </div>
         ${error ? html`<p class="absence-error">${error}</p>` : null}
       </div>
@@ -233,7 +286,7 @@ export function EventRow({
 // the organiser's attendance view are shown at length.
 // ---------------------------------------------------------------------------
 export function EventDetail({
-  event, term, myAbsence, myCheckin, absencesForEvent = [], checkinsForEvent = [],
+  event, term, myAbsence, myCheckin, myAway, absencesForEvent = [], checkinsForEvent = [],
   canManage, profileId, directory = {}, onBack, onManage,
 }) {
   const cancelled = event.status === 'cancelled';
@@ -274,7 +327,9 @@ export function EventDetail({
 
       <p class="eyebrow">Your status</p>
       <div class="card detail-status">
-        <${AttendanceStatus} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence} />
+        <${AttendanceStatus} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
+          myAway=${myAway} />
+        ${myAway && myAway.note ? html`<p class="detail-away-note">Your leave: ${myAway.note}</p>` : null}
         ${cancelled ? null : html`
           <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence} profileId=${profileId} />
           ${myCheckin
@@ -282,6 +337,18 @@ export function EventDetail({
             : html`<${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId} />`}
         `}
       </div>
+
+      ${event.status !== 'cancelled' ? html`
+        <p class="eyebrow">Add to your calendar</p>
+        <div class="card add-cal">
+          <a class="btn btn-outline btn-sm" href=${icsHref(event, term)}
+            download=${`${eventTitle(event).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`}>
+            Apple / iCal
+          </a>
+          <a class="btn btn-outline btn-sm" href=${googleCalHref(event)}
+            target="_blank" rel="noopener noreferrer">Google Calendar</a>
+        </div>
+      ` : null}
 
       ${event.description ? html`
         <p class="eyebrow">Notes</p>
@@ -427,131 +494,6 @@ export function EventForm({ event, terms, onDone, focusField = null }) {
         </button>
         <button class="btn btn-outline" disabled=${busy} onClick=${onDone}>Cancel</button>
       </div>
-    </div>
-  `;
-}
-
-// ---------------------------------------------------------------------------
-// Calendar / My Term — a list of rows, with one event opened at a time as a detail screen.
-// ---------------------------------------------------------------------------
-// The member calendar, and now identical for everyone: creating, editing and cancelling events
-// all moved to Admin > Events. The only role-dependent things left are on the event *detail*
-// screen — a read-only attendance view and a "Manage this event" shortcut — and both are there
-// so an organiser doesn't lose information or context that Admin > Attendance will later absorb.
-export function CalendarTab({
-  profileId, canManage, events, loading, terms, absences, checkins, directory, onManageEvent,
-}) {
-  const [openId, setOpenId] = useState(null);     // id of the event shown as a detail screen
-
-  const termsById = useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
-  const currentTerm = useMemo(() => currentTermOf(terms), [terms]);
-
-  const myAbsenceByEvent = useMemo(() => {
-    const map = {};
-    for (const a of absences) if (a.profile_id === profileId) map[a.rehearsal_id] = a;
-    return map;
-  }, [absences, profileId]);
-
-  // Super only in practice: RLS gives an ordinary member back nothing but their own rows, so
-  // for them these maps only ever contain themselves — and they're never rendered for them anyway.
-  const absencesByEvent = useMemo(() => {
-    const map = {};
-    for (const a of absences) (map[a.rehearsal_id] ||= []).push(a);
-    return map;
-  }, [absences]);
-
-  const myCheckinByEvent = useMemo(() => {
-    const map = {};
-    for (const c of checkins) if (c.profile_id === profileId) map[c.rehearsal_id] = c;
-    return map;
-  }, [checkins, profileId]);
-
-  const checkinsByEvent = useMemo(() => {
-    const map = {};
-    for (const c of checkins) (map[c.rehearsal_id] ||= []).push(c);
-    return map;
-  }, [checkins]);
-
-  const openEvent = openId ? events.find((e) => e.id === openId) : null;
-
-  if (openId && openEvent) {
-    return html`
-      <${EventDetail}
-        event=${openEvent}
-        term=${openEvent.term_id ? termsById[openEvent.term_id] : null}
-        myAbsence=${myAbsenceByEvent[openEvent.id]}
-        myCheckin=${myCheckinByEvent[openEvent.id]}
-        absencesForEvent=${absencesByEvent[openEvent.id] || []}
-        checkinsForEvent=${checkinsByEvent[openEvent.id] || []}
-        canManage=${canManage}
-        profileId=${profileId}
-        directory=${directory}
-        onBack=${() => setOpenId(null)}
-        onManage=${onManageEvent}
-      />
-    `;
-  }
-
-  const today = todayStr();
-  const upcoming = events.filter((e) => e.rehearsal_date >= today);
-  const past = events.filter((e) => e.rehearsal_date < today).slice().reverse();
-  const termEventCount = currentTerm
-    ? events.filter((e) => e.term_id === currentTerm.id).length
-    : 0;
-
-  const rowProps = (e) => ({
-    event: e,
-    myAbsence: myAbsenceByEvent[e.id],
-    myCheckin: myCheckinByEvent[e.id],
-    canManage: false,
-    onOpen: (ev) => setOpenId(ev.id),
-    onManage: onManageEvent,
-  });
-
-  return html`
-    <div class="tab-content">
-      <div class="section-header">
-        <h2>${currentTerm ? 'My term' : 'Calendar'}</h2>
-      </div>
-
-      ${currentTerm ? html`
-        <div class="card term-card">
-          <p class="eyebrow eyebrow-tight">${currentTerm.name}</p>
-          <p class="term-card-range">
-            ${formatEventDate(currentTerm.starts_on)} – ${formatEventDateLong(currentTerm.ends_on)}
-          </p>
-          <p class="term-card-count">
-            ${termEventCount} ${termEventCount === 1 ? 'event' : 'events'} this term
-          </p>
-        </div>
-      ` : null}
-
-      ${loading ? html`<${LoadingState} label="Loading events…" />` : null}
-
-      ${!loading && events.length === 0 ? html`
-        <${EmptyState}
-          title="No events yet"
-          body="Rehearsals, workshops and performances will appear here once they\u2019re scheduled." 
-        />
-      ` : null}
-
-      ${!loading && upcoming.length > 0 ? html`
-        <p class="eyebrow">Coming up</p>
-        <div class="event-list">
-          ${upcoming.map((e) => html`<${EventRow} key=${e.id} ...${rowProps(e)} showRelative=${true} />`)}
-        </div>
-      ` : null}
-
-      ${!loading && events.length > 0 && upcoming.length === 0 ? html`
-        <${EmptyState} title="Nothing coming up" body="No future events are scheduled yet." />
-      ` : null}
-
-      ${!loading && past.length > 0 ? html`
-        <p class="eyebrow">Earlier</p>
-        <div class="event-list">
-          ${past.map((e) => html`<${EventRow} key=${e.id} ...${rowProps(e)} />`)}
-        </div>
-      ` : null}
     </div>
   `;
 }

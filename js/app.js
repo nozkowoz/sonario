@@ -2,12 +2,12 @@ import { html, render, useState } from './lib.js';
 import { supabase } from './supabaseClient.js';
 import {
   useSession, useMyMembership, displayNameOf, isSuper,
-  useEvents, useTerms, useAbsences, useCheckins, useMemberDirectory,
+  useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useMemberDirectory,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
 import { LoadingState, ErrorState, EmptyState, BottomNav, useActiveTab } from './shell.js';
 import { HomeTab } from './home.js';
-import { CalendarTab } from './events.js';
+import { CalendarTab } from './calendar.js';
 import { AdminTab } from './admin.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
@@ -64,6 +64,7 @@ function Main({ session, membership, profile }) {
   const { terms } = useTerms();
   const { absences } = useAbsences();
   const { checkins } = useCheckins();
+  const { awayDates } = useAwayDates();
   // Only supers ever render another member's name, so members don't call the directory at all.
   const { directory } = useMemberDirectory(canManage);
 
@@ -96,7 +97,8 @@ function Main({ session, membership, profile }) {
           <${CalendarTab}
             profileId=${profile.id} canManage=${canManage}
             events=${events} loading=${eventsLoading} terms=${terms}
-            absences=${absences} checkins=${checkins} directory=${directory}
+            absences=${absences} checkins=${checkins} awayDates=${awayDates}
+            directory=${directory}
             onManageEvent=${canManage ? manageEvent : null}
           />
         ` : null}

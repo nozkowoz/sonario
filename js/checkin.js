@@ -39,18 +39,23 @@ export const timeOfDay = (iso) =>
 // either do nothing or reintroduce the RSVP that decision deliberately removed. It gets a
 // button's visual weight without a button's promise.
 // ---------------------------------------------------------------------------
-export function AttendanceStatus({ event, myCheckin, myAbsence }) {
+export function AttendanceStatus({ event, myCheckin, myAbsence, myAway }) {
   const past = event.rehearsal_date < todayStr();
 
+  // Order matters. Turning up beats everything, so a check-in wins even over logged leave — you
+  // were evidently there. Leave then outranks a one-off absence, because it's the broader
+  // statement and the member didn't mark this event individually.
   const state = event.status === 'cancelled'
     ? { text: 'This event has been cancelled.', tone: 'muted' }
     : myCheckin
       ? { text: `You're here${myCheckin.checked_in_at ? ` — checked in at ${timeOfDay(myCheckin.checked_in_at)}` : ''}`, tone: 'good' }
-      : myAbsence
-        ? { text: "You've told us you can't make it.", tone: 'off' }
-        : past
-          ? { text: 'No check-in was recorded for you.', tone: 'muted' }
-          : { text: "You're expected", tone: 'good' };
+      : myAway
+        ? { text: "You're away", tone: 'off' }
+        : myAbsence
+          ? { text: "You've told us you can't make it.", tone: 'off' }
+          : past
+            ? { text: 'No check-in was recorded for you.', tone: 'muted' }
+            : { text: "You're expected", tone: 'good' };
 
   return html`
     <p class="att-status att-${state.tone}">

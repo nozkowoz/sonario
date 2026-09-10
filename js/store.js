@@ -279,6 +279,49 @@ export async function clearAbsence(eventId, profileId) {
     .eq('rehearsal_id', eventId).eq('profile_id', profileId);
 }
 
+// --- Leave / away dates ----------------------------------------------------
+
+// Same single-hook-for-both-audiences shape as absences and check-ins: `away_dates` is
+// own-row-or-super under RLS (tightened in migration 0002), so a member gets only their own
+// ranges back and a super gets everyone's.
+export function useAwayDates() {
+  const { rows, loading } = useLiveTable('away_dates', {
+    orderFn: (a, b) => a.starts_on.localeCompare(b.starts_on),
+  });
+  return { awayDates: rows, loading };
+}
+
+// Leave is a RANGE, so a member away on holiday doesn't mark every affected rehearsal one by one.
+// `status` defaults to 'pending' in the schema and there is a "super confirms away dates" policy,
+// but no organiser UI performs that confirmation — so the app treats logged leave as effective
+// immediately and only 'cancelled' stops counting. Don't gate a member's own view on an approval
+// step nobody can currently carry out.
+export async function logLeave({ startsOn, endsOn, note }, profileId) {
+  return supabase.from('away_dates')
+    .insert({ profile_id: profileId, starts_on: startsOn, ends_on: endsOn, note: note || '' })
+    .select();
+}
+
+// Not a delete — there is no DELETE policy on away_dates. Cancelling is a status flip, and the
+// update policy permits it only `while status = 'pending'`: once a super confirms a range, this
+// matches zero rows and the caller must report that rather than showing success.
+export async function cancelLeave(id) {
+  return supabase.from('away_dates')
+    .update({ status: 'cancelled' })
+    .eq('id', id)
+    .select();
+}
+
+// A member is away for an event if any of their non-cancelled ranges covers its date. Plain
+// string comparison is safe and deliberate: these are all ISO yyyy-mm-dd date strings, so this
+// never goes near a Date object and can't be shifted by a timezone.
+export function awayRangeFor(event, awayDates, profileId) {
+  return awayDates.find((a) => a.profile_id === profileId
+    && a.status !== 'cancelled'
+    && a.starts_on <= event.rehearsal_date
+    && a.ends_on >= event.rehearsal_date) || null;
+}
+
 // --- Check-in (Step D) -----------------------------------------------------
 
 // Same single-hook-for-both-audiences reasoning as useAbsences: `checkins` is own-row-or-super

@@ -96,3 +96,31 @@ The three stats are exactly:
 If there isn't enough arrival data, show `—` rather than inventing a value. (Implementation: the
 app requires at least 3 timestamped check-ins before showing an average, on the grounds that a
 mean of one arrival isn't an average. Change that threshold here if you disagree.)
+
+
+## Future functionality (agreed, not built)
+
+Recorded so these don't get quietly lost, and so nobody fabricates the data to make a mockup
+render. None of them blocks current work.
+
+- **Latest Recap on Home.** Wanted in the intended Home design. Needs the full chain: recap
+  authoring → stored recap → latest published recap surfaced on Home. `rehearsal_recaps` and
+  `rehearsal_recap_items` exist as tables with no content and no UI.
+- **Tentative / TBC events.** An organiser creating or editing an event should be able to mark it
+  Tentative, which invokes the butter/yellow state. Needs a migration widening
+  `rehearsals.status` beyond `scheduled` / `cancelled`. Do not add that migration merely to make
+  a mockup render.
+- **A proper Notice concept, with severity/type.** Only an actual change or disruption earns the
+  coral treatment. An ordinary organiser note must not masquerade as an urgent alert — which is
+  why Home currently renders the event's own note in neutral lilac.
+- **Leave lifecycle.** Currently: a member logs leave, it's effective immediately, and they can
+  cancel it while it's `pending`. Eventually: organisers can see it, members can cancel or edit
+  *future* leave, an admin can override, and there are no silent failure states. Note that
+  `away_dates` has **no DELETE policy** and the member UPDATE policy is limited to
+  `status = 'pending'`, so any expansion here means new policies.
+
+### Rule for all of the above
+For member-facing Calendar and Home logic, `pending` and `confirmed` away dates are **both
+effective immediately** — an overlapping rehearsal shows "You're away". But the underlying status
+is preserved and the two are never collapsed: a detailed leave view may show "Pending
+confirmation" without changing the event-level treatment.

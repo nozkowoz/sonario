@@ -505,7 +505,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 /* --- Event detail screen ------------------------------------------------- */
 .detail-head { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
 .detail-head .icon-btn { margin-left: -6px; }
-.detail-title {
+.tab-content h2.detail-title {
   font-family: 'Oswald', sans-serif; font-size: 15px; text-transform: uppercase;
   letter-spacing: 0.8px; margin: 0; flex: 1; min-width: 0; color: var(--ink-soft);
 }
@@ -518,6 +518,78 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .detail-notes { display: flex; gap: 12px; align-items: flex-start; }
 .detail-notes svg { color: var(--ink-soft); flex-shrink: 0; margin-top: 2px; }
 .detail-notes p { margin: 0; font-size: 15px; white-space: pre-wrap; }
+
+/* --- Calendar: purple header block -------------------------------------- */
+.cal-top {
+  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 18px;
+  padding: 0 var(--main-pad) 20px;
+  background: linear-gradient(180deg, #6547be 0%, #5e40b6 100%);
+}
+.cal-top-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tab-content h2.cal-title { font-family: 'Oswald', sans-serif; font-size: 30px; text-transform: none; letter-spacing: -0.2px; margin: 0; color: #fff; }
+.cal-term { margin: 2px 0 0; font-size: 15px; color: rgba(255, 255, 255, 0.8); }
+/* A white pill on the purple — the same job the dark pill does on a light screen. */
+.btn-on-purple { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.5); color: #fff; }
+.btn-on-purple:hover { background: rgba(255, 255, 255, 0.26); transform: translateY(-1px); }
+
+/* --- Calendar: month grid ----------------------------------------------- */
+.month-card { padding: 14px 12px 10px; }
+.month-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.month-title { font-size: 17px; font-weight: 700; margin: 0; }
+.month-dow, .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.month-dow { margin-bottom: 2px; }
+.month-dow span { text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-soft); padding: 4px 0; }
+.month-cell {
+  border: none; background: none; cursor: pointer; padding: 4px 0 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 10px;
+}
+.month-cell:disabled { cursor: default; }
+.month-cell-num {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  font-size: 15px; font-weight: 600; color: var(--ink);
+}
+.month-cell-out .month-cell-num { color: #b9b2cf; }
+.month-cell-today .month-cell-num { box-shadow: inset 0 0 0 1.5px var(--purple); color: var(--purple-dark); }
+.month-cell-sel .month-cell-num { background: var(--purple); color: #fff; box-shadow: none; }
+.month-cell:hover:not(:disabled) .month-cell-num { background: var(--purple-light); }
+.month-cell-sel:hover .month-cell-num { background: var(--purple); }
+/* Fixed-height dot row so cells with and without events line up. */
+.month-dots { display: flex; gap: 3px; height: 6px; align-items: center; }
+.month-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+/* THE DOT COLOUR IS THE MEANING — semantic palette, see DESIGN-RULES.md. */
+.dot-rehearsal { background: var(--purple); }
+.dot-workshop { background: #b9a7e8; }
+.dot-performance { background: var(--green); }
+.dot-social { background: #4a9aad; }
+.dot-tentative { background: #e6b422; }
+.dot-cancelled { background: #e8695f; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 12px 2px 16px; }
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-soft); }
+
+/* --- Calendar: filter chips --------------------------------------------- */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; }
+.chip {
+  border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  background: var(--purple-light); color: var(--purple-dark);
+  font-size: 14px; font-weight: 600; padding: 9px 16px; border-radius: 99px;
+}
+.chip-on { background: var(--purple); color: #fff; }
+
+/* --- Calendar: leave ---------------------------------------------------- */
+.form-hint { margin: -4px 0 0; font-size: 13px; color: var(--ink-soft); }
+.leave-list { margin-top: 24px; }
+.leave-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.leave-range { margin: 0; font-size: 15px; font-weight: 600; }
+.leave-note { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
+.leave-hint { margin: -4px 0 10px; font-size: 13px; color: var(--ink-soft); }
+.leave-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+/* Pending is shown, not hidden — the status is real data and shouldn't be collapsed into
+   "confirmed" just because both currently count for the You're away calculation. */
+.leave-pending { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--ink-soft); }
+.detail-away-note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.add-cal { display: flex; gap: 10px; flex-wrap: wrap; }
+.add-cal .btn { text-decoration: none; }
 
 /* --- Member management rows --------------------------------------------- */
 .member-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -532,7 +604,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 
 /* --- Admin console ------------------------------------------------------ */
 .admin-intro { margin: -6px 0 18px; font-size: 14px; color: var(--ink-soft); }
-.admin-head-title {
+.tab-content h2.admin-head-title {
   font-family: 'Oswald', sans-serif; font-size: 18px; text-transform: uppercase;
   letter-spacing: 0.5px; margin: 0; flex: 1; min-width: 0;
 }
