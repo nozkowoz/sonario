@@ -49,41 +49,11 @@ alter default privileges in schema sonario grant all on tables to anon, authenti
 alter default privileges in schema sonario grant all on sequences to anon, authenticated;
 alter default privileges in schema sonario grant execute on functions to anon, authenticated;
 
--- --- The sweep -------------------------------------------------------------
--- No-ops on the first run (there is nothing in the schema yet). It exists so that running this
--- file AGAIN after 0006 guarantees every object created in between is granted, whatever role
--- created it and whether or not the defaults above took effect. That second run is the cheap
--- insurance against the single most confusing failure mode this app has.
-grant all on all tables in schema sonario to anon, authenticated;
-grant all on all sequences in schema sonario to anon, authenticated;
-grant execute on all functions in schema sonario to anon, authenticated;
-
--- NOTE on the security-definer helpers: 0001 deliberately REVOKES execute from public on
--- `handle_new_auth_user`, `set_updated_at`, `enforce_assignable_part` and the membership
--- predicates, then grants execute back to `authenticated` only where a client legitimately calls
--- it. Running the sweep above AFTER 0001 would re-grant execute on all of them to anon and
--- authenticated, undoing those revokes.
---
--- So: if you run this file a second time as the post-0006 sweep, RE-RUN THE REVOKES afterwards.
--- They are idempotent too, and they are gathered here for convenience:
---
---   revoke execute on function sonario.handle_new_auth_user() from public, anon, authenticated;
---   revoke execute on function sonario.set_updated_at() from public, anon, authenticated;
---   revoke execute on function sonario.enforce_assignable_part() from public, anon, authenticated;
---   revoke execute on function sonario.enforce_checkin_timestamp() from public, anon, authenticated;
---   revoke execute on function sonario.current_membership() from public;
---   revoke execute on function sonario.is_super() from public;
---   revoke execute on function sonario.is_active_member() from public;
---   revoke execute on function sonario.member_directory() from public;
---   grant execute on function sonario.current_membership() to authenticated;
---   grant execute on function sonario.is_super() to authenticated;
---   grant execute on function sonario.is_active_member() to authenticated;
---   grant execute on function sonario.member_directory() to authenticated;
---
--- The trigger functions take `from public, anon, authenticated` rather than just `from public`
--- because the sweep granted them explicitly to those two roles, and REVOKE FROM PUBLIC does not
--- remove an explicit grant. Nothing breaks if a client can't execute them — they are invoked by
--- triggers, which run as the table owner.
+-- --- The sweep lives in 0007 ---------------------------------------------
+-- An earlier draft of this file carried a `grant all on all tables` sweep plus a commented-out
+-- block of revokes, with an instruction to run this file a second time after 0006. Both are gone.
+-- The sweep and the revokes are now `0007_grant_sweep_and_revokes.sql`, which runs ONCE, LAST,
+-- and as real SQL rather than as comments somebody has to notice and uncomment.
 
 -- ============================================================================
 -- Rollback
