@@ -503,6 +503,44 @@ select case
 
 ## 7. Current work / exact stopping point
 
+### 📍 EXACT STOPPING POINT — end of 2026-09-10
+
+Nina is **part-way through Phase B on the new project (`rwkaofshfatqqkupeqoe`)**, working from
+`~/Downloads/sonario-phase-b-runbook.html` (regenerate with
+`python3 scripts/make-phase-b-runbook.py`). Her checkbox progress is saved in that browser.
+
+**Done — steps 1 to 5:** project created · `0000` run · `sonario` exposed in the Data API ·
+`0001`–`0007` run · Google provider configured, with the new callback URI **added** alongside the
+old one in Google Cloud Console.
+
+**Next — step 6:** email provider + redirect URLs (must include `http://localhost:8777`, because
+the app passes `redirectTo: window.location.origin`). Then 7 (sign in, promote to super),
+8 (Leave Test identity), 9 (seed), 10 (verify).
+
+⚠️ **ONE CHECKPOINT WENT UNCONFIRMED.** `0007` returns 8 rows with a `verdict` per function, and
+every one must read `ok`. That output was never pasted back, so it has not been assessed. It is
+cheap to re-check — `0007` is idempotent — and worth doing before seeding, because it is the gate
+that proves the grant revokes actually applied:
+
+```sql
+select p.proname as function,
+       case when has_function_privilege('anon', p.oid, 'EXECUTE') then 'anon' else '-' end as anon,
+       case when has_function_privilege('authenticated', p.oid, 'EXECUTE') then 'authenticated' else '-' end as authenticated
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'sonario' order by p.proname;
+```
+
+Expect the four trigger functions (`handle_new_auth_user`, `set_updated_at`,
+`enforce_assignable_part`, `enforce_checkin_timestamp`) to show `-` for **both** roles, and the
+four callable ones (`current_membership`, `is_super`, `is_active_member`, `member_directory`) to
+show `authenticated` only.
+
+**Two errors already hit and fixed in the runbook**, so they don't recur: the expose-schema step
+was ordered before `0000` (impossible — the schema must exist first), and the migration-number
+badge was selectable, so a paste began with the literal text `0000` and Postgres rejected line 1.
+
+---
+
 **Updated 2026-09-10 (latest). PHASE B OF THE SUPABASE SPLIT IS HANDED TO NINA AND IN PROGRESS.**
 Read `supabase/PHASE-B-RUNBOOK.md` and `supabase/SPLIT-PLAN.md` before touching anything
 Supabase-related.
