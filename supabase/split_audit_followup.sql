@@ -46,7 +46,9 @@ select b.name as bucket,
        b.public,
        b.created_at::date as created,
        count(o.id) as objects,
-       coalesce(pg_size_pretty(sum(o.metadata->>'size')::bigint), '0 bytes') as total_size
+       -- Cast INSIDE sum(): metadata->>'size' is text, so sum() has to receive a bigint. Casting
+       -- the sum's result instead means calling sum(text), which has no such function.
+       coalesce(pg_size_pretty(sum((o.metadata->>'size')::bigint)), '0 bytes') as total_size
 from storage.buckets b
 left join storage.objects o on o.bucket_id = b.id
 group by b.name, b.public, b.created_at
