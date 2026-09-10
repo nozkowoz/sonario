@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 :root {
   --purple: #7052CD;
@@ -21,6 +21,25 @@
   --butter-bg: #fdf3d7;
   --coral: #b5342e;        /* cancelled, or a genuine disruption. Reserved. */
   --coral-bg: #fbe6e3;
+  /* Greys and greens straight from the Figma spec — these are exact values, not approximations,
+     so a row or a stat can be checked against the design file by eye. */
+  --fig-ink: #111827;        /* section headings, sheet titles */
+  --fig-meta: #6B7280;       /* secondary line on a row (time), "See all" */
+  --fig-mute: #9CA3AF;       /* tertiary line (location), rail weekday, inactive nav */
+  --fig-hair: #F3F4F6;       /* hairline rules and dividers */
+  --fig-lav: #EEE6FF;        /* body ground; also the progress-bar track */
+  --pill-green-bg: #DCFCE7;
+  --pill-green-text: #15803D;
+  --pill-green-icon: #16A34A;
+  /* Per-type row tints. Rehearsals stay WHITE — the common case shouldn't be colour-coded, so
+     colour on a row means "this one isn't the usual Tuesday". Matched to the lightness of the
+     Figma's #E0F2FE so a mixed list reads evenly; lilac sits deeper than the others because it
+     has to separate from the --fig-lav ground behind it. */
+  --tint-rehearsal: #FFFFFF;
+  --tint-workshop: #E1D4FE;
+  --tint-performance: #DCFCE7;
+  --tint-social: #E0F2FE;
+  --tint-cancelled: #FEE2E2;
   --radius-lg: 16px;
   --radius-md: 10px;
   --radius-sm: 7px;
@@ -33,11 +52,11 @@
 
 * { box-sizing: border-box; }
 
+/* Flat pale lavender, per the Figma: the purple hero does the work at the top of every screen,
+   so the ground underneath it stays quiet. The old radial wash fought the hero's hard edge. */
 html, body {
   margin: 0;
-  background: var(--bg);
-  background-image: radial-gradient(ellipse 900px 500px at 8% -10%, rgba(239, 234, 255, 0.9) 0%, transparent 55%);
-  background-attachment: fixed;
+  background: var(--fig-lav);
   color: var(--ink);
   font-family: 'Inter', system-ui, sans-serif;
 }
@@ -84,20 +103,21 @@ button { font: inherit; }
 .bottom-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
   display: flex; justify-content: space-around;
-  background: #fff; border-top: 1px solid var(--border);
-  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: #fff; border-top: 1px solid var(--fig-hair);
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
 }
 .bottom-nav-btn {
   flex: 1; max-width: 140px;
   border: none; background: none; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 4px; border-radius: var(--radius-sm);
-  font-size: 12px; font-weight: 600; color: var(--ink-soft);
+  padding: 10px 4px; color: var(--fig-mute);
 }
-.bottom-nav-btn.active { color: var(--purple-dark); }
-.bottom-nav-btn svg { display: block; }
-.bottom-nav-label { font-size: 11px; letter-spacing: 0.2px; }
-.bottom-nav-btn.active svg { stroke-width: 2.1; }
+.bottom-nav-btn.active { color: var(--purple); }
+/* Inactive icons at 0.35, per the Figma — the label carries the tab and the glyph stays quiet.
+   Only the icon dims: a 0.35 label would fail contrast. */
+.bottom-nav-btn svg { display: block; opacity: 0.35; }
+.bottom-nav-btn.active svg { opacity: 1; }
+.bottom-nav-label { font-size: 10px; font-weight: 500; line-height: 15px; letter-spacing: 0.3px; }
 
 /* Auth */
 .auth-shell { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
@@ -111,11 +131,11 @@ button { font: inherit; }
   text-align: center;
 }
 .auth-title {
-  font-family: 'Oswald', sans-serif;
-  font-weight: 700;
+  font-family: 'Big Shoulders Display', 'Inter', system-ui, sans-serif;
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-size: 32px;
+  letter-spacing: 1.3px;
+  font-size: 34px;
   color: var(--ink);
   margin: 0 0 6px;
 }
@@ -159,11 +179,19 @@ button { font: inherit; }
 /* Purple header bar, per the mockup's Option B. It's one component, so this applies on every
    tab — the alternative would be a header that changes colour as you move between them. */
 .app-header {
-  background: linear-gradient(180deg, var(--purple) 0%, #6547be 100%);
+  background: var(--purple);
   position: sticky; top: 0; z-index: 5;
 }
-.app-header-inner { max-width: 780px; margin: 0 auto; padding: 14px 20px 14px; display: flex; align-items: center; justify-content: space-between; }
-.app-title { font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 24px; margin: 0; color: #fff; }
+.app-header-inner { max-width: 780px; margin: 0 auto; padding: 12px 20px 2px; display: flex; align-items: center; justify-content: space-between; }
+/* The wordmark, to the Figma's own numbers: Big Shoulders Display 900 at 26px/39px with 1.04px
+   of tracking. Big Shoulders is the condensed face the design file specifies; DESIGN-RULES.md
+   still describes the app ICON as Oswald-derived, and the two have not been reconciled — see
+   the note at the bottom of that file. */
+.app-title {
+  font-family: 'Big Shoulders Display', 'Inter', system-ui, sans-serif;
+  font-weight: 900; font-size: 26px; line-height: 39px; letter-spacing: 1.04px;
+  text-transform: uppercase; margin: 0; color: #fff;
+}
 .app-subtitle { margin: 0; font-size: 12px; color: rgba(255, 255, 255, 0.82); font-weight: 600; }
 .app-user { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-soft); }
 .tab-row { max-width: 780px; margin: 0 auto; display: flex; gap: 4px; padding: 0 20px; overflow-x: auto; }
@@ -176,11 +204,13 @@ button { font: inherit; }
 .app-footer { text-align: center; color: #a89fc4; font-size: 12px; padding: 8px 20px calc(var(--bottom-nav-h) + 16px); }
 
 /* Tab content */
-.tab-content h2 { font-family: 'Oswald', sans-serif; font-size: 20px; text-transform: uppercase; letter-spacing: 0.3px; margin: 0 0 14px; }
+/* Sentence case, not uppercase: the Figma sets every screen title as Inter 900 rather than as a
+   condensed all-caps heading, so "Calendar" reads as a name and not as a section label. */
+.tab-content h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.2px; margin: 0 0 14px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .section-header h2 { margin: 0; }
-.section-header-secondary { font-family: 'Oswald', sans-serif; font-size: 16px; text-transform: uppercase; color: var(--ink-soft); margin: 28px 0 14px; }
-.group-heading { font-family: 'Oswald', sans-serif; font-size: 14px; text-transform: uppercase; color: var(--ink-soft); margin: 20px 0 10px; }
+.section-header-secondary { font-family: 'Inter', system-ui, sans-serif; font-size: 16px; text-transform: uppercase; color: var(--ink-soft); margin: 28px 0 14px; }
+.group-heading { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; text-transform: uppercase; color: var(--ink-soft); margin: 20px 0 10px; }
 .empty-state { color: var(--ink-soft); font-size: 14px; }
 
 .card {
@@ -199,7 +229,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 
 /* Rehearsals */
 .rehearsal-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.rehearsal-date { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; }
+.rehearsal-date { font-family: 'Inter', system-ui, sans-serif; font-weight: 600; font-size: 17px; }
 .rehearsal-meta { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
 .rehearsal-focus { font-size: 14px; margin: 12px 0 0; color: var(--ink); }
 .rsvp-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
@@ -251,14 +281,14 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 /* Leaderboard */
 .leaderboard-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .leaderboard-row:last-child { border-bottom: none; }
-.leaderboard-rank { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 16px; color: var(--purple-dark); width: 22px; flex-shrink: 0; }
+.leaderboard-rank { font-family: 'Inter', system-ui, sans-serif; font-weight: 700; font-size: 16px; color: var(--purple-dark); width: 22px; flex-shrink: 0; }
 .leaderboard-name { font-weight: 700; font-size: 14px; flex: 1; }
 .leaderboard-stat { font-size: 13px; color: var(--ink-soft); text-align: right; }
 .leaderboard-tiers { margin-left: 6px; }
 
 /* Events (unified event model: rehearsal/workshop/performance/social all render the same) */
 .event-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.event-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.event-title { font-family: 'Inter', system-ui, sans-serif; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .event-meta { color: var(--ink-soft); font-size: 13px; margin-top: 3px; }
 .event-relative { color: var(--purple-dark); font-weight: 600; }
 .event-term { font-size: 12px; }
@@ -291,14 +321,20 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 /* --- "Where you stand" status + the quiet way out ----------------------- */
 /* Green carries the settled, default case (you're coming) with a button's visual weight but
    without a button's implied action — there is nothing to confirm under the absence-only model. */
-.att-status { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 16px; font-weight: 700; }
-.att-good { background: var(--green-bg); color: var(--green); border-radius: var(--radius-md); padding: 12px 14px; }
-.att-off { color: var(--ink); font-weight: 600; background: var(--purple-light); border-radius: var(--radius-md); padding: 12px 14px; }
-.att-muted { color: var(--ink-soft); font-weight: 600; font-size: 15px; }
-.att-tick {
-  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
-  background: var(--green); color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0;
+/* The status pill, at the Figma's values: 13px/700 on a 92%-opaque #DCFCE7, 12px radius, with an
+   18px filled tick. Deliberately pill-shaped and green rather than button-shaped — under the
+   absence-only model there is nothing here to confirm, so it must not look pressable. */
+.att-status {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  font-size: 13px; font-weight: 700; line-height: 19.5px;
 }
+.att-good { background: var(--pill-green-bg); color: var(--pill-green-text); border-radius: 12px; padding: 8px 12px; }
+.att-off { color: var(--ink); font-weight: 600; background: var(--purple-light); border-radius: 12px; padding: 8px 12px; }
+.att-muted { color: var(--ink-soft); font-weight: 500; }
+.att-tick { color: var(--pill-green-icon); flex-shrink: 0; display: grid; place-items: center; }
+/* On purple the 92% green reads slightly warmer than a flat fill, which is what the design file
+   specifies — the hero's purple shows through just enough to tie the pill to the card. */
+.next-detail .att-good { background: rgba(220, 252, 231, 0.92); }
 /* Not being able to come is the exception, so its control is a text link, not a button. */
 .btn-quiet {
   background: none; border: none; cursor: pointer; padding: 4px 0;
@@ -323,14 +359,14 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .attendance-missing strong { color: var(--error); }
 
 .btn-sm { font-size: 13px; padding: 8px 14px; white-space: nowrap; }
-.form-heading { font-family: 'Oswald', sans-serif; font-size: 16px; text-transform: uppercase; letter-spacing: 0.3px; margin: 0; }
+.form-heading { font-family: 'Inter', system-ui, sans-serif; font-size: 16px; text-transform: uppercase; letter-spacing: 0.3px; margin: 0; }
 .checkbox-label { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); font-weight: 500; }
 .checkbox-label input { width: auto; }
 .term-banner { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
 
 /* Small-caps section label, used everywhere a group of cards needs naming. */
 .eyebrow {
-  font-family: 'Oswald', sans-serif; font-size: 13px; text-transform: uppercase;
+  font-family: 'Inter', system-ui, sans-serif; font-size: 13px; text-transform: uppercase;
   letter-spacing: 0.7px; color: var(--ink-soft); margin: 16px 0 8px;
 }
 .eyebrow-tight { margin: 0 0 4px; color: var(--purple-dark); }
@@ -338,54 +374,73 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 /* --- Avatar in the header ------------------------------------------------ */
 .avatar-btn { border: none; background: none; padding: 0; cursor: pointer; border-radius: 50%; flex-shrink: 0; }
 .avatar-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* 36px with a 20%-white fill inside a 60%-white ring, per the Figma. A faint fill rather than a
+   transparent one: it sits on the purple header and reads as part of that block, and the ring
+   alone was too weak to hold a single initial at this size. */
 .avatar {
   display: grid; place-items: center;
-  width: 40px; height: 40px; border-radius: 50%;
-  object-fit: cover; background: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  width: 36px; height: 36px; border-radius: 50%;
+  object-fit: cover; background: rgba(255, 255, 255, 0.20);
+  border: 1.36px solid rgba(255, 255, 255, 0.60);
 }
-/* An outlined ring with the initial, not a filled chip: it sits on the purple header and the
-   mockup treats it as part of that block rather than as a card on top of it. */
-.avatar-initials { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; color: #fff; }
-.app-header-inner { padding-bottom: 10px; }
+.avatar-initials { font-weight: 700; font-size: 14px; line-height: 20px; color: #fff; }
 
 /* --- Home ---------------------------------------------------------------- */
-/* The purple block continues the header rather than sitting inside the padded body, so it bleeds
-   to both edges by cancelling the main padding — hence --main-pad existing as a token. */
+/* Rebuilt 2026-09-10 from Nina's Figma spec. The numbers below are the design file's own values
+   (16px card padding, 44px date numeral, 0.68px hairlines, and so on) rather than rounded
+   approximations, so a discrepancy can be spotted by comparing one figure against the file.
+   Where the Figma disagreed with DESIGN-RULES.md, the rules won — see the row tints below.
+
+   The purple hero continues the app header rather than sitting inside the padded body, so it
+   bleeds to both edges by cancelling the main padding — which is why --main-pad exists. */
 .home-top {
-  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 18px;
-  padding: 0 var(--main-pad) 22px;
-  background: linear-gradient(180deg, #6547be 0%, #5e40b6 100%);
+  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 16px;
+  /* padding-top, NOT a margin on the greeting: a top margin on the first child collapses out
+     through this block (padding-top would have to be non-zero to stop it) and drags the purple
+     down, leaving a pale seam under the app header. */
+  padding: 10px var(--main-pad) 20px;
+  background: var(--purple);
 }
 .home-greeting {
-  margin: 0 0 16px; font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.2px;
+  margin: 0; font-size: 24px; font-weight: 700; line-height: 36px; color: #fff;
 }
+
 /* A slightly lighter panel on the purple: hierarchy from tone, not from borders. */
-.next-card { background: rgba(255, 255, 255, 0.13); border-radius: var(--radius-lg); padding: 16px 18px; }
-.next-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.next-card { background: rgba(255, 255, 255, 0.14); border-radius: var(--radius-lg); padding: 16px; margin-top: 16px; }
+.next-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .next-eyebrow {
-  margin: 0; font-family: 'Oswald', sans-serif; font-size: 12px; text-transform: uppercase;
-  letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.75);
+  margin: 0; font-size: 11px; font-weight: 700; line-height: 16.5px;
+  letter-spacing: 1.1px; text-transform: uppercase; color: rgba(255, 255, 255, 0.65);
 }
-.next-when { margin: 0; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
-.next-empty { margin: 8px 0 0; font-size: 15px; color: rgba(255, 255, 255, 0.88); }
-.next-card-body { display: flex; gap: 18px; align-items: flex-start; }
+.next-when { margin: 0; font-size: 12px; font-weight: 500; line-height: 18px; color: rgba(255, 255, 255, 0.65); }
+.next-empty { margin: 10px 0 0; font-size: 15px; color: rgba(255, 255, 255, 0.88); }
+.next-card-body { display: flex; align-items: flex-start; padding: 12px 0; }
+
+/* The date rail. 44px/900 on the numeral is the loudest type on the screen by some distance,
+   which is the point: the one thing a member opens this app to find out is when. */
 .next-rail {
   display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
-  padding-right: 18px; border-right: 1px solid rgba(255, 255, 255, 0.28); align-self: stretch;
-  color: #fff;
+  padding-right: 16px; min-width: 64px; color: #fff;
 }
-.next-rail-day { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: 1.5px; line-height: 1.1; }
-.next-rail-num { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 54px; line-height: 0.9; }
-.next-rail-mon { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 18px; letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.8); }
-.next-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.next-title { margin: 0; font-size: 18px; font-weight: 700; color: #fff; }
-.next-time { margin: 0; font-size: 19px; font-weight: 600; color: #fff; }
-.next-loc { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 15px; color: rgba(255, 255, 255, 0.85); }
-.next-loc svg { flex-shrink: 0; }
-/* The status pill and the quiet opt-out both sit on purple here, so they need their own treatment
-   rather than the on-white versions used on the detail screen. */
-.next-detail .att-status { margin-top: 8px; }
+.next-rail-day, .next-rail-mon {
+  font-size: 11px; font-weight: 700; line-height: 16.5px; letter-spacing: 0.88px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.next-rail-num { font-size: 44px; font-weight: 900; line-height: 44px; }
+.next-detail {
+  flex: 1; min-width: 0; padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.20);
+}
+.next-title { margin: 0 0 2px; font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, 0.92); }
+.next-time { margin: 0; font-size: 18px; font-weight: 700; line-height: 21.6px; color: #fff; }
+.next-loc {
+  display: flex; align-items: center; gap: 4px; margin: 4px 0 0;
+  font-size: 13px; line-height: 19.5px; color: rgba(255, 255, 255, 0.70);
+}
+.next-loc svg { flex-shrink: 0; color: rgba(255, 255, 255, 0.65); }
+/* The status pill and the quiet opt-out sit on purple here, so they need their own treatment
+   rather than the on-white versions the detail screen uses. */
+.next-detail .att-status { margin-top: 12px; }
 .next-detail .att-off { background: rgba(255, 255, 255, 0.16); color: #fff; }
 .next-detail .att-muted { color: rgba(255, 255, 255, 0.85); }
 .next-detail .checkin-row, .next-detail .absence-row { margin: 0; padding: 0; border-top: 0; align-items: flex-start; }
@@ -393,18 +448,29 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .next-detail .btn-quiet:hover { color: #fff; text-decoration-color: #fff; }
 .next-detail .btn-primary { background: #fff; border-color: #fff; color: var(--purple-dark); box-shadow: none; }
 .next-detail .absence-error, .next-detail .hero-error { color: #ffd9d4; }
+/* "Can't make it?" is deliberately the quietest thing in the card: an underlined 13px link on
+   the card's bottom edge, well below the status pill. It's an escape hatch, not an invitation —
+   the absence-only model assumes you're coming. */
+.next-card-foot { margin-top: 4px; }
+.next-card-foot .absence-row { margin: 0; padding: 0; border-top: 0; align-items: flex-start; }
+.next-card-foot .btn-quiet, .next-card-foot .absence-noted {
+  font-size: 13px; font-weight: 400; line-height: 19.5px; color: rgba(255, 255, 255, 0.75);
+}
+.next-card-foot .btn-quiet { text-decoration-color: rgba(255, 255, 255, 0.5); }
+.next-card-foot .btn-quiet:hover { color: #fff; text-decoration-color: #fff; }
+.next-card-foot .absence-error { color: #ffd9d4; }
 
 /* --- Home: notice ------------------------------------------------------- */
 /* NEUTRAL, not coral. The rules reserve coral for genuine attention states, and this slot carries
    the organiser's ordinary note about the event. */
 .notice-card {
   display: flex; gap: 12px; align-items: flex-start;
-  background: var(--lilac-bg); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 14px;
+  background: #fff; border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 14px;
 }
 .notice-icon { color: var(--lilac); flex-shrink: 0; display: grid; place-items: center; margin-top: 1px; }
 .notice-text { min-width: 0; }
-.notice-title { margin: 0; font-size: 15px; font-weight: 700; }
-.notice-body { margin: 2px 0 0; font-size: 14px; color: var(--ink-soft); white-space: pre-wrap; }
+.notice-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--fig-ink); }
+.notice-body { margin: 2px 0 0; font-size: 13px; color: var(--fig-meta); white-space: pre-wrap; }
 /* Butter = heads-up, not alarm: provisional or time-sensitive. Distinct from coral, which means
    something has gone wrong or changed. See DESIGN-RULES.md. */
 .notice-butter { background: var(--butter-bg); }
@@ -412,39 +478,77 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .notice-butter .notice-body { color: #6f5205; }
 
 /* --- Home: My Term ------------------------------------------------------ */
-.term-stats-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.term-stats-title { font-family: 'Oswald', sans-serif; font-size: 17px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
-.term-stats-name { font-size: 13px; font-weight: 600; color: var(--purple-dark); }
-.term-stats-row { display: flex; align-items: stretch; }
-.stat { flex: 1; min-width: 0; padding: 0 10px; }
-.stat:first-child { padding-left: 0; }
-.stat:not(:first-child) { border-left: 1px solid var(--border); }
-.stat-value { margin: 0; font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 26px; color: var(--purple-dark); line-height: 1.05; }
-.stat-label { margin: 3px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.25; }
-.stat-bar { margin-top: 16px; height: 8px; border-radius: 99px; background: #e6e1f3; overflow: hidden; }
+.term-stats { padding: 16px; box-shadow: none; }
+.term-stats-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.term-stats-title {
+  margin: 0; font-size: 12px; font-weight: 900; line-height: 18px; letter-spacing: 1.44px;
+  text-transform: uppercase; color: var(--fig-ink);
+}
+.term-stats-name { font-size: 13px; font-weight: 600; color: var(--purple); }
+.term-stats-row { display: flex; align-items: stretch; margin-top: 12px; }
+.stat { flex: 1; min-width: 0; }
+.stat:not(:first-child) { padding-left: 16px; border-left: 1px solid var(--fig-hair); }
+.stat-value { margin: 0; font-size: 24px; font-weight: 800; line-height: 36px; color: var(--purple); }
+.stat-label { margin: 1px 0 0; font-size: 11px; font-weight: 400; line-height: 16.5px; color: var(--fig-mute); }
+.stat-bar { margin-top: 14px; height: 5px; border-radius: 99px; background: var(--fig-lav); overflow: hidden; }
 .stat-bar > span { display: block; height: 100%; border-radius: 99px; background: var(--purple); }
 
 /* --- Home: Coming up ---------------------------------------------------- */
-.home-section { margin: 22px 0 10px; }
-.home-section-title { font-family: 'Oswald', sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 0.6px; margin: 0; color: var(--ink-soft); }
-.mini-row {
-  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; cursor: pointer;
-  background: #fff; border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-card);
-  padding: 13px 12px 13px 16px;
+.home-section { margin: 20px 0 0; }
+.home-section-title {
+  margin: 0; font-size: 12px; font-weight: 900; line-height: 18px; letter-spacing: 1.44px;
+  text-transform: uppercase; color: var(--fig-ink);
+}
+.home-section .btn-quiet { font-size: 13px; font-weight: 500; color: var(--fig-meta); text-decoration: none; }
+.home-section .btn-quiet:hover { color: var(--purple); }
+
+/* --- Event rows with a date rail ---------------------------------------- */
+/* One row component, shared by Home's "Coming up" and the Calendar list, so the two can't drift.
+   Tint comes from the event's TYPE, per DESIGN-RULES.md — the Figma painted every non-rehearsal
+   row the same sky blue, which is a rehearsal/not-rehearsal distinction rather than a semantic
+   one. Nina chose semantic, so the palette's own colours are used and white stays for the
+   ordinary Tuesday rehearsal. */
+.rail-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.rail-row {
+  display: flex; align-items: center; width: 100%; text-align: left; cursor: pointer;
+  min-height: 64px; border: none; border-radius: 12px; overflow: hidden; padding: 0;
+  background: var(--tint-rehearsal);
   transition: transform 0.15s var(--ease);
 }
-.mini-row:hover { transform: translateY(-1px); }
-.mini-rail {
-  display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 56px;
-  padding-right: 14px; border-right: 1px solid var(--border);
-}
-.mini-rail-day { font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 0.6px; color: var(--ink-soft); }
-.mini-rail-date { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 15px; color: var(--purple-dark); }
-.mini-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.mini-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; }
-.mini-meta { font-size: 13px; color: var(--ink-soft); }
-.mini-chev { color: var(--ink-soft); flex-shrink: 0; display: grid; place-items: center; }
+.rail-row:hover { transform: translateY(-1px); }
+.rail-row:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.rail-row-workshop { background: var(--tint-workshop); }
+.rail-row-performance { background: var(--tint-performance); }
+.rail-row-social { background: var(--tint-social); }
+.rail-row-cancelled { background: var(--tint-cancelled); }
+.rail-row-cancelled .rail-title { text-decoration: line-through; text-decoration-thickness: 1px; }
 
+.rail-date {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex-shrink: 0; min-width: 52px; padding: 8px 12px;
+}
+.rail-dow { font-size: 10px; font-weight: 700; line-height: 15px; letter-spacing: 0.8px; color: var(--fig-mute); }
+.rail-num { font-size: 20px; font-weight: 900; line-height: 22px; color: var(--purple); }
+.rail-mon { font-size: 10px; font-weight: 700; line-height: 15px; letter-spacing: 0.8px; color: var(--purple); }
+
+.rail-body {
+  flex: 1; min-width: 0; padding: 8px 4px 8px 12px;
+  border-left: 1px solid var(--fig-hair);
+  display: flex; flex-direction: column;
+}
+.rail-title {
+  font-size: 13.5px; font-weight: 600; line-height: 20.25px; color: var(--purple);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rail-time { font-size: 12px; font-weight: 400; line-height: 18px; color: var(--fig-meta); }
+.rail-loc {
+  font-size: 11px; font-weight: 400; line-height: 16.5px; color: var(--fig-mute);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rail-chev { color: var(--fig-mute); opacity: 0.5; flex-shrink: 0; display: grid; place-items: center; padding: 0 12px; }
+/* A row that is only ever read (no detail screen behind it) shouldn't advertise a tap. */
+.rail-row-static { cursor: default; }
+.rail-row-static:hover { transform: none; }
 /* The dark pill from the mockup's admin header — deliberately not purple, so "add" reads as a
    primary action distinct from everything else on a purple-accented screen. */
 .btn-dark { background: var(--ink); border-color: var(--ink); color: #fff; }
@@ -473,10 +577,10 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   width: 54px; flex-shrink: 0; padding-top: 2px;
   border-right: 1px solid var(--border); align-self: stretch;
 }
-.date-rail-day { font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 0.6px; color: var(--ink-soft); }
-.date-rail-date { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 14px; color: var(--purple-dark); letter-spacing: 0.2px; }
+.date-rail-day { font-family: 'Inter', system-ui, sans-serif; font-size: 12px; letter-spacing: 0.6px; color: var(--ink-soft); }
+.date-rail-date { font-family: 'Inter', system-ui, sans-serif; font-weight: 700; font-size: 14px; color: var(--purple-dark); letter-spacing: 0.2px; }
 .event-row-body { flex: 1; min-width: 0; }
-.event-row-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 17px; }
+.event-row-title { font-family: 'Inter', system-ui, sans-serif; font-weight: 600; font-size: 17px; }
 .event-row-meta { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
 .event-row-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .badge-in { background: var(--green-bg); color: var(--green); }
@@ -511,12 +615,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .detail-head { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
 .detail-head .icon-btn { margin-left: -6px; }
 .tab-content h2.detail-title {
-  font-family: 'Oswald', sans-serif; font-size: 15px; text-transform: uppercase;
+  font-family: 'Inter', system-ui, sans-serif; font-size: 15px; text-transform: uppercase;
   letter-spacing: 0.8px; margin: 0; flex: 1; min-width: 0; color: var(--ink-soft);
 }
 .detail-when { background: var(--purple-light); box-shadow: none; padding: 20px; }
 .detail-weekday { margin: 0; font-size: 15px; font-weight: 600; color: var(--purple-dark); }
-.detail-date { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 32px; line-height: 1.05; margin: 2px 0 8px; }
+.detail-date { font-family: 'Inter', system-ui, sans-serif; font-weight: 700; font-size: 32px; line-height: 1.05; margin: 2px 0 8px; }
 .detail-time { margin: 0; font-size: 17px; font-weight: 600; }
 .detail-loc { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; font-size: 14px; color: var(--ink-soft); }
 .detail-loc svg { flex-shrink: 0; }
@@ -531,7 +635,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   background: linear-gradient(180deg, #6547be 0%, #5e40b6 100%);
 }
 .cal-top-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.tab-content h2.cal-title { font-family: 'Oswald', sans-serif; font-size: 25px; text-transform: none; letter-spacing: -0.2px; margin: 0; color: #fff; }
+.tab-content h2.cal-title { font-family: 'Inter', system-ui, sans-serif; font-size: 25px; text-transform: none; letter-spacing: -0.2px; margin: 0; color: #fff; }
 .cal-term { margin: 1px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.8); }
 /* A white pill on the purple — the same job the dark pill does on a light screen. */
 .btn-on-purple { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.5); color: #fff; }
@@ -616,7 +720,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 /* --- Admin console ------------------------------------------------------ */
 .admin-intro { margin: -6px 0 18px; font-size: 14px; color: var(--ink-soft); }
 .tab-content h2.admin-head-title {
-  font-family: 'Oswald', sans-serif; font-size: 18px; text-transform: uppercase;
+  font-family: 'Inter', system-ui, sans-serif; font-size: 18px; text-transform: uppercase;
   letter-spacing: 0.5px; margin: 0; flex: 1; min-width: 0;
 }
 .admin-menu { display: flex; flex-direction: column; gap: 10px; }
@@ -659,14 +763,9 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
      hero cancels it with negative margins, so a hardcoded .app-main padding here would leave the
      purple block a few pixels short of the screen edge. */
   :root { --main-pad: 16px; }
-  .app-header-inner { padding: 14px 16px 6px; }
+  .app-header-inner { padding: 12px 16px 2px; }
   .tab-row { padding: 0 16px; }
   .detail-date { font-size: 28px; }
-  .home-greeting { font-size: 23px; }
-  .next-rail-num { font-size: 46px; }
-  .next-card-body { gap: 14px; }
-  .next-rail { padding-right: 14px; }
-  .stat-value { font-size: 22px; }
   .event-row { padding: 13px 8px 13px 13px; gap: 11px; }
   .date-rail { width: 48px; }
 }

@@ -5,7 +5,8 @@ import { EVENT_TYPES, createEvent, updateEvent, setEventStatus, markAbsent, clea
 import { LoadingState, EmptyState } from './shell.js';
 import { CHOIR_NAME } from './config.js';
 import { CheckInPanel, AttendanceStatus, AttendanceSummary, isCheckInDay } from './checkin.js';
-import { IconKebab, IconPin, IconBack, IconCheck, IconNote, IconEdit, IconReschedule, IconCancel } from './icons.js';
+import { IconKebab, IconPin, IconBack, IconCheck, IconNote, IconEdit, IconReschedule, IconCancel,
+  IconChevron } from './icons.js';
 
 // The unified event model in product language. `event_type` is purely what kind of thing it is;
 // whether it counts towards attendance is a separate, independent flag on the same row (a
@@ -35,6 +36,48 @@ export function currentTermOf(terms) {
 export function nextEvent(events) {
   const today = todayStr();
   return events.find((e) => e.rehearsal_date >= today && e.status !== 'cancelled') || null;
+}
+
+// ---------------------------------------------------------------------------
+// The date-rail row. ONE component, used by Home's "Coming up" and by the Calendar list, so a
+// change to how an event reads in a list can't land on one screen and miss the other.
+//
+// The tint is SEMANTIC — it comes from the event's type per DESIGN-RULES.md, and a cancelled
+// event overrides its type because "this isn't happening" outranks "this was going to be a
+// concert". Nina's Figma painted every non-rehearsal row the same sky blue, which encodes
+// rehearsal/not-rehearsal rather than what kind of thing it is; she chose semantic when asked,
+// so the palette's own colours are used here and rehearsals keep the Figma's white.
+// ---------------------------------------------------------------------------
+export const rowTintClass = (ev) => (ev.status === 'cancelled'
+  ? 'rail-row-cancelled'
+  : ev.event_type === 'rehearsal' ? '' : `rail-row-${ev.event_type}`);
+
+export function RailRow({ event, onOpen = null, trailing = null }) {
+  const rail = formatDateRail(event.rehearsal_date);
+  const [dayNum, mon] = rail.date.split(' ');
+  const Tag = onOpen ? 'button' : 'div';
+  return html`
+    <${Tag}
+      class=${`rail-row ${rowTintClass(event)} ${onOpen ? '' : 'rail-row-static'}`}
+      type=${onOpen ? 'button' : null}
+      onClick=${onOpen ? () => onOpen(event) : null}>
+      <span class="rail-date" aria-hidden="true">
+        <span class="rail-dow">${rail.day}</span>
+        <span class="rail-num">${dayNum}</span>
+        <span class="rail-mon">${mon}</span>
+      </span>
+      <span class="rail-body">
+        <span class="rail-title">${eventTitle(event)}</span>
+        ${event.start_time
+          ? html`<span class="rail-time">${formatTimeRange(event.start_time, event.end_time)}</span>`
+          : null}
+        ${event.location ? html`<span class="rail-loc">${event.location}</span>` : null}
+      </span>
+      ${trailing !== null
+        ? trailing
+        : onOpen ? html`<span class="rail-chev"><${IconChevron} size=${14} /></span>` : null}
+    <//>
+  `;
 }
 
 // ---------------------------------------------------------------------------

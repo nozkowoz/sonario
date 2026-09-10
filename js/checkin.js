@@ -1,6 +1,7 @@
 import { html, useState, useEffect, useMemo } from './lib.js';
 import { todayStr } from './lib.js';
 import { checkIn, undoCheckIn, clearAbsence } from './store.js';
+import { IconCheckCircle } from './icons.js';
 
 // The undo window is a database policy (migration 0003), not a UI rule — this constant only
 // decides when to stop *offering* the button, so the two must stay in step. If the policy's
@@ -59,7 +60,9 @@ export function AttendanceStatus({ event, myCheckin, myAbsence, myAway }) {
 
   return html`
     <p class="att-status att-${state.tone}">
-      ${state.tone === 'good' ? html`<span class="att-tick" aria-hidden="true">✓</span>` : null}
+      ${state.tone === 'good'
+        ? html`<span class="att-tick"><${IconCheckCircle} size=${18} /></span>`
+        : null}
       ${state.text}
     </p>
   `;

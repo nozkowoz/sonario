@@ -130,3 +130,23 @@ export const IconCheckSquare = ({ size }) => svg(html`
   <rect x="4" y="4" width="16" height="16" rx="4" fill="currentColor" stroke="none" />
   <path d="M8 12.3l2.7 2.7L16 9.7" stroke="#fff" stroke-width="2.1" />
 `, { size });
+
+// From Nina's Figma icon export (IcCheck.svg): a solid disc with a white tick cut through it,
+// used by the "You're expected" / "You're here" status pill. The disc carries the colour, so it
+// sets its own green rather than inheriting currentColor — the pill's text is a darker green
+// (#15803D) than the mark (#16A34A) and the two must not be collapsed into one.
+export const IconCheckCircle = ({ size = 18 }) => html`
+  <svg width=${size} height=${size} viewBox="0 0 18 18" fill="none" aria-hidden="true">
+    <circle cx="9" cy="9" r="7.5" fill="currentColor" />
+    <path d="M5.6 9.2l2.4 2.3 4.4-4.6" stroke="#fff" stroke-width="1.65"
+      stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+`;
+
+// Filled counterpart to IconPin, from IcPin.svg. The hero's location line runs at 13px on purple,
+// where an outlined 11px pin disappears — a solid glyph holds at that size.
+export const IconPinFilled = ({ size = 11 }) => html`
+  <svg width=${size} height=${size} viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+    <path d="M6 0.9a3.7 3.7 0 0 0-3.7 3.7c0 2.7 3.7 6.5 3.7 6.5s3.7-3.8 3.7-6.5A3.7 3.7 0 0 0 6 0.9Zm0 5.1a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Z" />
+  </svg>
+`;

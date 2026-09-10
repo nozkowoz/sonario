@@ -12,9 +12,15 @@ rules were written after the mockups and generally win.
 - **App icon:** dark condensed "S" derived from the real SONARIO wordmark, on pale lavender.
   Ink `#1E0355`, background `#EEE6FF`.
 - **The wordmark keeps its tall, narrow, condensed face.** Do not substitute or redraw the logo
-  with a generic S or another font. The mark is the letter S in **Oswald Bold**, which is why
-  `scripts/make-icons.py` can render it from type — that script is the sanctioned way to produce
-  new sizes.
+  with a generic S or another font.
+- ⚠️ **Two condensed faces are now in play, and they have NOT been reconciled.** The Figma
+  (2026-09-10) sets the in-app wordmark as **Big Shoulders Display 900**, 26px/39px, 1.04px
+  tracking — and that is what the app now renders, because the design file says so explicitly.
+  The **app icons** are still rendered from **Oswald Bold** by `scripts/make-icons.py`. Both are
+  tall condensed sans faces and the difference is slight at icon size (Big Shoulders is a little
+  wider and blockier), so nothing looks wrong today. But it is a real inconsistency: either
+  re-render the icons from Big Shoulders, or move the wordmark back to Oswald. **Nina's call** —
+  don't quietly pick one.
 - **Careful:** the branding sheet uses TWO darks and they are not interchangeable — the
   **wordmark** is near-black `#090223`, the **S mark / app icon** is indigo `#1E0355`.
 
@@ -44,6 +50,46 @@ Don't use coral casually; an organiser's ordinary note about a rehearsal is neit
 ⚠️ **Tentative has no data behind it yet.** `rehearsals.status` is only
 `scheduled` / `cancelled`, so the butter tokens exist but nothing can currently be marked TBC.
 Adding it means a migration widening that check constraint.
+
+## Typography
+
+Set from the Figma, 2026-09-10. **Oswald is gone from the app** (it survives only inside
+`scripts/make-icons.py`, see the warning above).
+
+- **Inter for everything** — 400 through 900. The heavy weights do the work that Oswald's
+  condensed caps used to: section headings are Inter **900 at 12px** with 1.44px tracking
+  (`MY TERM`, `COMING UP`), stats are **800 at 24px**, the hero's date numeral is **900 at 44px**.
+- **Big Shoulders Display 900** for the SONARIO wordmark only. Nothing else uses it.
+- **Screen titles are sentence case**, not uppercase — "Calendar", not "CALENDAR". The Figma sets
+  them as Inter 900/800 names rather than as condensed all-caps section labels.
+- The exact greys are tokens, so a value can be checked against the design file by eye:
+  `--fig-ink #111827` (headings), `--fig-meta #6B7280` (secondary), `--fig-mute #9CA3AF`
+  (tertiary, inactive nav), `--fig-hair #F3F4F6` (hairlines).
+- The body ground is **flat `#EEE6FF`** (`--fig-lav`). The old radial lavender wash is gone — it
+  fought the purple hero's hard bottom edge.
+
+## Event row tints — semantic, not rehearsal/not-rehearsal
+
+The Figma paints every non-rehearsal row the same sky blue (`#E0F2FE`). That encodes
+*rehearsal vs. anything else*, which is a different claim from the semantic palette above. Nina
+chose **semantic** when asked (2026-09-10), so the row tints are:
+
+| Type | Token | Value |
+|---|---|---|
+| Rehearsal | `--tint-rehearsal` | `#FFFFFF` |
+| Workshop | `--tint-workshop` | `#E1D4FE` |
+| Performance | `--tint-performance` | `#DCFCE7` |
+| Social | `--tint-social` | `#E0F2FE` (the Figma's own blue) |
+| Cancelled | `--tint-cancelled` | `#FEE2E2` |
+
+Rehearsals stay **white**: the common case shouldn't be colour-coded, so colour on a row means
+"this one isn't the usual Tuesday". Cancelled **overrides the type** — "this isn't happening"
+outranks "this was going to be a concert". Lilac sits deeper than the others because it has to
+separate from the `--fig-lav` ground behind it; the rest are matched to `#E0F2FE`'s lightness so
+a mixed list reads evenly.
+
+One component renders these on both Home and Calendar — `RailRow` in `js/events.js`. Keep it that
+way, so a change to how an event reads in a list can't land on one screen and miss the other.
 
 ## General visual direction
 
@@ -124,6 +170,24 @@ render. None of them blocks current work.
   *future* leave, an admin can override, and there are no silent failure states. Note that
   `away_dates` has **no DELETE policy** and the member UPDATE policy is limited to
   `status = 'pending'`, so any expansion here means new policies.
+- **Calendar becomes a week strip.** The Figma replaces the month grid with a single scrolling
+  week (M–S with an event dot under each day) above an event list grouped under month headings
+  (`JULY 2026`, `AUGUST 2026`). This is a better answer to "the calendar takes up too much room"
+  than the trimming done on 2026-09-10, and it supersedes it. Needs no new data — the month grid
+  and the week strip read the same `rehearsals` rows. Plus filter chips: All / Rehearsals /
+  Performances / Other.
+- **More becomes a real profile screen.** Name + voice part + choir, then My Profile, My
+  Availability, Notification Settings, Help & Feedback, About Sonario, Sign out. Voice part is
+  the only new field; the rest are either existing (sign out) or shells.
+- **Repertoire and Practice Mode. THESE NEED A SCHEMA, and none of it exists.** The Figma
+  specifies song libraries by semester, concert playlists, per-song voice-part recordings, and a
+  player with a queue, an "ALTO ONLY" part selector and a waveform. Behind that sit songs,
+  song–playlist membership, voice parts, and an audio file per song per part — plus storage, which
+  the app has never used. `js/repertoire.js` exists from the original scaffold and is not wired
+  into the nav. Do NOT build any of this from the mockup: the schema is the decision, and the
+  screens are downstream of it.
+- **Admin gains a Recordings section**, listed above Events in the Figma. Blocked on the same
+  schema as Practice Mode.
 
 ### Rule for all of the above
 For member-facing Calendar and Home logic, `pending` and `confirmed` away dates are **both

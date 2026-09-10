@@ -258,8 +258,29 @@ per test rather than letting that build again.
 
 ## 5. Current UI / product design
 
-**Updated 2026-09-09 (evening) — the UI was substantially restyled towards mockups Nina supplied,
-so anything written about it before that date is out of date.**
+**Updated 2026-09-10 (late) — HOME WAS REBUILT FROM A FIGMA SPEC and the app's typography changed
+app-wide. Read `DESIGN-RULES.md` first; it is the design system and it now carries the
+typography, the row tints, and a list of the Figma screens that are NOT built. Anything written
+below about type, greys or Home's layout that predates 2026-09-10 is out of date.**
+
+**THE DESIGN SOURCE IS NOW A PUBLISHED FIGMA SITE, and it is readable without a connector:**
+`https://poker-invite-84311564.figma.site` — the whole clickable prototype, public HTML, so a
+session can fetch any screen and read its computed styles directly. This is far better than
+screenshots or the design file (Nina's Figma account is personal; this is her work Claude, and
+the two can't be linked). Nina also pastes Dev Mode HTML per screen, which gives exact values.
+**Prefer the published site over reasoning from a screenshot.**
+
+Five screens exist in that prototype. Home is built. **Calendar, Repertoire, Practice Mode and
+More are NOT** — see `DESIGN-RULES.md` → "Future functionality" for what each needs, and note
+that Repertoire and Practice Mode are blocked on a schema that does not exist and must not be
+invented to make a mockup render.
+
+**Type, as of v24:** Inter 400–900 for everything, Big Shoulders Display 900 for the SONARIO
+wordmark only. **Oswald is gone from the app** — it survives only inside `scripts/make-icons.py`,
+which still renders the app icons from it. That is an unreconciled inconsistency and it is
+Nina's call; it is flagged at the top of `DESIGN-RULES.md`.
+
+**Older note, still true except where the above supersedes it (2026-09-09 evening):**
 
 **Navigation:** Bottom nav, three tabs, now with icons: **Home / Calendar / More**. Nina's mockups
 show a fourth **Repertoire** tab; it is deliberately absent because there is no screen behind it
@@ -447,7 +468,32 @@ Membership status copy is exact, agreed wording — see `js/auth.js`, don't casu
 
 ## 7. Current work / exact stopping point
 
-**Updated 2026-09-09 (second pass), after Steps C, D and E were built and verified live.** The
+**Updated 2026-09-10 (late).** Home has been rebuilt to Nina's Figma spec and the type system
+changed app-wide (commit below, NOT pushed). What that pass did and did not do:
+
+- **Done:** new colour tokens at the Figma's exact values; Inter app-wide + Big Shoulders
+  wordmark; `html/body` ground flattened to `#EEE6FF`; bottom nav restyled (10px/500 labels,
+  inactive icons at 0.35); the avatar to 36px with the Figma's fill and ring; screen titles to
+  sentence case; the "You're expected" pill to `#DCFCE7`/`#15803D`/`#16A34A` with a filled tick
+  from Nina's own `IcCheck.svg`; Home rebuilt (hero, MY TERM, COMING UP) to the spec's numbers;
+  and a single shared `RailRow` component in `js/events.js` carrying the semantic per-type tints.
+- **Verified** in a throwaway render harness at 375×812 with Term 3 data shaped like the real
+  rows: Home reproduces the Figma's own figures (7 / 9, 78%, 6:58pm) from real attendance logic
+  rather than hardcoding, no console errors on `index.html`, and Calendar/Admin/More still render
+  after the global type change. The harness was deleted before commit, per §9.
+- **Not done, deliberately:** Calendar still uses the OLD month-grid layout and the old
+  `.event-row` styling, so its list rows now look different from Home's. That is the next pass —
+  the Figma replaces the month grid with a week strip and groups the list under month headings.
+  Nothing is broken; it is just visibly older.
+- **Two bugs found and fixed during the pass**, both worth knowing as classes: (1) the greeting's
+  top margin collapsed out *through* `.home-top` (padding-top was 0), dragging the purple hero
+  down and opening a pale seam under the header — the fix is padding, not a child margin;
+  (2) the pre-Figma `@media (max-width: 480px)` block shrank Home's greeting, date numeral and
+  stats, which was wrong once the design itself became a 390px phone. Those overrides were
+  removed. **If a Figma value looks right in the CSS but wrong on screen, check that media
+  query.**
+
+**Older note (2026-09-09 second pass), after Steps C, D and E were built and verified live:** The
 compressed "MVP run" that re-scoped the original 16-checkpoint plan is now essentially complete
 on the build side; what remains is Nina's own hands-on test.
 
@@ -636,6 +682,10 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   since the convention below means local can run ahead again at any time. Latest commits,
   newest first:
   ```
+  <new>  Rebuild Home from the Figma spec; Inter + Big Shoulders app-wide
+  d90de73 Pin a "last week of term" notice to Home
+  1836779 Shrink the calendar chrome so the event list is actually visible
+  f3da37d HANDOVER: keep the Leave Test identity, it isn't residue
   8358564 Step D: check-in with a one-hour undo window, plus Step E seed data
   7e44be1 Step C: Home, Calendar/My Term, admin event management, absence marking
   c282294 Add handover doc for Claude account switch (documentation only, no product changes)
@@ -656,7 +706,9 @@ Nina's consistent, explicitly repeated instruction throughout the project.
 
 ## 11. Local development
 
-**Running the app locally:** No build step. A dev-server launch config already exists at
+**Running the app locally:** No build step. There is now a launch config INSIDE the repo at
+`sonario/.claude/launch.json` (`python3 -m http.server`, port 8777) — use that one; it's the
+shortest path to a preview for visual verification. An older config also exists at
 `/Users/nina.kowalski/Documents/Claude/.claude/launch.json` (note: this lives one level up, in
 the parent `Claude` directory that also holds Page Turners and other projects, not inside
 `sonario/` itself) — entry named `"sonario"`, serves the `sonario` folder on port 5501 via `npx

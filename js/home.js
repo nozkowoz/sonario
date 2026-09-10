@@ -2,19 +2,22 @@ import { html, useMemo } from './lib.js';
 import { formatDateRail, formatWeekdayLong, formatDayMonthLong, formatTimeRange,
   parseLocalDate, relativeDayLabel, todayStr } from './lib.js';
 import { displayNameOf } from './store.js';
-import { EVENT_TYPE_LABEL, eventTitle, nextEvent, currentTermOf, AbsenceToggle } from './events.js';
+import { EVENT_TYPE_LABEL, nextEvent, currentTermOf, AbsenceToggle, RailRow } from './events.js';
 import { CheckInPanel, AttendanceStatus, isCheckInDay } from './checkin.js';
-import { IconMegaphone, IconPin, IconChevron } from './icons.js';
+import { IconMegaphone, IconPinFilled } from './icons.js';
 import { LoadingState, EmptyState } from './shell.js';
 
-// Home, per Nina's 2026-09-10 mockup and DESIGN-RULES.md: a strong purple block at the top
-// carrying identity, greeting and the next rehearsal, then pale-lavender body content in cards.
+// Home, rebuilt 2026-09-10 from Nina's Figma spec (and DESIGN-RULES.md, which wins where the two
+// disagree): a purple block carrying identity, greeting and the next rehearsal, then pale
+// lavender body content — MY TERM, then COMING UP.
 //
-// Not here, and why: LATEST RECAP needs `rehearsal_recaps`, which has a table but no content and
-// no authoring UI (Checkpoint 13). And the mockup's coral "Rehearsal room changed" notice is
-// styled NEUTRAL here, because the rules reserve coral for genuine attention states and what the
-// app actually has to put in that slot is the organiser's ordinary note on the event. Coral
-// becomes correct once there's a notices feature that can mark something as a disruption.
+// Not here, and why:
+//  - LATEST RECAP needs `rehearsal_recaps`, which is an empty table with no authoring UI. It
+//    stays off Home rather than being faked (DESIGN-RULES.md → Future functionality).
+//  - The intended design's coral "Rehearsal room changed" notice is rendered NEUTRAL, because
+//    the only thing the app can actually put in that slot is the organiser's ordinary note on
+//    the event, and the rules reserve coral for a genuine disruption. Coral becomes correct once
+//    a notices feature can mark something as one.
 
 const greetingFor = (d = new Date()) => {
   const h = d.getHours();
@@ -68,7 +71,7 @@ function lastWeekNotice(term, events, today) {
 
 // My Term. THE DENOMINATOR IS REHEARSALS THAT HAVE ALREADY HAPPENED, not everything scheduled in
 // the term — in week 2 having attended both it reads 2/2, never 2/10. That's an explicit rule.
-function termStats({ term, events, checkins, absences, profileId }) {
+function termStats({ term, events, checkins, profileId }) {
   if (!term) return null;
   const today = todayStr();
 
@@ -111,8 +114,8 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
     [checkins, next, profile.id],
   );
   const stats = useMemo(
-    () => termStats({ term, events, checkins, absences, profileId: profile.id }),
-    [term, events, checkins, absences, profile.id],
+    () => termStats({ term, events, checkins, profileId: profile.id }),
+    [term, events, checkins, profile.id],
   );
   const termNotice = useMemo(() => lastWeekNotice(term, events, todayStr()), [term, events]);
 
@@ -121,7 +124,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
     const today = todayStr();
     return events
       .filter((e) => e.rehearsal_date >= today && e.status !== 'cancelled' && e.id !== next?.id)
-      .slice(0, 3);
+      .slice(0, 5);
   }, [events, next]);
 
   const firstName = (displayNameOf(profile) || '').split(' ')[0];
@@ -164,16 +167,18 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
                   ? html`<p class="next-time">${formatTimeRange(next.start_time, next.end_time)}</p>`
                   : null}
                 ${next.location ? html`
-                  <p class="next-loc"><${IconPin} size=${17} />${next.location}</p>
+                  <p class="next-loc"><${IconPinFilled} size=${11} />${next.location}</p>
                 ` : null}
                 <${AttendanceStatus} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence} />
                 <${CheckInPanel} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence}
                   profileId=${profile.id} />
-                ${myCheckin
-                  ? null
-                  : html`<${AbsenceToggle} event=${next} myAbsence=${myAbsence} profileId=${profile.id} />`}
               </div>
             </div>
+            ${myCheckin ? null : html`
+              <div class="next-card-foot">
+                <${AbsenceToggle} event=${next} myAbsence=${myAbsence} profileId=${profile.id} />
+              </div>
+            `}
           </div>
         ` : null}
       </div>
@@ -232,22 +237,9 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
           <h3 class="home-section-title">Coming up</h3>
           <button class="btn-quiet" onClick=${() => onNavigate('calendar')}>See all</button>
         </div>
-        <div class="event-list">
+        <div class="rail-list">
           ${upcoming.map((e) => html`
-            <button key=${e.id} class="mini-row" onClick=${() => onNavigate('calendar')}>
-              <span class="mini-rail" aria-hidden="true">
-                <span class="mini-rail-day">${formatDateRail(e.rehearsal_date).day}</span>
-                <span class="mini-rail-date">${formatDateRail(e.rehearsal_date).date}</span>
-              </span>
-              <span class="mini-body">
-                <span class="mini-title">${eventTitle(e)}</span>
-                ${e.start_time
-                  ? html`<span class="mini-meta">${formatTimeRange(e.start_time, e.end_time)}</span>`
-                  : null}
-                ${e.location ? html`<span class="mini-meta">${e.location}</span>` : null}
-              </span>
-              <span class="mini-chev"><${IconChevron} size=${18} /></span>
-            </button>
+            <${RailRow} key=${e.id} event=${e} onOpen=${() => onNavigate('calendar')} />
           `)}
         </div>
       ` : null}
