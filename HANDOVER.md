@@ -682,7 +682,7 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   since the convention below means local can run ahead again at any time. Latest commits,
   newest first:
   ```
-  <new>  Rebuild Home from the Figma spec; Inter + Big Shoulders app-wide
+  c3c5a5e Rebuild Home from the Figma spec; Inter + Big Shoulders app-wide
   d90de73 Pin a "last week of term" notice to Home
   1836779 Shrink the calendar chrome so the event list is actually visible
   f3da37d HANDOVER: keep the Leave Test identity, it isn't residue
