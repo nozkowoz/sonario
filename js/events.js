@@ -309,14 +309,17 @@ export function EventDetail({
 // Admin event form — create / edit / reschedule. Cancelling is a separate action on the card
 // (a status flip), so there's no status field in here.
 // ---------------------------------------------------------------------------
+// Defaults are the choir's actual pattern — Tuesdays 7-9pm at EASTMINT — because nearly every
+// event added by hand is either a rehearsal or something at the same hall. A performance
+// elsewhere means clearing two fields; the alternative was retyping them every single time.
 const blankEvent = () => ({
   event_type: 'rehearsal',
   title: '',
   description: '',
   rehearsal_date: todayStr(),
-  start_time: '19:30',
-  end_time: '21:30',
-  location: '',
+  start_time: '19:00',
+  end_time: '21:00',
+  location: 'EASTMINT, Northcote',
   term_id: '',
   counts_towards_attendance: true,
 });
@@ -404,7 +407,7 @@ export function EventForm({ event, terms, onDone, focusField = null }) {
       </div>
       <label>
         Location
-        <input type="text" value=${form.location} onInput=${set('location')} placeholder="e.g. Church hall" />
+        <input type="text" value=${form.location} onInput=${set('location')} placeholder="e.g. EASTMINT, Northcote" />
       </label>
       <label>
         Notes (optional)

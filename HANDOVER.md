@@ -627,11 +627,23 @@ case coordinate clicks and screenshots fail outright — drive the page through 
 **Testing a real sign-in/role locally:** see §9's anonymous-identity pattern — there is currently
 no way to test Google sign-in itself without Nina's own Google account and confirmed OAuth setup.
 
-**Identifying the Supabase project:** project ref `jpffnazfjxvdzqnfueue`, reachable via the
-connected Supabase MCP tool (`mcp__b4a8a01d-9f7a-4326-8637-56df71835a4f__*` in this session's tool
-list — the exact tool-name prefix may differ in a new session, search for Supabase MCP tools by
-capability, e.g. `execute_sql`/`apply_migration`/`list_tables`). No local `.env` — the anon key is
-directly in `js/config.js`.
+**Identifying the Supabase project — CHECK THIS EVERY SESSION BEFORE WRITING ANYTHING.** Sonario
+is project ref **`jpffnazfjxvdzqnfueue`**. On 2026-09-10 the Supabase MCP server in Nina's
+`~/.claude.json` was pinned to `--project-ref=ylrcotvnrvvfosuvtleh` — which is **North Island
+Diary**, a completely different app — and additionally set to `--read-only`. A `select` against
+`sonario.terms` failed with "relation does not exist", which is the *good* failure mode; the bad
+one would have been "helpfully" creating the schema and polluting another app's database. Verify
+first, with a query that can't do damage:
+```sql
+select current_database(),
+       (select count(*) from information_schema.schemata where schema_name = 'sonario');
+```
+If `sonario` isn't there, you are on the wrong project: stop, and either hand Nina the SQL to run
+in the Supabase SQL editor (`https://supabase.com/dashboard/project/jpffnazfjxvdzqnfueue/sql`) or
+ask her to repoint `--project-ref` and restart the session. `--read-only` also removes
+`apply_migration` and every other write tool from the session, so migrations can't be applied
+directly either — check whether they're in the tool list before promising to apply one. No local
+`.env`; the anon key is in `js/config.js`.
 
 **No automated test suite exists for this project** — verification has always meant live
 end-to-end testing against the real Supabase project (see §9), not unit/integration tests.
