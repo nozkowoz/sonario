@@ -1,9 +1,9 @@
 import { html, useState, useMemo } from './lib.js';
 import { formatEventDate, formatEventDateLong, parseLocalDate, todayStr, localDateStr } from './lib.js';
 import { logLeave, cancelLeave, awayRangeFor } from './store.js';
-import { EventRow, EventDetail, currentTermOf } from './events.js';
+import { EventDetail, RailRow, currentTermOf } from './events.js';
 import { LoadingState, EmptyState } from './shell.js';
-import { IconChevron, IconBack } from './icons.js';
+import { IconChevron, IconBack, IconCheckCircle, IconMinusCircle } from './icons.js';
 
 // The member Calendar, per DESIGN-RULES.md. No Subscribe (removed by rule — add-to-calendar lives
 // on the individual event instead), and no RSVP anywhere: members are expected by default and the
@@ -12,87 +12,80 @@ import { IconChevron, IconBack } from './icons.js';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The dot colour IS the meaning — see the semantic palette in DESIGN-RULES.md. Cancelled outranks
-// type, because "no rehearsal tonight" is the thing you need to see first.
-export function eventDotClass(ev) {
-  if (ev.status === 'cancelled') return 'dot-cancelled';
-  return `dot-${ev.event_type}`;
+// The WEEK STRIP, replacing the month grid (Nina's Figma, 2026-09-10). One row of seven days
+// inside the purple hero rather than a six-row grid in a white card below it.
+//
+// This is the real answer to "the calendar takes up a bit too much room so you can see more of
+// the list" — the earlier pass trimmed the grid's chrome and won back about 180px, but the grid
+// itself was the cost. A strip is one row, and it sits in the hero rather than adding a card, so
+// the list now starts near the top of the body instead of halfway down the screen.
+//
+// Dots are a single translucent WHITE, not the semantic type colours the grid used. On purple,
+// dark purple / green / teal dots are all but invisible; white carries "something happens that
+// day", and the row tints in the list below carry what kind of thing it is. The legend went with
+// them — it existed to decode the grid's colours, and there is nothing left for it to decode.
+const MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Monday of the week containing `dateStr`. JS weeks start Sunday, ours start Monday.
+function mondayOf(dateStr) {
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
 }
 
-// A month's worth of cells, Monday-first, padded with the neighbouring months' days to complete
-// the first and last weeks — and only as many WEEKS as the month actually spans. A fixed six-row
-// grid meant most months carried a whole row of nothing but greyed-out next-month days, which
-// cost about 55px of a screen where the event list was already being squeezed off the bottom.
-function monthCells(year, month) {
-  const lead = (new Date(year, month, 1).getDay() + 6) % 7;   // JS weeks start Sunday; ours Monday
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const weeks = Math.ceil((lead + daysInMonth) / 7);
-  const cells = [];
-  for (let i = 0; i < weeks * 7; i += 1) {
-    const d = new Date(year, month, 1 - lead + i);
-    cells.push({ date: localDateStr(d), inMonth: d.getMonth() === month, day: d.getDate() });
-  }
-  return cells;
+function weekDays(mondayDate) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate() + i);
+    return { date: localDateStr(d), day: d.getDate(), month: d.getMonth(), year: d.getFullYear() };
+  });
 }
 
-function MonthGrid({ year, month, eventsByDate, selected, onSelect, onStep }) {
-  const cells = useMemo(() => monthCells(year, month), [year, month]);
+// A week can straddle two months, and two years. Say so rather than picking one and being wrong
+// for three days of every crossing week.
+function weekLabel(days) {
+  const a = days[0];
+  const b = days[6];
+  if (a.year !== b.year) return `${MON_SHORT[a.month]} ${a.year} – ${MON_SHORT[b.month]} ${b.year}`;
+  if (a.month !== b.month) return `${MON_SHORT[a.month]} – ${MON_SHORT[b.month]} ${a.year}`;
+  return `${MONTHS[a.month]} ${a.year}`;
+}
+
+function WeekStrip({ monday, eventsByDate, selected, onSelect, onStep }) {
+  const days = useMemo(() => weekDays(monday), [monday]);
   const today = todayStr();
 
   return html`
-    <div class="card month-card">
-      <div class="month-head">
-        <button class="icon-btn" aria-label="Previous month" onClick=${() => onStep(-1)}>
-          <${IconBack} size=${20} />
+    <div class="week-strip">
+      <div class="week-head">
+        <button class="week-nav" aria-label="Previous week" onClick=${() => onStep(-1)}>
+          <${IconBack} size=${18} />
         </button>
-        <h3 class="month-title">${MONTHS[month]} ${year}</h3>
-        <button class="icon-btn" aria-label="Next month" onClick=${() => onStep(1)}>
-          <${IconChevron} size=${20} />
+        <p class="week-title">${weekLabel(days)}</p>
+        <button class="week-nav" aria-label="Next week" onClick=${() => onStep(1)}>
+          <${IconChevron} size=${18} />
         </button>
       </div>
-      <div class="month-dow" aria-hidden="true">
-        ${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => html`<span key=${i}>${d}</span>`)}
-      </div>
-      <div class="month-grid" role="grid">
-        ${cells.map((c) => {
+      <div class="week-days" role="group" aria-label="Week">
+        ${days.map((c, i) => {
           const evs = eventsByDate[c.date] || [];
-          const label = `${c.day} ${MONTHS[month]}${evs.length
+          const label = `${c.day} ${MONTHS[c.month]}${evs.length
             ? `, ${evs.length} event${evs.length > 1 ? 's' : ''}` : ', no events'}`;
           return html`
-            <button key=${c.date} role="gridcell"
-              class="month-cell ${c.inMonth ? '' : 'month-cell-out'} ${c.date === selected ? 'month-cell-sel' : ''} ${c.date === today ? 'month-cell-today' : ''}"
+            <button key=${c.date} class="week-day"
               aria-label=${label} aria-current=${c.date === today ? 'date' : 'false'}
-              disabled=${!evs.length && !c.inMonth}
+              disabled=${!evs.length}
               onClick=${() => onSelect(c.date, evs)}>
-              <span class="month-cell-num">${c.day}</span>
-              <span class="month-dots">
-                ${evs.slice(0, 3).map((e) => html`<span key=${e.id} class="month-dot ${eventDotClass(e)}"></span>`)}
+              <span class="week-dow" aria-hidden="true">${['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</span>
+              <span class=${`week-num ${c.date === selected ? 'week-num-sel' : ''} ${c.date === today ? 'week-num-today' : ''}`}>
+                ${c.day}
+              </span>
+              <span class="week-dots" aria-hidden="true">
+                ${evs.slice(0, 3).map((e) => html`<span key=${e.id} class="week-dot"></span>`)}
               </span>
             </button>
           `;
         })}
       </div>
-      <${Legend} />
-    </div>
-  `;
-}
-
-// The legend earns its place because the dots are the only thing carrying meaning in the grid.
-// Tentative is deliberately absent: `rehearsals.status` is scheduled/cancelled only, so nothing
-// can be marked TBC yet and a legend entry for it would be describing a state that can't occur.
-function Legend() {
-  const items = [
-    ['dot-rehearsal', 'Rehearsal'],
-    ['dot-workshop', 'Workshop'],
-    ['dot-performance', 'Performance'],
-    ['dot-social', 'Social'],
-    ['dot-cancelled', 'Cancelled'],
-  ];
-  return html`
-    <div class="legend">
-      ${items.map(([cls, label]) => html`
-        <span key=${cls} class="legend-item"><span class="month-dot ${cls}"></span>${label}</span>
-      `)}
     </div>
   `;
 }
@@ -223,11 +216,12 @@ export function CalendarTab({
 }) {
   const [openId, setOpenId] = useState(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  // Which day the strip highlights. Defaults to today, which is what the design shows.
   const [selected, setSelected] = useState(todayStr());
-  const [cursor, setCursor] = useState(() => {
-    const d = parseLocalDate(todayStr());
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
+  // Separate from `selected`: narrowing the list to one day only happens when a day carries more
+  // than one event, so highlighting today doesn't hide the rest of the term.
+  const [dayFilter, setDayFilter] = useState(null);
+  const [weekStart, setWeekStart] = useState(() => mondayOf(todayStr()));
   const [filter, setFilter] = useState('all');
 
   const termsById = useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
@@ -295,16 +289,14 @@ export function CalendarTab({
   }
 
   // Tapping a date opens the event when there's only one, which is the common case for a choir
-  // rehearsing weekly; with more than one it selects the day and the list below narrows to it.
+  // rehearsing weekly; with more than one it narrows the list to that day instead.
   const selectDate = (date, evs) => {
-    if (evs.length === 1) { setOpenId(evs[0].id); return; }
     setSelected(date);
+    if (evs.length === 1) { setOpenId(evs[0].id); return; }
+    setDayFilter(evs.length > 1 ? date : null);
   };
 
-  const step = (by) => setCursor(({ year, month }) => {
-    const d = new Date(year, month + by, 1);
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
+  const step = (by) => setWeekStart((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + by * 7));
 
   const FILTERS = [
     ['all', 'All'],
@@ -315,20 +307,51 @@ export function CalendarTab({
   const matchesFilter = (e) => filter === 'all'
     || (filter === 'other' ? !['rehearsal', 'performance'].includes(e.event_type) : e.event_type === filter);
 
-  const monthPrefix = `${cursor.year}-${String(cursor.month + 1).padStart(2, '0')}`;
-  const monthEvents = events.filter((e) => e.rehearsal_date.startsWith(monthPrefix) && matchesFilter(e));
-  const selectedEvents = (eventsByDate[selected] || []).filter(matchesFilter);
-  const listed = selectedEvents.length > 1 ? selectedEvents : monthEvents;
+  // The list is UPCOMING, grouped by month — not scoped to the week showing in the strip. That's
+  // the division of labour the design implies: the strip is a date jumper, the list is the whole
+  // road ahead. Scoping the list to the visible week would put six events on screen at most and
+  // make the strip mandatory navigation rather than a shortcut.
+  const today = todayStr();
+  const groups = useMemo(() => {
+    const upcoming = events
+      .filter((e) => e.rehearsal_date >= today && matchesFilter(e));
+    const out = [];
+    for (const e of upcoming) {
+      const d = parseLocalDate(e.rehearsal_date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const last = out[out.length - 1];
+      if (last && last.key === key) last.events.push(e);
+      else out.push({ key, label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, events: [e] });
+    }
+    return out;
+  }, [events, today, filter]);
 
-  const rowProps = (e) => ({
-    event: e,
-    myAbsence: myAbsenceByEvent[e.id],
-    myCheckin: myCheckinByEvent[e.id],
-    myAway: awayRangeFor(e, awayDates, profileId),
-    canManage: false,
-    onOpen: (ev) => setOpenId(ev.id),
-    onManage: onManageEvent,
-  });
+  const dayEvents = dayFilter ? (eventsByDate[dayFilter] || []).filter(matchesFilter) : [];
+
+  // Where a member stands on an event, as a marker in the row's trailing slot. Only rendered when
+  // there IS something to say — the default "you're expected" is the whole point of the
+  // absence-only model and would be noise on every row. The words live on the detail screen; this
+  // is deliberately just a mark, because the row is 358px wide and the title has to fit.
+  const stateMark = (e) => {
+    if (myCheckinByEvent[e.id]) {
+      return html`<span class="rail-mark rail-mark-in" role="img" aria-label="You checked in">
+        <${IconCheckCircle} size=${16} /></span>`;
+    }
+    if (awayRangeFor(e, awayDates, profileId)) {
+      return html`<span class="rail-mark rail-mark-off" role="img" aria-label="You're away">
+        <${IconMinusCircle} size=${16} /></span>`;
+    }
+    if (myAbsenceByEvent[e.id]) {
+      return html`<span class="rail-mark rail-mark-off" role="img" aria-label="You can't make it">
+        <${IconMinusCircle} size=${16} /></span>`;
+    }
+    return null;
+  };
+
+  const row = (e) => html`
+    <${RailRow} key=${e.id} event=${e} onOpen=${(ev) => setOpenId(ev.id)}
+      trailing=${stateMark(e) || html`<span class="rail-chev"><${IconChevron} size=${14} /></span>`} />
+  `;
 
   return html`
     <div class="tab-content">
@@ -343,36 +366,43 @@ export function CalendarTab({
               + Log leave
             </button>`}
         </div>
+        <${WeekStrip} monday=${weekStart} eventsByDate=${eventsByDate}
+          selected=${selected} onSelect=${selectDate} onStep=${step} />
       </div>
 
       ${leaveOpen
         ? html`<${LeaveForm} profileId=${profileId} onDone=${() => setLeaveOpen(false)} />`
         : null}
 
-      <${MonthGrid} year=${cursor.year} month=${cursor.month} eventsByDate=${eventsByDate}
-        selected=${selected} onSelect=${selectDate} onStep=${step} />
-
       <div class="chips">
         ${FILTERS.map(([key, label]) => html`
           <button key=${key} class="chip ${filter === key ? 'chip-on' : ''}"
-            onClick=${() => setFilter(key)}>${label}</button>
+            onClick=${() => { setFilter(key); setDayFilter(null); }}>${label}</button>
         `)}
       </div>
 
       ${loading ? html`<${LoadingState} label="Loading events…" />` : null}
 
-      ${!loading ? html`
-        <p class="eyebrow">
-          ${selectedEvents.length > 1
-            ? formatEventDateLong(selected)
-            : `${MONTHS[cursor.month]} ${cursor.year}`}
-        </p>
-        ${listed.length
-          ? html`<div class="event-list">
-              ${listed.map((e) => html`<${EventRow} key=${e.id} ...${rowProps(e)} showRelative=${true} />`)}
-            </div>`
-          : html`<${EmptyState} title="Nothing this month"
-              body="Use the arrows above to look at another month." />`}
+      ${!loading && dayFilter ? html`
+        <div class="section-header home-section">
+          <h3 class="home-section-title">${formatEventDateLong(dayFilter)}</h3>
+          <button class="btn-quiet" onClick=${() => setDayFilter(null)}>Show all</button>
+        </div>
+        <div class="rail-list">${dayEvents.map(row)}</div>
+      ` : null}
+
+      ${!loading && !dayFilter ? html`
+        ${groups.length
+          ? groups.map((g) => html`
+              <div key=${g.key} class="month-group">
+                <p class="month-group-title">${g.label}</p>
+                <div class="rail-list">${g.events.map(row)}</div>
+              </div>
+            `)
+          : html`<${EmptyState} title="Nothing coming up"
+              body=${filter === 'all'
+                ? 'New rehearsals and events will appear here as soon as they’re scheduled.'
+                : 'Nothing upcoming of this kind. Try another filter.'} />`}
       ` : null}
 
       <${LeaveList} leave=${myLeave} />

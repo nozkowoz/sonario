@@ -628,68 +628,77 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .detail-notes svg { color: var(--ink-soft); flex-shrink: 0; margin-top: 2px; }
 .detail-notes p { margin: 0; font-size: 15px; white-space: pre-wrap; }
 
-/* --- Calendar: purple header block -------------------------------------- */
+/* --- Calendar: purple hero + week strip --------------------------------- */
+/* The hero now carries the week strip as well as the title, so it bleeds to both edges the same
+   way Home's does. The month grid and its legend that used to sit in a white card below this are
+   GONE — see the comment on WeekStrip in js/calendar.js for why the strip replaced them. */
 .cal-top {
-  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 14px;
-  padding: 0 var(--main-pad) 14px;
-  background: linear-gradient(180deg, #6547be 0%, #5e40b6 100%);
+  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 16px;
+  padding: 2px var(--main-pad) 16px;
+  background: var(--purple);
 }
-.cal-top-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.tab-content h2.cal-title { font-family: 'Inter', system-ui, sans-serif; font-size: 25px; text-transform: none; letter-spacing: -0.2px; margin: 0; color: #fff; }
-.cal-term { margin: 1px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.8); }
-/* A white pill on the purple — the same job the dark pill does on a light screen. */
-.btn-on-purple { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.5); color: #fff; }
-.btn-on-purple:hover { background: rgba(255, 255, 255, 0.26); transform: translateY(-1px); }
+.cal-top-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.tab-content h2.cal-title { font-size: 30px; font-weight: 900; line-height: 33px; letter-spacing: -0.3px; text-transform: none; margin: 0; color: #fff; }
+.cal-term { margin: 2px 0 0; font-size: 13px; font-weight: 500; line-height: 19.5px; color: rgba(255, 255, 255, 0.65); }
+/* An outlined pill on the purple — the same job the dark pill does on a light screen. */
+.btn-on-purple { background: transparent; border: 1.36px solid rgba(255, 255, 255, 0.40); color: #fff; font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 99px; }
+.btn-on-purple:hover { background: rgba(255, 255, 255, 0.16); }
 
-/* --- Calendar: month grid ----------------------------------------------- */
-.month-card { padding: 10px 10px 8px; margin-bottom: 12px; }
-.month-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
-.month-title { font-size: 16px; font-weight: 700; margin: 0; }
-.month-dow, .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
-.month-dow { margin-bottom: 2px; }
-.month-dow span { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); padding: 2px 0; }
-.month-cell {
-  border: none; background: none; cursor: pointer; padding: 1px 0 3px;
-  display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 10px;
+.week-strip { padding-top: 20px; }
+.week-head { display: flex; align-items: center; justify-content: space-between; }
+.week-title { margin: 0; font-size: 13px; font-weight: 700; line-height: 19.5px; color: rgba(255, 255, 255, 0.90); }
+.week-nav {
+  border: none; background: none; cursor: pointer; padding: 4px; border-radius: 99px;
+  color: rgba(255, 255, 255, 0.75); display: grid; place-items: center;
 }
-.month-cell:disabled { cursor: default; }
-.month-cell-num {
-  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
-  font-size: 14px; font-weight: 600; color: var(--ink);
+.week-nav:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.week-days { display: flex; gap: 2px; padding-top: 8px; }
+.week-day {
+  flex: 1; min-width: 0; border: none; background: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 0; border-radius: 12px;
 }
-.month-cell-out .month-cell-num { color: #b9b2cf; }
-.month-cell-today .month-cell-num { box-shadow: inset 0 0 0 1.5px var(--purple); color: var(--purple-dark); }
-.month-cell-sel .month-cell-num { background: var(--purple); color: #fff; box-shadow: none; }
-.month-cell:hover:not(:disabled) .month-cell-num { background: var(--purple-light); }
-.month-cell-sel:hover .month-cell-num { background: var(--purple); }
-/* Fixed-height dot row so cells with and without events line up. */
-.month-dots { display: flex; gap: 3px; height: 5px; align-items: center; }
-.month-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-/* THE DOT COLOUR IS THE MEANING — semantic palette, see DESIGN-RULES.md. */
-.dot-rehearsal { background: var(--purple); }
-.dot-workshop { background: #b9a7e8; }
-.dot-performance { background: var(--green); }
-.dot-social { background: #4a9aad; }
-.dot-tentative { background: #e6b422; }
-.dot-cancelled { background: #e8695f; }
+/* A day with nothing on it is not a link to anywhere, so it doesn't pretend to be one. It still
+   renders at full strength — greying out five days of every week would make the strip harder to
+   read as a week, and "no rehearsal" isn't a disabled state, it's just Wednesday. */
+.week-day:disabled { cursor: default; }
+.week-day:not(:disabled):hover { background: rgba(255, 255, 255, 0.10); }
+.week-dow { font-size: 10px; font-weight: 600; line-height: 15px; letter-spacing: 0.4px; color: rgba(255, 255, 255, 0.50); }
+.week-num {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 99px;
+  font-size: 14px; font-weight: 600; line-height: 21px; color: #fff;
+}
+/* Today gets a ring, the selected day gets the fill. They coincide on open, which is why the fill
+   has to win — two treatments on one cell would read as two different days. */
+.week-num-today { box-shadow: inset 0 0 0 1.36px rgba(255, 255, 255, 0.55); }
+.week-num-sel { background: #fff; color: var(--purple); font-weight: 800; box-shadow: none; }
+.week-dots { display: flex; gap: 3px; height: 5px; align-items: center; }
+.week-dot { width: 4px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.55); flex-shrink: 0; }
 
-/* Wraps rather than scrolls: all five items don't fit on one line at 375px, and a legend with
-   "Cancelled" hidden off the edge is worse than one that costs an extra 10px. */
-.legend {
-  display: flex; flex-wrap: wrap; gap: 4px 11px; margin: 6px 2px 2px; padding-top: 7px;
-  border-top: 1px solid var(--border);
+/* --- Calendar: month groups in the list --------------------------------- */
+.month-group + .month-group { margin-top: 20px; }
+.month-group-title {
+  margin: 0; font-size: 11px; font-weight: 800; line-height: 16.5px; letter-spacing: 1.32px;
+  text-transform: uppercase; color: var(--fig-mute);
 }
-.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
+.month-group .rail-list { margin-top: 8px; }
 
 /* --- Calendar: filter chips --------------------------------------------- */
-.chips { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 2px; scrollbar-width: none; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 20px; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
-  border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0; line-height: 1.2;
-  background: var(--purple-light); color: var(--purple-dark);
-  font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 99px;
+  border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  background: #fff; color: var(--purple);
+  font-size: 13px; font-weight: 600; line-height: 19.5px; padding: 6px 14px; border-radius: 99px;
 }
 .chip-on { background: var(--purple); color: #fff; }
+
+/* --- Calendar: a member's own state on a list row ----------------------- */
+/* Replaces the chevron rather than sitting beside it: at 358px the title needs the width, and a
+   mark that says something outranks a chevron that says "tappable" on a row that obviously is. */
+.rail-mark { flex-shrink: 0; display: grid; place-items: center; padding: 0 12px; }
+.rail-mark-in { color: var(--pill-green-icon); }
+.rail-mark-off { color: var(--fig-mute); }
 
 /* --- Calendar: leave ---------------------------------------------------- */
 .form-hint { margin: -4px 0 0; font-size: 13px; color: var(--ink-soft); }

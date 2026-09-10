@@ -476,7 +476,29 @@ Membership status copy is exact, agreed wording — see `js/auth.js`, don't casu
 
 ## 7. Current work / exact stopping point
 
-**Updated 2026-09-10 (latest).** Since the Home rebuild:
+**Updated 2026-09-10 (latest).** Calendar has been rebuilt to the Figma — the month grid is
+replaced by a week strip inside the purple hero, and the list is now upcoming events grouped
+under month headings. The list's first row moved from y≈544 to y≈338 on a 375px viewport, which
+is what Nina actually asked for when she said the calendar took up too much room; the earlier
+trimming pass (`1836779`) treated the symptom. `MonthGrid`, `monthCells`, `Legend` and
+`eventDotClass` are deleted, along with ~40 lines of now-dead `.month-*` / `.dot-*` / `.legend-*`
+CSS. Verified in a harness: week stepping, the two-months-in-one-week label, per-day tap
+behaviour (one event opens it, several narrow the list, none is inert), the semantic row tints
+including cancelled-overrides-type, and the away marker landing on the right row.
+
+**`migrations/0006_voice_parts.sql` IS APPLIED** — Nina ran it 2026-09-10 and both halves were
+verified: `part_labels` returns the 11 expected rows with Sop/Alto/Tenor/Barry flagged `common`,
+and `song_assignments_one_part_per_person_per_song` exists in `pg_indexes`.
+
+**NINA HAS DECIDED TO SPLIT THE SUPABASE PROJECTS** (2026-09-10, "i think i would like to
+separate it now while i can"). Sonario and Page Turners currently share one project, which means
+one `auth.users` and one restore point — see §12 for the audit and the plan. **Nothing has been
+done yet.** The recommendation is to move **Sonario** to a fresh project and leave Page Turners
+where it is, because Sonario's user-linked data is entirely fabricated test data and the choir
+hasn't started using it, whereas Page Turners has real book-club data keyed to anonymous
+identities that cannot be recreated in a new project.
+
+Since the Home rebuild:
 
 - **App icons re-rendered from Big Shoulders Display 900** (typography only — see §5).
 - **`supabase/migrations/0006_voice_parts.sql` is WRITTEN AND NOT APPLIED.** It needs Nina to run

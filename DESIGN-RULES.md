@@ -137,6 +137,34 @@ business appearing for a member.
 
 ## Calendar rules
 
+**Built 2026-09-10 to the Figma.** The month grid is gone, replaced by a **week strip inside the
+purple hero**:
+
+- **One row of seven days**, Monday-first, with `‹ ›` stepping by **week**. The header names the
+  month; a week straddling two months says so ("Sep – Oct 2026") rather than picking one and
+  being wrong for three days.
+- **Today gets a ring, the selected day gets a white fill.** They coincide when the tab opens,
+  which is why the fill has to win — two treatments on one cell reads as two different days.
+- **Dots are a single translucent white**, not the semantic type colours. On purple, dark purple /
+  green / teal are all but invisible. The row tints in the list carry what kind of event it is.
+  **The legend went with the grid** — it existed to decode the dots' colours and has nothing left
+  to decode.
+- **A day with no events is disabled but not greyed.** Greying five days of every week makes the
+  strip harder to read as a week, and "no rehearsal" isn't a disabled state, it's just Wednesday.
+- **Tapping a day:** one event opens it; more than one narrows the list to that day with a *Show
+  all* escape; none does nothing.
+- **The list is UPCOMING, grouped by month heading — not scoped to the visible week.** That's the
+  division of labour: the strip is a date jumper, the list is the whole road ahead. Scoping the
+  list to the week would put at most a handful of events on screen and make the strip mandatory
+  navigation rather than a shortcut.
+- **A member's own state replaces the chevron** on a row where there is any: a green tick for
+  checked in, a muted **minus-in-circle** for away or can't-make-it. Not a circle-X — on a list
+  where cancelled events already use a coral tint and a struck-through title, an X beside a
+  healthy concert reads as the event being off rather than the member being absent. The words
+  live on the detail screen; at 358px wide the row title needs the space.
+- **Still to do:** the event **detail screen** is unchanged and does not match the Figma's bottom
+  sheet (date line, 28px title, type pill, status card, Add to calendar, Notes, Can't make it).
+
 - **No global Subscribe button.**
 - Normal rehearsals **do not use RSVP** — members are expected by default. An individual event may
   offer **Can't make it?**
@@ -186,12 +214,6 @@ render. None of them blocks current work.
   *future* leave, an admin can override, and there are no silent failure states. Note that
   `away_dates` has **no DELETE policy** and the member UPDATE policy is limited to
   `status = 'pending'`, so any expansion here means new policies.
-- **Calendar becomes a week strip.** The Figma replaces the month grid with a single scrolling
-  week (M–S with an event dot under each day) above an event list grouped under month headings
-  (`JULY 2026`, `AUGUST 2026`). This is a better answer to "the calendar takes up too much room"
-  than the trimming done on 2026-09-10, and it supersedes it. Needs no new data — the month grid
-  and the week strip read the same `rehearsals` rows. Plus filter chips: All / Rehearsals /
-  Performances / Other.
 - **More becomes a real profile screen.** Name + voice part + choir, then My Profile, My
   Availability, Notification Settings, Help & Feedback, About Sonario, Sign out. Voice part is
   the only new field; the rest are either existing (sign out) or shells.

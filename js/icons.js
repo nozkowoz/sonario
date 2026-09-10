@@ -150,3 +150,12 @@ export const IconPinFilled = ({ size = 11 }) => html`
     <path d="M6 0.9a3.7 3.7 0 0 0-3.7 3.7c0 2.7 3.7 6.5 3.7 6.5s3.7-3.8 3.7-6.5A3.7 3.7 0 0 0 6 0.9Zm0 5.1a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Z" />
   </svg>
 `;
+
+// "You're away" / "You can't make it" on a list row. Deliberately NOT IconCancel (a circle with
+// an X): on a row that already uses a coral tint and a struck-through title to mean "this event is
+// cancelled", an X next to a perfectly healthy concert reads as the event being off rather than
+// as the member being absent. A minus reads as excluded-or-excused, which is what it means.
+export const IconMinusCircle = ({ size = 16 }) => svg(html`
+  <circle cx="12" cy="12" r="8.5" />
+  <path d="M8.5 12h7" />
+`, { size });
