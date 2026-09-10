@@ -447,7 +447,7 @@ partial grep of its `store.js`, not on its schema — it plainly has around thir
 for an app that needs three" framing was wrong; the real finding is that two apps are cohabiting
 in `public`.
 
-### ⚠️ One row that is not merely informational: `app_secrets`
+### ✅ RESOLVED — `app_secrets` is safe
 
 `app_secrets` — 2 columns, **0 RLS policies**. Also `scheduled_notifications` — 6 columns, 0
 policies. Every other `public` table has 3 or 4.
@@ -472,8 +472,12 @@ where n.nspname = 'public' and c.relkind = 'r'
 order by c.relname;
 ```
 
-Anything that query returns is a `public` table with RLS switched off. An empty result means
-everything is protected and `app_secrets` is simply deny-all.
+**Run 2026-09-10: "Success. No rows returned."** So **no `public` table has RLS disabled** —
+`app_secrets` and `scheduled_notifications` have RLS *enabled* with zero policies, which is
+deny-all. The anon key cannot read either of them. Whatever writes to them must be doing it
+through `service_role` or a security-definer function, which is the correct shape.
+
+The flag was worth raising and it closed cleanly. Nothing to do.
 
 ### The "2 supers" alarm was mine, and it was wrong 🔧
 Raised as a possible integrity problem, then resolved by reading the file that causes it.
