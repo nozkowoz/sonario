@@ -461,6 +461,17 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .detail-notes svg { color: var(--ink-soft); flex-shrink: 0; margin-top: 2px; }
 .detail-notes p { margin: 0; font-size: 15px; white-space: pre-wrap; }
 
+/* --- Member management rows --------------------------------------------- */
+.member-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.member-row-main { flex: 1; min-width: 0; }
+.member-row-name { font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.member-row-email { font-size: 13px; color: var(--ink-soft); }
+.member-row-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.role-badge { background: var(--purple); color: #fff; }
+/* Handing someone full organiser access is a two-step: there's no undo beyond reversing it. */
+.member-confirm { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.member-confirm-text { margin: 0; font-size: 13px; color: var(--ink); }
+
 /* --- Admin console ------------------------------------------------------ */
 .admin-intro { margin: -6px 0 18px; font-size: 14px; color: var(--ink-soft); }
 .admin-head-title {

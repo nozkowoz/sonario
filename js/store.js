@@ -72,6 +72,21 @@ export function useAllMemberships() {
   return { memberships: rows, loading };
 }
 
+// Role changes only. Kept separate from decideMembership so a promotion can never accidentally
+// rewrite someone's status (or vice versa) by sharing a patch object.
+//
+// The database already allowed this — `super decides memberships` is
+// `is_super() AND profile_id <> auth.uid()` — so nothing new is being opened up here; the UI
+// simply never offered it. That policy also gives the system a useful property for free: a super
+// can never change their OWN row, so however many supers demote each other, the last one standing
+// cannot demote themselves. The choir cannot be locked out of its own admin.
+export async function setMemberRole(profileId, role, decidedBy) {
+  return supabase.from('memberships')
+    .update({ role, decided_at: new Date().toISOString(), decided_by: decidedBy })
+    .eq('profile_id', profileId)
+    .select();
+}
+
 export async function decideMembership(profileId, { status, role }, decidedBy) {
   const patch = { status, decided_at: new Date().toISOString(), decided_by: decidedBy };
   if (role) patch.role = role;

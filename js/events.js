@@ -181,7 +181,8 @@ function adminMenuItems(event, { onEdit, onReschedule, flip, busy }) {
 // Tapping it opens the detail screen; everything that used to be expanded inline lives there now.
 // ---------------------------------------------------------------------------
 export function EventRow({
-  event, myAbsence, myCheckin, canManage, onOpen, onEdit, onReschedule, showRelative = false,
+  event, myAbsence, myCheckin, canManage, onOpen, onEdit, onReschedule, onManage,
+  showRelative = false,
 }) {
   const { busy, error, flip } = useStatusFlip(event);
   const cancelled = event.status === 'cancelled';
@@ -213,7 +214,16 @@ export function EventRow({
       </div>
       ${canManage
         ? html`<${KebabMenu} items=${adminMenuItems(event, { onEdit, onReschedule, flip, busy })} />`
-        : null}
+        : onManage
+          // Calendar is read-only, but a super shouldn't have to go and find an event again in a
+          // second list to change it. One pencil, straight into the admin editor for this event.
+          ? html`
+            <button class="icon-btn" aria-label=${`Edit ${eventTitle(event)}`}
+              onClick=${(e) => { e.stopPropagation(); onManage(event); }}>
+              <${IconEdit} size=${19} />
+            </button>
+          `
+          : null}
     </div>
   `;
 }
@@ -236,6 +246,11 @@ export function EventDetail({
           <${IconBack} size=${20} />
         </button>
         <h2 class="detail-title">${formatWeekdayLong(event.rehearsal_date)} ${eventTitle(event)}</h2>
+        ${canManage && onManage ? html`
+          <button class="icon-btn" aria-label="Edit this event" onClick=${() => onManage(event)}>
+            <${IconEdit} size=${20} />
+          </button>
+        ` : null}
       </div>
 
       <div class="card detail-when">
@@ -286,11 +301,7 @@ export function EventDetail({
         </div>
       ` : null}
 
-      ${canManage && onManage ? html`
-        <button class="btn btn-outline home-link-btn" onClick=${() => onManage(event)}>
-          Manage this event
-        </button>
-      ` : null}
+
     </div>
   `;
 }
@@ -494,6 +505,7 @@ export function CalendarTab({
     myCheckin: myCheckinByEvent[e.id],
     canManage: false,
     onOpen: (ev) => setOpenId(ev.id),
+    onManage: onManageEvent,
   });
 
   return html`
