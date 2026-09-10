@@ -745,6 +745,8 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   ```
   As of this handover:
   ```
+  9dc7af1 Open an event as a bottom sheet, restyled to the Figma
+  e70f9b1 HANDOVER: generate the commit list instead of hand-editing it
   09903ea Rebuild Calendar as a week strip with a month-grouped list
   05c5086 HANDOVER: record the icon commit hash
   02ca7d5 Re-render the app icons from Big Shoulders Display 900
@@ -757,8 +759,6 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   65f0083 Migration 0005 applied: members can now cancel their own pending leave
   190d102 Migration 0005 (NOT APPLIED): members cannot actually cancel their own leave
   da6b5d6 Calendar pass: month grid with semantic dots, log leave, add-to-calendar
-  9598170 Home redesign per the 2026-09-10 mockup, and lock in the design rules
-  354ea1b Add fabricated Term 3 attendance for Nina's profile (dev data, not applied)
   ```
 - **Remote:** `origin` → `https://github.com/nozkowoz/sonario.git`
 - **Pushing is Nina's own step** — established convention throughout this project is that Claude

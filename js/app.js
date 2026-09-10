@@ -10,6 +10,7 @@ import { EventDetail, eventTitle } from './events.js';
 import { HomeTab } from './home.js';
 import { CalendarTab } from './calendar.js';
 import { AdminTab } from './admin.js';
+import { MoreTab } from './more.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
 // Home and More are deliberately role-blind: a super sees exactly what an ordinary member sees,
@@ -63,6 +64,7 @@ function Main({ session, membership, profile }) {
   // already lives. Keyed by id, not by the row object, so a realtime update to the event while
   // the sheet is open is reflected instead of being frozen at the moment it was tapped.
   const [openEventId, setOpenEventId] = useState(null);
+  const [moreView, setMoreView] = useState(null);
 
   // Events/terms/absences/check-ins load once here rather than per tab: both Home and Calendar need the
   // same rows, useLiveTable names its realtime channel after the table, and switching tabs
@@ -121,7 +123,11 @@ function Main({ session, membership, profile }) {
               body="Songs, voice parts and practice recordings land here. The tab is in the nav because the navigation is locked — see DESIGN-RULES.md." />
           </div>
         ` : null}
-        ${activeTab === 'more' ? html`<${MoreTab} profile=${profile} />` : null}
+        ${activeTab === 'more' ? html`
+          <${MoreTab} profile=${profile} terms=${terms}
+            view=${moreView} setView=${setMoreView}
+            onNavigate=${setTab} onSignOut=${() => supabase.auth.signOut()} />
+        ` : null}
         ${activeTab === 'admin' && canManage
           ? html`<${AdminTab} session=${session} view=${adminView} setView=${setAdminView}
               events=${events} eventsLoading=${eventsLoading} terms=${terms} />`
@@ -147,21 +153,6 @@ function Main({ session, membership, profile }) {
           />
         <//>
       ` : null}
-    </div>
-  `;
-}
-
-// Identical for every member, super or not. Nothing role-dependent belongs on this screen.
-function MoreTab({ profile }) {
-  return html`
-    <div class="tab-content">
-      <h2>More</h2>
-      <${EmptyState} title="Nothing here yet" body="Repertoire, recordings and settings land in later builds." />
-      <div class="more-account">
-        <p class="eyebrow">Account</p>
-        <p class="more-account-name">${displayNameOf(profile)}</p>
-        <button class="btn btn-outline btn-sm" onClick=${() => supabase.auth.signOut()}>Sign out</button>
-      </div>
     </div>
   `;
 }

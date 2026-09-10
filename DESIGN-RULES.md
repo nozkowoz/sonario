@@ -90,6 +90,39 @@ a mixed list reads evenly.
 One component renders these on both Home and Calendar — `RailRow` in `js/events.js`. Keep it that
 way, so a change to how an event reads in a list can't land on one screen and miss the other.
 
+## More
+
+**Built 2026-09-10** to the Figma (PDF p5). Purple hero with the member's avatar and name, then
+plain white cards, then Sign out in red, then a version line. Identical for every member — More
+is role-blind, like Home.
+
+Three departures from the mockup, all settled with Nina on 2026-09-10:
+
+- **No voice part under the name.** The mockup shows "Soprano · Melbourne City Choir". A voice
+  part is one per person **per song** (see below), so there is no profile-level part to print. It
+  could be derived — a member's most-assigned part — but there are no songs yet, so that query
+  can only return nothing today. **It goes in when Repertoire does**, and no profile column was
+  added for it.
+- **The choir is called Sonario.** "Melbourne City Choir" was a mockup error (Nina's words: "the
+  mock up got it wrong"). Since the wordmark directly above already says SONARIO, the subtitle
+  would have been repeating itself, so it's gone rather than restated.
+- **"My Availability" navigates to Calendar** instead of carrying its own leave list. Nina asked
+  for leave to stay on Calendar; two screens that both list and cancel leave are two places to
+  keep in step.
+
+**My Profile edits the display name only.** `google_email` comes from the identity provider and
+`avatar_url` is whatever Google returned, so neither is editable. The mockup's "contact info" has
+no column behind it and **one was not added** — adding schema to make a mockup render is the thing
+Nina explicitly asked not to happen.
+
+**The version line shows `APP_VERSION`, not "Version 1.0".** The mockup's friendlier string would
+lose the one thing that footer is for: telling Nina which build a phone is actually running,
+given the PWA's caching.
+
+**"About Sonario" is factual, not legal.** The mockup says "Version info and legal details";
+writing a privacy policy and terms this app doesn't have would be pretending. It states the
+version, the term, what the app does, and who can see your attendance.
+
 ## Voice parts
 
 Set by Nina 2026-09-10. Ten assignable parts, of which **four are standard** and six are
@@ -231,9 +264,6 @@ render. None of them blocks current work.
   *future* leave, an admin can override, and there are no silent failure states. Note that
   `away_dates` has **no DELETE policy** and the member UPDATE policy is limited to
   `status = 'pending'`, so any expansion here means new policies.
-- **More becomes a real profile screen.** Name + voice part + choir, then My Profile, My
-  Availability, Notification Settings, Help & Feedback, About Sonario, Sign out. Voice part is
-  the only new field; the rest are either existing (sign out) or shells.
 - **Repertoire and Practice Mode.** Corrected 2026-09-10: **most of the schema already exists**
   and is empty — migration 0001 §7 creates `part_labels` (seeded Sop / Alto / Alto 1 / Alto 2 /
   Tenor / Tenor 1 / Tenor 2 / Barry / Full choir), `songs`, `song_assignments` (per song, per

@@ -312,6 +312,19 @@ export async function cancelLeave(id) {
     .select();
 }
 
+// The one thing a member owns about their own profile. `google_email` comes from the identity
+// provider and `avatar_url` is whatever Google returned, so neither is editable here.
+//
+// `.select()` matters: the "update own profile" policy is `using (id = auth.uid())`, and an
+// update RLS filters out returns no error and zero rows — so the caller has to see a row come
+// back to know it landed. Same trap as every other write in this app.
+export async function updateDisplayName(profileId, displayName) {
+  return supabase.from('profiles')
+    .update({ display_name: displayName })
+    .eq('id', profileId)
+    .select();
+}
+
 // A member is away for an event if any of their non-cancelled ranges covers its date. Plain
 // string comparison is safe and deliberate: these are all ISO yyyy-mm-dd date strings, so this
 // never goes near a Date object and can't be shifted by a timezone.
