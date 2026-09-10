@@ -100,6 +100,13 @@ function Main({ session, membership, profile }) {
             onManageEvent=${canManage ? manageEvent : null}
           />
         ` : null}
+        ${activeTab === 'repertoire' ? html`
+          <div class="tab-content">
+            <h2>Repertoire</h2>
+            <${EmptyState} title="Not built yet"
+              body="Songs, voice parts and practice recordings land here. The tab is in the nav because the navigation is locked — see DESIGN-RULES.md." />
+          </div>
+        ` : null}
         ${activeTab === 'more' ? html`<${MoreTab} profile=${profile} />` : null}
         ${activeTab === 'admin' && canManage
           ? html`<${AdminTab} session=${session} view=${adminView} setView=${setAdminView}

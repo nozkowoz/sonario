@@ -1,5 +1,5 @@
 import { html, useState } from './lib.js';
-import { IconHome, IconCalendar, IconMore, IconCrown } from './icons.js';
+import { IconHome, IconCalendar, IconNote2, IconMore, IconCrown } from './icons.js';
 
 // Reusable states so every tab handles loading/empty/error the same way, rather than each
 // screen inventing its own copy and layout.
@@ -32,15 +32,14 @@ export function ErrorState({ title = 'Something went wrong', body, onRetry }) {
   `;
 }
 
-// Repertoire still isn't here: it has no screen behind it yet (Checkpoints 6-8), and a nav item
-// that leads nowhere is worse than one that isn't there.
-//
-// Admin sits third with a crown, per Nina's mockup. That does shift More from third to fourth for
-// a super, which an earlier pass avoided by appending Admin last — but with a handful of supers
-// who each know they're a super, matching the intended design wins over that.
+// LOCKED ORDER — see DESIGN-RULES.md. Home, Calendar, Repertoire, Admin, More.
+// Repertoire is in the nav even though its screen isn't built, because the nav is locked and a
+// visible "not built yet" is more honest than a tab that silently isn't there. Admin stays
+// super-only, so a member sees four of the five.
 const TABS = [
   { key: 'home', label: 'Home', Icon: IconHome },
   { key: 'calendar', label: 'Calendar', Icon: IconCalendar },
+  { key: 'repertoire', label: 'Repertoire', Icon: IconNote2 },
   { key: 'admin', label: 'Admin', Icon: IconCrown, superOnly: true },
   { key: 'more', label: 'More', Icon: IconMore },
 ];

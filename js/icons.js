@@ -108,6 +108,19 @@ export const IconCrown = ({ size, active }) => (active
 
 export const IconChevron = ({ size }) => svg(html`<path d="M9 5l7 7-7 7" />`, { size });
 
+// Repertoire — music note, outline/filled like the rest of the nav set.
+export const IconNote2 = ({ size, active }) => (active
+  ? svg(html`
+      <path d="M9 18V6.6l9-1.8V16" fill="none" />
+      <ellipse cx="6.6" cy="18" rx="2.6" ry="2.2" fill="currentColor" stroke="none" />
+      <ellipse cx="15.6" cy="16" rx="2.6" ry="2.2" fill="currentColor" stroke="none" />
+    `, { size })
+  : svg(html`
+      <path d="M9 18V6.6l9-1.8V16" />
+      <ellipse cx="6.6" cy="18" rx="2.6" ry="2.2" />
+      <ellipse cx="15.6" cy="16" rx="2.6" ry="2.2" />
+    `, { size }));
+
 export const IconBell = ({ size }) => svg(html`
   <path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4 1.5 5.5 1.5 5.5H5S6.5 14 6.5 10Z" />
   <path d="M10 19a2 2 0 0 0 4 0" />

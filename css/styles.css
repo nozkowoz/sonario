@@ -10,8 +10,17 @@
   --bg: #f5f2fb;
   --error: #b5342e;
   --error-bg: #fbe6e3;
-  --green: #1f7a44;
+  /* Semantic event/state colours — see DESIGN-RULES.md. Not decorative: each one means a thing. */
+  --green: #1f7a44;        /* positive: performance, expected, checked in, confirmed */
   --green-bg: #e3f6ea;
+  --lilac: #6b4ea8;        /* workshop / extra rehearsal */
+  --lilac-bg: #EEE6FF;
+  --teal: #16697a;         /* social event */
+  --teal-bg: #ddf1f4;
+  --butter: #8a6300;       /* tentative / TBC — no data behind it yet, see DESIGN-RULES.md */
+  --butter-bg: #fdf3d7;
+  --coral: #b5342e;        /* cancelled, or a genuine disruption. Reserved. */
+  --coral-bg: #fbe6e3;
   --radius-lg: 16px;
   --radius-md: 10px;
   --radius-sm: 7px;
@@ -19,6 +28,7 @@
   --shadow-btn: 0 1px 2px rgba(32, 28, 46, 0.06), 0 4px 10px -2px rgba(112, 82, 205, 0.25);
   --ease: cubic-bezier(0.16, 0.84, 0.44, 1);
   --bottom-nav-h: 60px;
+  --main-pad: 20px;
 }
 
 * { box-sizing: border-box; }
@@ -162,7 +172,7 @@ button { font: inherit; }
   cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
 }
 .tab-btn.active { color: var(--purple-dark); border-bottom-color: var(--purple); }
-.app-main { max-width: 780px; margin: 0 auto; padding: 20px; padding-bottom: calc(var(--bottom-nav-h) + 20px); }
+.app-main { max-width: 780px; margin: 0 auto; padding: var(--main-pad); padding-bottom: calc(var(--bottom-nav-h) + 20px); }
 .app-footer { text-align: center; color: #a89fc4; font-size: 12px; padding: 8px 20px calc(var(--bottom-nav-h) + 16px); }
 
 /* Tab content */
@@ -263,11 +273,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   background: var(--purple-light); color: var(--purple-dark);
 }
 .event-type-rehearsal { background: var(--purple-light); color: var(--purple-dark); }
-.event-type-workshop { background: #e5f0fb; color: #24608f; }
-.event-type-performance { background: #fdf0d9; color: #8a5c04; }
-.event-type-social { background: var(--green-bg); color: var(--green); }
+.event-type-workshop { background: var(--lilac-bg); color: var(--lilac); }
+.event-type-performance { background: var(--green-bg); color: var(--green); }
+.event-type-social { background: var(--teal-bg); color: var(--teal); }
+.event-type-tentative { background: var(--butter-bg); color: var(--butter); }
 .event-type-neutral { background: var(--bg); color: var(--ink-soft); }
-.event-cancelled-badge { background: var(--error-bg); color: var(--error); }
+.event-cancelled-badge { background: var(--coral-bg); color: var(--coral); }
 
 /* Absence marking ("I can't make it" — there is no going/maybe/not-going RSVP) */
 .absence-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -329,59 +340,106 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .avatar-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .avatar {
   display: grid; place-items: center;
-  width: 38px; height: 38px; border-radius: 50%;
-  object-fit: cover; background: var(--purple-light);
-  border: 2px solid rgba(255, 255, 255, 0.75);
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover; background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.85);
 }
-.avatar-initials { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 14px; color: var(--purple-dark); }
+/* An outlined ring with the initial, not a filled chip: it sits on the purple header and the
+   mockup treats it as part of that block rather than as a card on top of it. */
+.avatar-initials { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; color: #fff; }
+.app-header-inner { padding-bottom: 10px; }
 
-/* --- Home: the next event, date-led (mockup Option B) -------------------- */
-/* The date is set as a big numeral beside the details rather than inside a coloured card, so the
-   single most useful fact on the screen — which day — is legible at arm's length. */
-.next-block { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 18px; }
-.bigdate {
+/* --- Home ---------------------------------------------------------------- */
+/* The purple block continues the header rather than sitting inside the padded body, so it bleeds
+   to both edges by cancelling the main padding — hence --main-pad existing as a token. */
+.home-top {
+  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 18px;
+  padding: 0 var(--main-pad) 22px;
+  background: linear-gradient(180deg, #6547be 0%, #5e40b6 100%);
+}
+.home-greeting {
+  margin: 0 0 16px; font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -0.2px;
+}
+/* A slightly lighter panel on the purple: hierarchy from tone, not from borders. */
+.next-card { background: rgba(255, 255, 255, 0.13); border-radius: var(--radius-lg); padding: 16px 18px; }
+.next-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.next-eyebrow {
+  margin: 0; font-family: 'Oswald', sans-serif; font-size: 12px; text-transform: uppercase;
+  letter-spacing: 1.1px; color: rgba(255, 255, 255, 0.75);
+}
+.next-when { margin: 0; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
+.next-empty { margin: 8px 0 0; font-size: 15px; color: rgba(255, 255, 255, 0.88); }
+.next-card-body { display: flex; gap: 18px; align-items: flex-start; }
+.next-rail {
   display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
-  padding-right: 18px; border-right: 1px solid var(--border); align-self: stretch;
+  padding-right: 18px; border-right: 1px solid rgba(255, 255, 255, 0.28); align-self: stretch;
+  color: #fff;
 }
-.bigdate-day {
-  font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 30px;
-  letter-spacing: 1.5px; line-height: 1; color: var(--ink);
-}
-.bigdate-num { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 66px; line-height: 0.85; color: var(--ink); }
-.next-info { flex: 1; min-width: 0; }
-.eyebrow-sm {
-  font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 1.2px; color: var(--ink-soft); margin: 0 0 5px;
-}
-.next-title { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.25; }
-.next-time { margin: 3px 0 0; font-size: 16px; }
-.next-loc { margin: 3px 0 0; font-size: 15px; color: var(--ink-soft); }
-.next-rel { margin: 8px 0 0; font-size: 13px; font-weight: 700; color: var(--purple-dark); }
-/* Full-width stacked actions, so the two things a member can do read as one pair of choices
-   rather than as buttons scattered through a card. */
-.next-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
-.next-actions .checkin-row, .next-actions .absence-row {
-  margin: 0; padding: 0; border-top: 0; width: 100%; align-items: stretch; gap: 8px;
-}
-.next-actions .btn { width: 100%; font-size: 15px; padding: 12px 18px; }
-.next-actions .btn-quiet { align-self: flex-start; }
-.detail-status { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.detail-status .checkin-row, .detail-status .absence-row { margin: 0; padding: 0; border-top: 0; }
+.next-rail-day { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: 1.5px; line-height: 1.1; }
+.next-rail-num { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 54px; line-height: 0.9; }
+.next-rail-mon { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 18px; letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.8); }
+.next-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.next-title { margin: 0; font-size: 18px; font-weight: 700; color: #fff; }
+.next-time { margin: 0; font-size: 19px; font-weight: 600; color: #fff; }
+.next-loc { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 15px; color: rgba(255, 255, 255, 0.85); }
+.next-loc svg { flex-shrink: 0; }
+/* The status pill and the quiet opt-out both sit on purple here, so they need their own treatment
+   rather than the on-white versions used on the detail screen. */
+.next-detail .att-status { margin-top: 8px; }
+.next-detail .att-off { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.next-detail .att-muted { color: rgba(255, 255, 255, 0.85); }
+.next-detail .checkin-row, .next-detail .absence-row { margin: 0; padding: 0; border-top: 0; align-items: flex-start; }
+.next-detail .btn-quiet { color: rgba(255, 255, 255, 0.9); text-decoration-color: rgba(255, 255, 255, 0.5); }
+.next-detail .btn-quiet:hover { color: #fff; text-decoration-color: #fff; }
+.next-detail .btn-primary { background: #fff; border-color: #fff; color: var(--purple-dark); box-shadow: none; }
+.next-detail .absence-error, .next-detail .hero-error { color: #ffd9d4; }
 
-/* --- Note band ----------------------------------------------------------- */
-/* The event's own notes, given the mockup's banner treatment. Not a separate "venue update"
-   feature — it's the `description` column that admins already fill in on the event form. */
-.note-band {
+/* --- Home: notice ------------------------------------------------------- */
+/* NEUTRAL, not coral. The rules reserve coral for genuine attention states, and this slot carries
+   the organiser's ordinary note about the event. */
+.notice-card {
   display: flex; gap: 12px; align-items: flex-start;
-  background: var(--purple-light); border-radius: var(--radius-md);
-  padding: 14px 16px; margin-bottom: 4px;
+  background: var(--lilac-bg); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 14px;
 }
-.note-band-icon { color: var(--ink); flex-shrink: 0; display: grid; place-items: center; margin-top: 1px; }
-.note-band .eyebrow-sm { margin-bottom: 2px; }
-.note-band-body { margin: 0; font-size: 14px; white-space: pre-wrap; }
+.notice-icon { color: var(--lilac); flex-shrink: 0; display: grid; place-items: center; margin-top: 1px; }
+.notice-text { min-width: 0; }
+.notice-title { margin: 0; font-size: 15px; font-weight: 700; }
+.notice-body { margin: 2px 0 0; font-size: 14px; color: var(--ink-soft); white-space: pre-wrap; }
 
-.home-rule { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
-.home-link-btn { width: 100%; }
+/* --- Home: My Term ------------------------------------------------------ */
+.term-stats-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.term-stats-title { font-family: 'Oswald', sans-serif; font-size: 17px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
+.term-stats-name { font-size: 13px; font-weight: 600; color: var(--purple-dark); }
+.term-stats-row { display: flex; align-items: stretch; }
+.stat { flex: 1; min-width: 0; padding: 0 10px; }
+.stat:first-child { padding-left: 0; }
+.stat:not(:first-child) { border-left: 1px solid var(--border); }
+.stat-value { margin: 0; font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 26px; color: var(--purple-dark); line-height: 1.05; }
+.stat-label { margin: 3px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.25; }
+.stat-bar { margin-top: 16px; height: 8px; border-radius: 99px; background: #e6e1f3; overflow: hidden; }
+.stat-bar > span { display: block; height: 100%; border-radius: 99px; background: var(--purple); }
+
+/* --- Home: Coming up ---------------------------------------------------- */
+.home-section { margin: 22px 0 10px; }
+.home-section-title { font-family: 'Oswald', sans-serif; font-size: 15px; text-transform: uppercase; letter-spacing: 0.6px; margin: 0; color: var(--ink-soft); }
+.mini-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; cursor: pointer;
+  background: #fff; border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-card);
+  padding: 13px 12px 13px 16px;
+  transition: transform 0.15s var(--ease);
+}
+.mini-row:hover { transform: translateY(-1px); }
+.mini-rail {
+  display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 56px;
+  padding-right: 14px; border-right: 1px solid var(--border);
+}
+.mini-rail-day { font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 0.6px; color: var(--ink-soft); }
+.mini-rail-date { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 15px; color: var(--purple-dark); }
+.mini-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.mini-title { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 16px; }
+.mini-meta { font-size: 13px; color: var(--ink-soft); }
+.mini-chev { color: var(--ink-soft); flex-shrink: 0; display: grid; place-items: center; }
+
 /* The dark pill from the mockup's admin header — deliberately not purple, so "add" reads as a
    primary action distinct from everything else on a purple-accented screen. */
 .btn-dark { background: var(--ink); border-color: var(--ink); color: #fff; }
@@ -514,14 +572,18 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .more-account-name { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
 
 @media (max-width: 480px) {
+  /* Must be a real rule, and --main-pad must be the ONLY place the body padding is set: the Home
+     hero cancels it with negative margins, so a hardcoded .app-main padding here would leave the
+     purple block a few pixels short of the screen edge. */
+  :root { --main-pad: 16px; }
   .app-header-inner { padding: 14px 16px 6px; }
-  .app-main { padding: 16px; }
   .tab-row { padding: 0 16px; }
   .detail-date { font-size: 28px; }
-  .next-block { gap: 14px; }
-  .bigdate { padding-right: 14px; }
-  .bigdate-day { font-size: 26px; }
-  .bigdate-num { font-size: 56px; }
+  .home-greeting { font-size: 23px; }
+  .next-rail-num { font-size: 46px; }
+  .next-card-body { gap: 14px; }
+  .next-rail { padding-right: 14px; }
+  .stat-value { font-size: 22px; }
   .event-row { padding: 13px 8px 13px 13px; gap: 11px; }
   .date-rail { width: 48px; }
 }
