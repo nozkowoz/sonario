@@ -210,11 +210,19 @@ the shared `auth.users` and that one trigger.
   in Melbourne and the current project should be checked to match.
 - **B2.** Add `sonario` to Settings → API → **Exposed schemas**. Do this early; it's the one that
   silently breaks everything.
-- **B3.** Run, in order: `0000` → `0001` → `0002` → `0003` → `0004` → `0005` → `0006`, then
-  **`0000` once more** as the grant sweep, then the `revoke`/`grant` block quoted at the bottom of
-  `0000` to restore the security-definer restrictions the sweep loosens. Stop at the first error
-  rather than pressing on. Note §0.1b: **0003 cannot be re-run** as it stands, so if you have to
-  restart partway, either fix it first or skip it if it already succeeded.
+- **B3. THE CANONICAL MIGRATION ORDER, settled by Nina 2026-09-10:**
+
+  ```
+  0000 → 0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007
+  ```
+
+  Linear, each file once, in that order. `0007` is **always last** and is the grant sweep +
+  explicit revokes + verification output. The earlier "run `0000` twice and paste a commented-out
+  revoke block" shape is **superseded and must not be restored** — Nina: "I do not want the
+  original two-step shape restored." See PHASE-B-RUNBOOK.md for why (the block was comments; a
+  run-it-again instruction gets misordered).
+
+  Stop at the first error rather than pressing on. `0003` is re-runnable as of `875b19b`.
 - **B4.** Configure auth per §2. Add the new callback URI in Google Cloud Console.
 - **B5.** Nina signs in with Google against the new project → a real `auth.users` row appears →
   promote it to `active` / `super` with the bootstrap query in `0001` §11 (it deliberately looks

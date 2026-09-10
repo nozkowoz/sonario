@@ -476,6 +476,36 @@ Membership status copy is exact, agreed wording — see `js/auth.js`, don't casu
 
 ## 7. Current work / exact stopping point
 
+**Updated 2026-09-10 (latest). PHASE B OF THE SUPABASE SPLIT IS HANDED TO NINA AND IN PROGRESS.**
+Read `supabase/PHASE-B-RUNBOOK.md` and `supabase/SPLIT-PLAN.md` before touching anything
+Supabase-related.
+
+- **Claude cannot execute Phase B.** There is no create-project tool, the MCP is bound to a single
+  project (currently `ylrcotvnrvvfosuvtleh` = North Island Diary), and auth setup needs Nina's
+  Google Cloud access. The runbook is the deliverable; she runs it.
+- **Canonical migration order for a fresh project:**
+  `0000 → 0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007`. Linear, each once. `0007` is always
+  last (grant sweep + revokes + verification). Settled by Nina; do not restore the older
+  "run 0000 twice" shape.
+- **Waiting on:** Nina pasting the output of `supabase/phase_b_verify.sql` from the new project.
+  Nothing proceeds until that is assessed.
+
+### 🔴 WHILE PHASE B IS IN PROGRESS: never `git add -A`
+
+Step 6 of the runbook has Nina make a **temporary, uncommitted** edit to `js/config.js` — pointing
+it at the new project just long enough to sign in with Google and create her `auth.users` row —
+and then revert it. She approved that explicitly, on condition it is "immediately reverted and
+never committed".
+
+The risk that creates is Claude's, not hers: a routine `git add -A` for some unrelated commit
+would sweep that edit in and effectively cut the app over by accident, silently, mid-Phase-B.
+**So: before any commit, run `git diff --stat js/config.js`.** If it shows changes, stop and ask
+— do not stage it, and do not "helpfully" revert it either, since she may be mid-sign-in.
+
+Cutover is a separate, explicitly approved step that changes that file deliberately.
+
+
+
 **Updated 2026-09-10 (latest).** Calendar has been rebuilt to the Figma — the month grid is
 replaced by a week strip inside the purple hero, and the list is now upcoming events grouped
 under month headings. The list's first row moved from y≈544 to y≈338 on a 375px viewport, which
