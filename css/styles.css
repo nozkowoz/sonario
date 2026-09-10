@@ -405,6 +405,11 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .notice-text { min-width: 0; }
 .notice-title { margin: 0; font-size: 15px; font-weight: 700; }
 .notice-body { margin: 2px 0 0; font-size: 14px; color: var(--ink-soft); white-space: pre-wrap; }
+/* Butter = heads-up, not alarm: provisional or time-sensitive. Distinct from coral, which means
+   something has gone wrong or changed. See DESIGN-RULES.md. */
+.notice-butter { background: var(--butter-bg); }
+.notice-butter .notice-icon { color: var(--butter); }
+.notice-butter .notice-body { color: #6f5205; }
 
 /* --- Home: My Term ------------------------------------------------------ */
 .term-stats-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }

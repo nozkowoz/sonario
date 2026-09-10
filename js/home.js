@@ -1,5 +1,5 @@
 import { html, useMemo } from './lib.js';
-import { formatDateRail, formatWeekdayLong, formatTimeRange,
+import { formatDateRail, formatWeekdayLong, formatDayMonthLong, formatTimeRange,
   parseLocalDate, relativeDayLabel, todayStr } from './lib.js';
 import { displayNameOf } from './store.js';
 import { EVENT_TYPE_LABEL, eventTitle, nextEvent, currentTermOf, AbsenceToggle } from './events.js';
@@ -34,6 +34,37 @@ const clockFromMinutes = (mins) => {
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   return `${h12}:${mm}${h24 < 12 ? 'am' : 'pm'}`;
 };
+
+// "Last week of term" — pinned to Home as a heads-up.
+//
+// Anchored on the term's LAST ACTUAL EVENT rather than on `ends_on`. A term's end date is
+// administrative (Term 3 2026 ends Friday 18 September) while the last rehearsal is the thing
+// worth warning about (Tuesday 15th). Counting back a week from `ends_on` would mean a term whose
+// final rehearsal sits well before its end date shows the notice after everyone's last chance to
+// act on it.
+//
+// Derived entirely from terms + events, so there's no notices table behind this and nothing to
+// author — it appears and disappears on its own.
+function lastWeekNotice(term, events, today) {
+  if (!term || today > term.ends_on) return null;
+
+  const inTerm = events.filter((e) => e.term_id === term.id && e.status !== 'cancelled');
+  if (!inTerm.length) return null;
+  const last = inTerm.reduce((a, b) => (a.rehearsal_date >= b.rehearsal_date ? a : b));
+  if (last.rehearsal_date < today) return null;   // the last one has already happened
+
+  const daysAway = Math.round(
+    (parseLocalDate(last.rehearsal_date) - parseLocalDate(today)) / 86400000,
+  );
+  if (daysAway > 7) return null;
+
+  const kind = (EVENT_TYPE_LABEL[last.event_type] || 'event').toLowerCase();
+  const when = daysAway === 0 ? 'Tonight' : `${formatWeekdayLong(last.rehearsal_date)} ${formatDayMonthLong(last.rehearsal_date)}`;
+  return {
+    title: 'Last week of term',
+    body: `${when} is the final ${kind} of ${term.name}.`,
+  };
+}
 
 // My Term. THE DENOMINATOR IS REHEARSALS THAT HAVE ALREADY HAPPENED, not everything scheduled in
 // the term — in week 2 having attended both it reads 2/2, never 2/10. That's an explicit rule.
@@ -83,6 +114,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
     () => termStats({ term, events, checkins, absences, profileId: profile.id }),
     [term, events, checkins, absences, profile.id],
   );
+  const termNotice = useMemo(() => lastWeekNotice(term, events, todayStr()), [term, events]);
 
   // Everything after the hero's own event, so the same rehearsal isn't listed twice.
   const upcoming = useMemo(() => {
@@ -145,6 +177,16 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
           </div>
         ` : null}
       </div>
+
+      ${termNotice ? html`
+        <div class="notice-card notice-butter">
+          <span class="notice-icon"><${IconMegaphone} size=${20} /></span>
+          <div class="notice-text">
+            <p class="notice-title">${termNotice.title}</p>
+            <p class="notice-body">${termNotice.body}</p>
+          </div>
+        </div>
+      ` : null}
 
       ${next && next.description ? html`
         <div class="notice-card">

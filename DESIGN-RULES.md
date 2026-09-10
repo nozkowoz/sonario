@@ -28,12 +28,18 @@ Colours are **semantic, not decorative.** Never colour a card for visual variety
 | Workshop / extra rehearsal | light purple / lilac | `--lilac-*` |
 | Performance / concert | green (positive, confirmed) | `--green-*` |
 | Social event | teal / blue (fun, distinct from performance) | `--teal-*` |
-| Tentative / provisional / TBC | yellow / butter | `--butter-*` |
+| Heads-up: tentative/TBC, or time-sensitive | yellow / butter | `--butter-*` |
 | Cancelled, no rehearsal, important disruption | red / coral | `--coral-*` |
 
 **Green is the positive status colour** generally — "You're expected", checked in, confirmed.
-**Coral/red is reserved for genuine attention states.** Don't use it casually; an organiser's
-ordinary note about a rehearsal is not an attention state.
+
+**Yellow/butter vs coral/red — the line between them**, widened 2026-09-10 when Nina asked for a
+"last week of term" notice in orange/yellow:
+- **Butter means heads-up, not alarm.** Provisional or time-sensitive: a tentative/TBC event, or
+  the last-week-of-term notice on Home.
+- **Coral means something has gone wrong or changed.** Cancelled, or a genuine disruption.
+
+Don't use coral casually; an organiser's ordinary note about a rehearsal is neither.
 
 ⚠️ **Tentative has no data behind it yet.** `rehearsals.status` is only
 `scheduled` / `cancelled`, so the butter tokens exist but nothing can currently be marked TBC.
@@ -124,3 +130,17 @@ For member-facing Calendar and Home logic, `pending` and `confirmed` away dates 
 effective immediately** — an overlapping rehearsal shows "You're away". But the underlying status
 is preserved and the two are never collapsed: a detailed leave view may show "Pending
 confirmation" without changing the event-level treatment.
+
+
+## Home — last week of term
+
+A butter notice pins to Home when the term's **last actual event** is seven days away or fewer.
+
+Anchored on the last event, not on `terms.ends_on`: the end date is administrative (Term 3 2026
+ends Friday 18 September) while the last rehearsal is the thing worth warning about (Tuesday the
+15th). Counting back a week from `ends_on` would show the notice after everyone's last chance to
+act on it in a term whose final rehearsal sits well before its end date.
+
+Derived entirely from `terms` + `rehearsals`, so there's nothing to author and no notices table
+behind it — it appears and disappears on its own. It hides once that last event has passed, even
+if the term technically runs on.
