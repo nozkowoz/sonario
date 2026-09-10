@@ -5,7 +5,7 @@
 // not one designed to accept offline writes.
 //
 // Bump CACHE_VERSION on any meaningful change to force a clean cache.
-const CACHE_VERSION = 'sonario-v12';
+const CACHE_VERSION = 'sonario-v13';
 const SHELL_URLS = [
   './',
   './index.html',
@@ -25,6 +25,7 @@ const SHELL_URLS = [
   './js/admin.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
+  './icons/favicon-32.png',
   './icons/icon-512.png',
 ];
 
