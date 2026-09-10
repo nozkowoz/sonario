@@ -357,7 +357,7 @@ without subtracting later drops. Fixed: the expected list is now built by replay
 drops in file order, so it holds what the chain **leaves behind** — 40. That makes live 51 = 40 +
 11, which reconciles perfectly.
 
-### The real finding: three tables no migration recreates 🟡
+### The real finding: three tables no migration recreates 🟡 — RESOLVED, see §8 q3
 `notices`, `social_events`, `social_rsvps`, with 11 policies, 2 triggers, 3 realtime
 registrations and 3 indexes between them. These are **pre-rebuild leftovers** from the old
 `supabase/schema.sql`; `js/noticeboard.js` and `js/social.js` still exist in the repo but are not
@@ -382,9 +382,34 @@ either way** — this plan touches neither, and cleaning them is a separate conv
 2 terms · 21 events (1 cancelled) · 10 profiles · 8 active memberships, **2 super** · 7 check-ins
 · 2 absences · 2 away_dates · 11 part_labels · 0 songs/recordings/recaps.
 
-⚠️ **2 supers is one more than expected.** Nina is one. The follow-up query identifies the other,
-and specifically whether the Leave Test identity is an ordinary member — because if it is secretly
-a super, every "verified as a plain member" RLS result in this project's history is suspect.
+### The "2 supers" alarm was mine, and it was wrong 🔧
+Raised as a possible integrity problem, then resolved by reading the file that causes it.
+`supabase/seed_test_data.sql:52` **deliberately** makes seeded fake #1
+(`f0000000-…-000000000001`) an active **super**, so the queue and the member-management screens
+have a second organiser to render. The arithmetic reconciles exactly:
+
+| | |
+|---|---|
+| 8 seeded fakes | 1 active super + 5 active members + 1 pending + 1 deactivated |
+| Nina | active super |
+| Leave Test | active member |
+| **10 profiles · 8 active · 2 super** | matches the audit precisely |
+
+Two independent corroborations that the Leave Test identity is **not** a super:
+
+1. The arithmetic above leaves no room for a third super.
+2. **Migration 0005's own recorded outcomes could not have happened for a super.** Its header
+   documents that the test identity *could not* self-confirm its leave and matched *zero* rows
+   cancelling someone else's. The `super confirms away dates` policy is `using (is_super())` — a
+   super would have been **allowed** to self-confirm. The block is only explicable as a
+   non-super.
+
+So the prior plain-member RLS results stand. The follow-up query still confirms it directly by
+printing role per profile, and that remains the actual proof rather than this reasoning.
+
+**Consequence for Phase B:** `seed_test_data.sql` will recreate a second super in the new
+project. That is intended and should be left as is — but it means "2 supers" is the correct
+expected value there too, and a validation check that expects 1 would be wrong.
 
 ---
 
@@ -397,10 +422,19 @@ a super, every "verified as a plain member" RLS result in this project's history
    checks whether the current one actually is.
 2. ✅ **Carry the 8 fake members and the fabricated Term 3 attendance over.** Nina: "I want
    realistic seeded data available for testing Home, My Term, Calendar, Attendance and Admin."
-3. ⏳ **The three legacy tables — carry them or drop them?** `notices`, `social_events`,
-   `social_rsvps` exist live but no migration recreates them, so the new project starts without
-   them unless we write a migration to add them back. They aren't wired into the app, aren't in
-   the Figma design, and social/notices is on the deferred list. **Recommendation: don't carry
-   them** — the new project gets a schema that matches the migrations exactly, which is the whole
-   point of rebuilding rather than dumping. Pending the follow-up query, which says whether they
-   hold any data worth keeping.
+3. ✅ **The three legacy tables are LEGACY and will not be recreated.** Nina, 2026-09-10: "treat
+   `notices`, `social_events`, and `social_rsvps` as legacy and do not recreate them in the new
+   Sonario project **unless the follow-up shows they contain data that is genuinely still
+   needed**." So: the new project gets a schema matching the migrations exactly, and the only
+   thing that could change this is real content in those tables — which the follow-up settles.
+   They stay untouched in the old project either way.
+4. ✅ **`trip-photos`, `update-photos` and the extra `public` tables are OUT OF SCOPE.** Nina:
+   "Identify them only; do not delete, migrate, or modify them." Identified in §9. **No step of
+   this plan touches them at any phase**, including Phase E — whose `drop` statements are scoped
+   to the `sonario` schema and its `auth.users` trigger, and never to `public` or `storage`.
+5. ✅ **If a plain-member RLS result turns out to have been obtained with a super identity, it is
+   unverified.** Nina: "prior plain-member RLS testing should be treated as unverified and re-run
+   later with a true ordinary member." The specific claims that would be affected, so they can be
+   found if it ever comes up: the leave log→cancel verification recorded in the header of
+   `0005_members_can_actually_cancel_leave.sql`, and the Step C adversarial results in HANDOVER
+   §7. Current evidence (§9) says both stand.
