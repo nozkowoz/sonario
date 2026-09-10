@@ -1,5 +1,5 @@
 import { html, useState } from './lib.js';
-import { IconHome, IconCalendar, IconMore } from './icons.js';
+import { IconHome, IconCalendar, IconMore, IconAdmin } from './icons.js';
 
 // Reusable states so every tab handles loading/empty/error the same way, rather than each
 // screen inventing its own copy and layout.
@@ -32,22 +32,30 @@ export function ErrorState({ title = 'Something went wrong', body, onRetry }) {
   `;
 }
 
-// Three tabs, not the mockup's four: Repertoire has no screen behind it yet (Checkpoints 6-8), and
-// a nav item that leads nowhere is worse than one that isn't there. Add it when it has content.
+// Repertoire still isn't here: it has no screen behind it yet (Checkpoints 6-8), and a nav item
+// that leads nowhere is worse than one that isn't there.
+//
+// Admin is appended LAST rather than slotted before More, so the three tabs everyone shares stay
+// in the same positions whether you're a super or not — a member's nav is a prefix of a super's.
+// Muscle memory doesn't shift when someone is promoted.
 const TABS = [
   { key: 'home', label: 'Home', Icon: IconHome },
   { key: 'calendar', label: 'Calendar', Icon: IconCalendar },
   { key: 'more', label: 'More', Icon: IconMore },
+  { key: 'admin', label: 'Admin', Icon: IconAdmin, superOnly: true },
 ];
 
 export function useActiveTab(initial = 'home') {
   return useState(initial);
 }
 
-export function BottomNav({ active, onChange }) {
+// Hiding the tab is presentation only — the Admin screen's contents are protected by RLS, not by
+// whether a button was rendered.
+export function BottomNav({ active, onChange, canManage = false }) {
+  const tabs = TABS.filter((t) => !t.superOnly || canManage);
   return html`
     <nav class="bottom-nav" aria-label="Primary">
-      ${TABS.map((t) => html`
+      ${tabs.map((t) => html`
         <button
           key=${t.key}
           type="button"

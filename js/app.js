@@ -11,10 +11,10 @@ import { HomeTab } from './home.js';
 import { CalendarTab } from './events.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
-// Steps C+D: Home (next event, absence marking, check-in on the day), Calendar/My Term (full
-// event list, admin event management, super attendance view), member absence marking and
-// self check-in. Repertoire/recordings/leaderboard/social remain later checkpoints and are
-// deliberately not wired up here.
+// Home and More are deliberately role-blind: a super sees exactly what an ordinary member sees,
+// so Nina can judge the member experience without switching accounts. Organiser controls live on
+// the super-only Admin tab, plus inline on Calendar where they're tied to a specific event.
+// Repertoire/recordings/leaderboard/social remain later checkpoints and aren't wired up here.
 function App() {
   const session = useSession();
 
@@ -49,6 +49,9 @@ function Gated({ session }) {
 function Main({ session, membership, profile }) {
   const canManage = isSuper(membership);
   const [tab, setTab] = useActiveTab('home');
+  // If a super is demoted while sitting on the Admin tab (role arrives over realtime), fall back
+  // rather than leaving them on a screen that no longer belongs to them.
+  const activeTab = tab === 'admin' && !canManage ? 'home' : tab;
 
   // Events/terms/absences/check-ins load once here rather than per tab: both Home and Calendar need the
   // same rows, useLiveTable names its realtime channel after the table, and switching tabs
@@ -64,10 +67,7 @@ function Main({ session, membership, profile }) {
     <div>
       <header class="app-header">
         <div class="app-header-inner">
-          <div>
-            <h1 class="app-title">${CHOIR_NAME}</h1>
-            ${canManage ? html`<p class="app-subtitle">Super access</p>` : null}
-          </div>
+          <h1 class="app-title">${CHOIR_NAME}</h1>
           <button class="avatar-btn" title=${displayNameOf(profile)}
             aria-label=${`${displayNameOf(profile)} — open More`} onClick=${() => setTab('more')}>
             ${profile.avatar_url
@@ -80,43 +80,58 @@ function Main({ session, membership, profile }) {
         </div>
       </header>
       <main class="app-main">
-        ${tab === 'home' ? html`
+        ${activeTab === 'home' ? html`
           <${HomeTab}
-            profile=${profile} canManage=${canManage}
+            profile=${profile}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins}
             onNavigate=${setTab}
           />
         ` : null}
-        ${tab === 'calendar' ? html`
+        ${activeTab === 'calendar' ? html`
           <${CalendarTab}
             profileId=${profile.id} canManage=${canManage}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins} directory=${directory}
           />
         ` : null}
-        ${tab === 'more' ? html`<${MoreTab} session=${session} canManage=${canManage} profile=${profile} />` : null}
+        ${activeTab === 'more' ? html`<${MoreTab} profile=${profile} />` : null}
+        ${activeTab === 'admin' && canManage
+          ? html`<${AdminTab} session=${session} />`
+          : null}
       </main>
       <p class="app-footer">${APP_VERSION}</p>
-      <${BottomNav} active=${tab} onChange=${setTab} />
+      <${BottomNav} active=${activeTab} onChange=${setTab} canManage=${canManage} />
     </div>
   `;
 }
 
-function MoreTab({ session, canManage, profile }) {
-  const { memberships } = useAllMemberships();
-
+// Identical for every member, super or not. Nothing role-dependent belongs on this screen.
+function MoreTab({ profile }) {
   return html`
     <div class="tab-content">
       <h2>More</h2>
-      ${canManage
-        ? html`<${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} />`
-        : html`<${EmptyState} title="Nothing here yet" body="Repertoire, recordings and settings land in later builds." />`}
+      <${EmptyState} title="Nothing here yet" body="Repertoire, recordings and settings land in later builds." />
       <div class="more-account">
         <p class="eyebrow">Account</p>
         <p class="more-account-name">${displayNameOf(profile)}</p>
         <button class="btn btn-outline btn-sm" onClick=${() => supabase.auth.signOut()}>Sign out</button>
       </div>
+    </div>
+  `;
+}
+
+// Everything an organiser can do that isn't tied to a specific event. For now that's the
+// membership approval queue, moved off More so More reads the same for everyone. Event management
+// deliberately stays inline on Calendar: managing a rehearsal from a different tab than the one
+// showing the rehearsals would be worse, not tidier.
+function AdminTab({ session }) {
+  const { memberships } = useAllMemberships();
+
+  return html`
+    <div class="tab-content">
+      <h2>Admin</h2>
+      <${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} />
     </div>
   `;
 }

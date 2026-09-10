@@ -2,8 +2,8 @@ import { html, useMemo } from './lib.js';
 import { formatDateRail, formatDayMonthLong, formatWeekdayLong, formatTimeRange,
   relativeDayLabel, todayStr } from './lib.js';
 import { EVENT_TYPE_LABEL, nextEvent, AbsenceToggle } from './events.js';
-import { CheckInPanel, isCheckInDay } from './checkin.js';
-import { IconUsers, IconAlert } from './icons.js';
+import { CheckInPanel, AttendanceStatus, isCheckInDay } from './checkin.js';
+import { IconAlert } from './icons.js';
 import { LoadingState, EmptyState } from './shell.js';
 
 // Home follows the mockup's Option B: the date is the loudest thing on the screen, set as a big
@@ -14,7 +14,7 @@ import { LoadingState, EmptyState } from './shell.js';
 // deferred work: "TERM 3 / 8 of 9 eligible rehearsals / 89% attendance / usually 2 minutes early"
 // is Checkpoint 10's attendance visual plus punctuality tiers, and "LATEST RECAP" is Checkpoint
 // 13 (and needs the song repertoire). So this screen is shorter than the mockup on purpose.
-export function HomeTab({ profile, canManage, events, loading, terms, absences, checkins, onNavigate }) {
+export function HomeTab({ profile, events, loading, terms, absences, checkins, onNavigate }) {
   const next = useMemo(() => nextEvent(events), [events]);
   const myAbsence = useMemo(
     () => (next ? absences.find((a) => a.rehearsal_id === next.id && a.profile_id === profile.id) : null),
@@ -38,14 +38,8 @@ export function HomeTab({ profile, canManage, events, loading, terms, absences, 
       <div class="tab-content">
         <${EmptyState}
           title="Nothing scheduled yet"
-          body=${canManage
-            ? 'Add an event on Calendar and it will show up here for everyone.'
-            : 'Your next rehearsal will show up here as soon as it’s scheduled.'}
-          action=${canManage
-            ? html`<button class="btn btn-primary btn-sm" onClick=${() => onNavigate('calendar')}>Go to Calendar</button>`
-            : null}
+          body="Your next rehearsal will show up here as soon as it’s scheduled."
         />
-        <${PromoCard} />
       </div>
     `;
   }
@@ -70,30 +64,21 @@ export function HomeTab({ profile, canManage, events, loading, terms, absences, 
         <div class="next-info">
           <p class="eyebrow-sm">${eyebrow}</p>
           <p class="next-title">
-            ${myCheckin
-              ? "You're here!"
-              : next.title
-                ? next.title
-                : `${formatWeekdayLong(next.rehearsal_date)} ${formatDayMonthLong(next.rehearsal_date)}`}
+            ${next.title || `${formatWeekdayLong(next.rehearsal_date)} ${formatDayMonthLong(next.rehearsal_date)}`}
           </p>
-          ${myCheckin
-            // The time and the Undo button come from CheckInPanel below — repeating them here is
-            // what a first pass at this did, and it read as a stutter.
-            ? null
-            : html`
-              ${next.title ? html`
-                <p class="next-time">
-                  ${formatWeekdayLong(next.rehearsal_date)} ${formatDayMonthLong(next.rehearsal_date)}
-                </p>
-              ` : null}
-              ${next.start_time
-                ? html`<p class="next-time">${formatTimeRange(next.start_time, next.end_time)}</p>`
-                : null}
-              ${next.location ? html`<p class="next-loc">${next.location}</p>` : null}
-              ${rel && !today ? html`<p class="next-rel">${rel}</p>` : null}
-            `}
+          ${next.title ? html`
+            <p class="next-time">
+              ${formatWeekdayLong(next.rehearsal_date)} ${formatDayMonthLong(next.rehearsal_date)}
+            </p>
+          ` : null}
+          ${next.start_time
+            ? html`<p class="next-time">${formatTimeRange(next.start_time, next.end_time)}</p>`
+            : null}
+          ${next.location ? html`<p class="next-loc">${next.location}</p>` : null}
+          ${rel && !today ? html`<p class="next-rel">${rel}</p>` : null}
 
           <div class="next-actions">
+            <${AttendanceStatus} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence} />
             <${CheckInPanel} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence}
               profileId=${profile.id} />
             ${myCheckin
@@ -119,30 +104,6 @@ export function HomeTab({ profile, canManage, events, loading, terms, absences, 
         See the full calendar
       </button>
 
-      <${PromoCard} />
-
-      ${canManage ? html`
-        <hr class="home-rule" />
-        <div class="home-admin">
-          <p class="eyebrow">Organiser shortcuts</p>
-          <div class="home-admin-actions">
-            <button class="btn btn-outline btn-sm" onClick=${() => onNavigate('calendar')}>Manage events</button>
-            <button class="btn btn-outline btn-sm" onClick=${() => onNavigate('more')}>Approve members</button>
-          </div>
-        </div>
-      ` : null}
-    </div>
-  `;
-}
-
-function PromoCard() {
-  return html`
-    <div class="card promo-card">
-      <span class="promo-icon"><${IconUsers} size=${22} /></span>
-      <div>
-        <p class="promo-title">Same voices.<br />Brighter together.</p>
-        <p class="promo-body">See you at rehearsal!</p>
-      </div>
     </div>
   `;
 }

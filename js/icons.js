@@ -71,3 +71,11 @@ export const IconAlert = ({ size }) => svg(html`
   <path d="M12 7.5v5.5" stroke="#fff" stroke-width="2" />
   <circle cx="12" cy="16.4" r="1.15" fill="#fff" stroke="none" />
 `, { size });
+
+// Sliders rather than a shield: this tab is where an organiser adjusts things, not a security
+// boundary — the boundary is RLS, and no icon can convey that.
+export const IconAdmin = ({ size }) => svg(html`
+  <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+  <circle cx="16" cy="7" r="2.2" />
+  <circle cx="8" cy="17" r="2.2" />
+`, { size });

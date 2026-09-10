@@ -30,6 +30,37 @@ export const timeOfDay = (iso) =>
   new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
 
 // ---------------------------------------------------------------------------
+// Where you stand on this event — the single source of that answer, so Home and the detail
+// screen can't drift apart or say it twice. Inlining the past-date test rather than importing
+// isPast() from events.js, which imports from here: a cycle isn't worth one comparison.
+//
+// "You're expected" is a STATUS, not a button. Under the absence-only model (decision 2) there is
+// nothing to confirm — every active member is assumed to be coming — so a button here would
+// either do nothing or reintroduce the RSVP that decision deliberately removed. It gets a
+// button's visual weight without a button's promise.
+// ---------------------------------------------------------------------------
+export function AttendanceStatus({ event, myCheckin, myAbsence }) {
+  const past = event.rehearsal_date < todayStr();
+
+  const state = event.status === 'cancelled'
+    ? { text: 'This event has been cancelled.', tone: 'muted' }
+    : myCheckin
+      ? { text: `You're here${myCheckin.checked_in_at ? ` — checked in at ${timeOfDay(myCheckin.checked_in_at)}` : ''}`, tone: 'good' }
+      : myAbsence
+        ? { text: "You've told us you can't make it.", tone: 'off' }
+        : past
+          ? { text: 'No check-in was recorded for you.', tone: 'muted' }
+          : { text: "You're expected", tone: 'good' };
+
+  return html`
+    <p class="att-status att-${state.tone}">
+      ${state.tone === 'good' ? html`<span class="att-tick" aria-hidden="true">✓</span>` : null}
+      ${state.text}
+    </p>
+  `;
+}
+
+// ---------------------------------------------------------------------------
 // Member self check-in
 // ---------------------------------------------------------------------------
 export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
@@ -79,14 +110,11 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
     `;
   }
 
+  // Checked in: the status line above already says so, so all that's left is the way out.
   return html`
-    <div class="checkin-row checkin-done">
-      <p class="checkin-noted">
-        <span class="checkin-tick" aria-hidden="true">✓</span>
-        Checked in${myCheckin.checked_in_at ? ` at ${timeOfDay(myCheckin.checked_in_at)}` : ''}
-      </p>
+    <div class="checkin-row">
       ${canUndo ? html`
-        <button class="btn-icon" disabled=${busy}
+        <button class="btn-quiet" disabled=${busy}
           onClick=${() => run(() => undoCheckIn(event.id, profileId))}>${undoLabel}</button>
       ` : null}
       ${errorLine}

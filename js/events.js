@@ -3,7 +3,7 @@ import { formatEventDate, formatEventDateLong, formatTimeRange, relativeDayLabel
   formatWeekdayLong, formatDayMonthLong, formatDateRail } from './lib.js';
 import { EVENT_TYPES, createEvent, updateEvent, setEventStatus, markAbsent, clearAbsence } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
-import { CheckInPanel, AttendanceSummary, isCheckInDay, timeOfDay } from './checkin.js';
+import { CheckInPanel, AttendanceStatus, AttendanceSummary, isCheckInDay } from './checkin.js';
 import { IconKebab, IconPin, IconBack, IconCheck, IconNote, IconEdit, IconReschedule, IconCancel } from './icons.js';
 
 // The unified event model in product language. `event_type` is purely what kind of thing it is;
@@ -42,6 +42,10 @@ export function nextEvent(events) {
 // member ever takes is telling the choir they can't make it. Undoing that is deleting the row,
 // with no time limit (the one-hour window is a check-in rule, not an absence rule).
 // ---------------------------------------------------------------------------
+// Deliberately quiet. Being unable to come is the exception, so it reads as a small aside rather
+// than the screen's main action — which is what a full-width button made it, especially on a
+// future event where check-in isn't offered yet and this was the only control present.
+// It's a one-tap flip either way, with no time limit, so a mistap costs nothing.
 export function AbsenceToggle({ event, myAbsence, profileId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -62,16 +66,15 @@ export function AbsenceToggle({ event, myAbsence, profileId }) {
     <div class="absence-row">
       ${myAbsence
         ? html`
-          <p class="absence-noted">You've let us know you can't make this one.</p>
-          <button class="btn-icon" disabled=${busy}
+          <button class="btn-quiet" disabled=${busy}
             onClick=${() => run(() => clearAbsence(event.id, profileId))}>
             ${busy ? 'Saving…' : 'Actually, I can make it'}
           </button>
         `
         : html`
-          <button class="btn btn-outline btn-sm" disabled=${busy}
+          <button class="btn-quiet" disabled=${busy}
             onClick=${() => run(() => markAbsent(event.id, profileId))}>
-            ${busy ? 'Saving…' : "I can't make it"}
+            ${busy ? 'Saving…' : "Can't make it?"}
           </button>
         `}
       ${error ? html`<p class="absence-error">${error}</p>` : null}
@@ -227,16 +230,6 @@ export function EventDetail({
   const cancelled = event.status === 'cancelled';
   const past = isPast(event);
 
-  const status = cancelled
-    ? { text: 'This event has been cancelled.', muted: true }
-    : myCheckin
-      ? { text: `You're here${myCheckin.checked_in_at ? ` — checked in at ${timeOfDay(myCheckin.checked_in_at)}` : ''}`, tick: true }
-      : myAbsence
-        ? { text: "You've told us you can't make this one.", muted: true }
-        : past
-          ? { text: 'No check-in was recorded for you.', muted: true }
-          : { text: "You're expected", tick: true };
-
   return html`
     <div class="tab-content">
       <div class="detail-head">
@@ -272,10 +265,7 @@ export function EventDetail({
 
       <p class="eyebrow">Your status</p>
       <div class="card detail-status">
-        <p class="status-line ${status.muted ? 'status-muted' : ''}">
-          ${status.tick ? html`<span class="status-tick"><${IconCheck} size=${16} /></span>` : null}
-          ${status.text}
-        </p>
+        <${AttendanceStatus} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence} />
         ${cancelled ? null : html`
           <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence} profileId=${profileId} />
           ${myCheckin
