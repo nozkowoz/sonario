@@ -488,13 +488,13 @@ choir wants a grace window.
 
 **THE VERY NEXT TASK (set 2026-09-10, after a session restart):**
 
-1. **Apply the real rehearsal schedule.** `supabase/real_schedule_2026.sql` is written, verified
-   and committed but **NOT YET RUN**. It creates Term 3 and Term 4 2026 with a rehearsal on every
-   Tuesday, 7-9pm, at EASTMINT, Northcote (10 and 11 Tuesdays respectively), and cancels the one
-   that lands on Melbourne Cup Day. Use the **`supabase-sonario`** MCP server for this, not
-   `supabase` — see §11. Confirm the closing SELECT reports 10 and 11.
-2. **Push.** There is at least one local commit ahead of `origin/main`; Nina runs `git push`
-   herself.
+1. ~~Apply the real rehearsal schedule.~~ **DONE 2026-09-10**, run by Nina in the Supabase SQL
+   editor (the MCP server in that session was pointed at the wrong project — see §11). Verified
+   output: Term 3 2026 = 10 rehearsals, 14 Jul - 15 Sep, 0 cancelled; Term 4 2026 = 11
+   rehearsals, 6 Oct - 15 Dec, 1 cancelled (Melbourne Cup Day, Tue 3 Nov). The invented seed
+   events are gone. `supabase/real_schedule_2026.sql` is re-runnable if the schedule ever needs
+   regenerating, and extending it to 2027 is two more rows in its terms insert.
+2. **Push.** There are local commits ahead of `origin/main`; Nina runs `git push` herself.
 3. Then the thing that still hasn't happened: **Nina's own hands-on pass** through the app as a
    real signed-in super, and whatever she wants changed as a result.
 
