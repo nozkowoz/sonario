@@ -427,7 +427,53 @@ URL, no authentication. Flagged because it is worth knowing, not because this pl
 about it — it is outside scope and stays untouched. Whose it is remains unidentified; both buckets
 were created 2026-09-01, the day Sonario was scaffolded.
 
-Question 4 (the `public` table list) is likewise identify-only and does **not gate Phase B**.
+**4. `public` holds TWO apps, not one.** 24 tables, and they cluster unmistakably:
+
+| Cluster | Tables |
+|---|---|
+| **Page Turners** (book club) | `books`, `book_recommendations`, `book_recommendation_notes`, `discussion_questions`, `question_submissions`, `meetings`, `meeting_hosts`, `members`, `ratings`, `rsvps`, `read_by`, `skipped_by`, `started_by` |
+| **A trip-journal app** | `itinerary_days`, `itinerary_items`, `journal_entries`, `journal_photos`, `journal_stickers`, `updates`, `update_comments`, `update_likes` |
+| Infrastructure / unclear | `app_secrets`, `scheduled_notifications`, `push_subscriptions` |
+
+The trip cluster matches the `update-photos` bucket exactly (`updates` / `update_comments` /
+`update_likes`), which explains both buckets. So **the "shared" project is Sonario + Page Turners
++ a trip-journal app** — and unlike Sonario, which has its own schema, those two share `public`
+with each other. Table-name collision risk between *them* is real. **Not Sonario's problem and
+not this plan's business**, but worth Nina knowing, because it is the same argument she made for
+splitting Sonario, applied to two apps that never got separated.
+
+**A correction to §9.** It said Page Turners "references three" tables. That was based on a
+partial grep of its `store.js`, not on its schema — it plainly has around thirteen. The "24 tables
+for an app that needs three" framing was wrong; the real finding is that two apps are cohabiting
+in `public`.
+
+### ⚠️ One row that is not merely informational: `app_secrets`
+
+`app_secrets` — 2 columns, **0 RLS policies**. Also `scheduled_notifications` — 6 columns, 0
+policies. Every other `public` table has 3 or 4.
+
+Zero policies is not automatically a problem: RLS *enabled* with no policies denies everything,
+which is safe. But RLS *disabled* on a table in `public` — which is exposed to the Data API by
+default — means **anyone holding the anon key can read it**, and the anon key ships in plain
+JavaScript in both apps. For a table called `app_secrets` that is worth resolving rather than
+filing.
+
+**This is outside the split's scope and nothing here touches it.** It is flagged because it was
+found while looking at something else, and a read-only check costs nothing:
+
+```sql
+select c.relname as table_name,
+       c.relrowsecurity as rls_enabled,
+       (select count(*) from pg_policies p
+        where p.schemaname = 'public' and p.tablename = c.relname) as policies
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relkind = 'r'
+  and not c.relrowsecurity
+order by c.relname;
+```
+
+Anything that query returns is a `public` table with RLS switched off. An empty result means
+everything is protected and `app_secrets` is simply deny-all.
 
 ### The "2 supers" alarm was mine, and it was wrong 🔧
 Raised as a possible integrity problem, then resolved by reading the file that causes it.
