@@ -271,9 +271,15 @@ the two can't be linked). Nina also pastes Dev Mode HTML per screen, which gives
 **Prefer the published site over reasoning from a screenshot.**
 
 Five screens exist in that prototype. Home is built. **Calendar, Repertoire, Practice Mode and
-More are NOT** — see `DESIGN-RULES.md` → "Future functionality" for what each needs, and note
-that Repertoire and Practice Mode are blocked on a schema that does not exist and must not be
-invented to make a mockup render.
+More are NOT** — see `DESIGN-RULES.md` → "Future functionality" for what each needs.
+
+**Do not repeat this mistake:** on 2026-09-10 Claude told Nina that Repertoire and Practice Mode
+"need a schema and none of it exists". That was wrong, and §5's own older note below said so.
+Migration 0001 §7 already creates `part_labels`, `songs`, `song_assignments`, `recordings` and
+`rehearsal_songs`, all with RLS. **Read the migrations before making a claim about what the
+database does or doesn't have** — §3 and the migration files, not memory of an earlier summary.
+What those screens actually need is (a) a table for named song collections that aren't events,
+(b) a decision on profile-level voice part vs per-song assignment, and (c) a Storage bucket.
 
 **Type, as of v24:** Inter 400–900 for everything, Big Shoulders Display 900 for the SONARIO
 wordmark only. **Oswald is gone from the app** — it survives only inside `scripts/make-icons.py`,

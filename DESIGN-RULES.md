@@ -179,15 +179,30 @@ render. None of them blocks current work.
 - **More becomes a real profile screen.** Name + voice part + choir, then My Profile, My
   Availability, Notification Settings, Help & Feedback, About Sonario, Sign out. Voice part is
   the only new field; the rest are either existing (sign out) or shells.
-- **Repertoire and Practice Mode. THESE NEED A SCHEMA, and none of it exists.** The Figma
-  specifies song libraries by semester, concert playlists, per-song voice-part recordings, and a
-  player with a queue, an "ALTO ONLY" part selector and a waveform. Behind that sit songs,
-  song–playlist membership, voice parts, and an audio file per song per part — plus storage, which
-  the app has never used. `js/repertoire.js` exists from the original scaffold and is not wired
-  into the nav. Do NOT build any of this from the mockup: the schema is the decision, and the
-  screens are downstream of it.
-- **Admin gains a Recordings section**, listed above Events in the Figma. Blocked on the same
-  schema as Practice Mode.
+- **Repertoire and Practice Mode.** Corrected 2026-09-10: **most of the schema already exists**
+  and is empty — migration 0001 §7 creates `part_labels` (seeded Sop / Alto / Alto 1 / Alto 2 /
+  Tenor / Tenor 1 / Tenor 2 / Barry / Full choir), `songs`, `song_assignments` (per song, per
+  person, collaboratively editable by any active member with a non-spoofable `updated_by`),
+  `recordings` (per song **per part**, Storage-backed, 50MB cap, audio mime whitelist) and
+  `rehearsal_songs` (setlists), all with RLS. Split it three ways before quoting any effort:
+    - **No database work:** the songs list, per-song part assignments, per-event setlists, and
+      reading recording metadata. `js/repertoire.js` exists from the original scaffold and is not
+      wired into the nav.
+    - **New schema:** the Figma's **named collections** — "Semester 2 · 2026" with a CURRENT
+      badge, "Semester 1 · 2026", "Sonario Classics · All-time favourites". `rehearsal_songs`
+      ties songs to an *event*, so "Mid-Year Concert 2026" maps onto it, but a standing
+      collection that isn't an event has nowhere to live. Also the **profile-level voice part**
+      the More screen shows ("Soprano · …"); note `song_assignments` is deliberately per-song, so
+      a member's part can differ between songs — which is exactly what Practice Mode's queue
+      shows ("Alto only", then "Soprano only"). Don't collapse the two without deciding which
+      is authoritative.
+    - **New infrastructure, not schema:** a Supabase **Storage bucket plus bucket policies**
+      mirroring the RLS model, for the audio itself. The app has never used Storage.
+  Ask Nina before building: semester vs term (the app's unit is *term*, the Figma says
+  *semester*), and who may upload a recording (the policy currently allows **any active
+  member**).
+- **Admin gains a Recordings section**, listed above Events in the Figma. Blocked on the Storage
+  bucket rather than on schema — `recordings` already exists.
 
 ### Rule for all of the above
 For member-facing Calendar and Home logic, `pending` and `confirmed` away dates are **both
