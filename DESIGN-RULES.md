@@ -301,6 +301,41 @@ render. None of them blocks current work.
 - **Admin gains a Recordings section**, listed above Events in the Figma. Blocked on the Storage
   bucket rather than on schema — `recordings` already exists.
 
+- **Subscription / fee tracking.** Raised by Nina 2026-09-10: "sonario admins need to be able to
+  see who has and hasn't paid, and people need to be able to tick off when they have paid, and
+  we'd send push notifications as reminders." Not built, not designed. What's worth knowing before
+  it is:
+
+  **The trust model is the real decision, not the schema.** "Members tick off when they've paid"
+  is a *claim*, and "the money arrived" is a *fact*, and they are not the same thing. Getting it
+  wrong is worse than with attendance: chasing someone who has paid is embarrassing, and not
+  chasing someone who hasn't costs the choir money. So a member's tick should be a claim an
+  organiser can confirm, with the organiser's record authoritative — the same two-state shape
+  `away_dates` already uses (`pending` / `confirmed`), and the same shape as the unused
+  `attendance_confirmation_requests` table. Do not collapse the two states into one boolean.
+
+  **RLS matters more here than anywhere else in the app.** This is financial information about
+  real people. A member must see their own payment status and **nobody else's**; only a super sees
+  the roll. That's the existing own-row-or-super pattern (`checkins`, `away_dates`) — but it has
+  to be right first time rather than found later, because a leak here isn't a data-quality bug.
+
+  **Needs new schema.** Roughly: what is owed and for which period (per term? per year? does it
+  vary by member — concession rates, part-year joiners?), and a payment record per member per
+  period carrying both the claim and the confirmation. **Ask Nina what the actual fee structure
+  is before modelling it** — a schema guessed from "subs" will be wrong, and money is the worst
+  place to guess.
+
+  **Push notifications: the tables exist, the delivery doesn't.** `push_subscriptions` and
+  `notification_log` were created in 0001 and have never been used. What's actually missing is
+  VAPID keys, a `push` event handler in `sw.js` (there is none today), and something server-side
+  to send — an Edge Function or a scheduled job, neither of which this project has ever used.
+  ⚠️ **On iOS, web push only works if the PWA is installed to the home screen** (16.4+). For a
+  choir that is probably mostly iPhones, that is a real adoption constraint on the whole idea, and
+  it should be checked with Nina before the plumbing is built rather than after.
+
+  This is also another argument for finishing the Supabase split first: it is new schema, new RLS
+  and eventually new server-side code, and all of it belongs on the isolated project.
+
 ### Rule for all of the above
 For member-facing Calendar and Home logic, `pending` and `confirmed` away dates are **both
 effective immediately** — an overlapping rehearsal shows "You're away". But the underlying status
