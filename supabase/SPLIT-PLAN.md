@@ -170,7 +170,7 @@ needs no rotation.
 | Shared thing | After the split |
 |---|---|
 | `auth.users` | **No longer shared.** Page Turners' anonymous identities stay exactly where they are, untouched |
-| `on_auth_user_created` trigger | Must be dropped from the old project — see §0.2. **This is the one step that can break Page Turners** |
+| `on_auth_user_created` trigger | Must be dropped from the old project — see §0.2. **This is the one step that can break Page Turners.** ✅ Audit confirms it is the ONLY trigger on `auth.users`, so the §5 Phase E order holds as written |
 | Quotas (DB size, egress, MAU, Storage) | No longer shared. Sonario's recordings won't eat Page Turners' 1GB |
 | Auth rate limits | No longer shared |
 | Google OAuth config | Page Turners doesn't use Google (anonymous only), so nothing to unpick |
@@ -187,7 +187,10 @@ the shared `auth.users` and that one trigger.
 
 ### Phase A — prepare (zero risk, nothing changes)
 
-- **A1. Reconcile this inventory against the live database.** ⏳ **Needs Nina to run it** —
+- **A1. Reconcile this inventory against the live database.** ✅ **RUN 2026-09-10 — results in
+  §9.** Headline: Page Turners is clean, and the live schema carries **three tables no migration
+  recreates**. One follow-up query outstanding (`split_audit_followup.sql`).
+- **A1 (original description).** —
   `supabase/split_audit.sql`, read-only, against the CURRENT project. Claude cannot: the MCP in
   this session is pointed at a third project (North Island Diary — confirmed by a `trip-photos`
   bucket and 41 anonymous users). The script prints counts, both-directions discrepancy lists,
@@ -312,13 +315,92 @@ exists.
 
 ---
 
-## 8. Two things Nina needs to decide
+## 9. A1 audit results (2026-09-10)
 
-1. **The "Leave Test" identity.** It won't survive the move (its `auth.users` row is anonymous and
-   can't be recreated as the same identity). Nina asked for it to be kept and not cleaned up.
-   Recreate an equivalent test identity in the new project, or accept that it served its purpose?
-2. **The 8 fake members and the fabricated Term 3 attendance.** Both are marked
-   "delete before the choir uses this for real". The new project is a natural moment to *not*
-   carry them across — but Home's My Term and the Admin attendance views have nothing to render
-   without them. Carry them over (recommended, since nobody real is using the app yet), or start
-   clean?
+Identity row confirmed `SHARED PROJECT — correct, carry on`.
+
+### Page Turners: clean 🟢
+- **Exactly ONE trigger on `auth.users`** — `on_auth_user_created` → `handle_new_auth_user` in
+  schema `sonario`. No second trigger, so **the Phase E order in §5 holds as written**. This was
+  the finding that could have halted the split, and it didn't.
+- **Zero `public` functions reference `sonario`.** Nothing in Page Turners calls into the schema
+  that eventually gets dropped.
+- 15 anonymous auth users (Page Turners visitors) and 9 non-anonymous (Nina + the 8 seeded fakes).
+
+### Counts reconcile exactly, and every difference is explained
+
+| | Expected | Live | Difference |
+|---|---|---|---|
+| Tables | 18 | **21** | +3 legacy: `notices`, `social_events`, `social_rsvps` |
+| Functions | 8 | 8 | — |
+| Policies | 42 → **40** | **51** | +11 on the three legacy tables (see the correction below) |
+| Triggers on sonario tables | 5 | **7** | +2 `set_updated_at` on the two social tables |
+| Realtime tables | 12 | **15** | +3 legacy tables |
+| Indexes | 12 | **43** | +31, all primary-key/unique constraint indexes plus the legacy tables' own — benign; the expected list only ever held explicitly-created indexes |
+| RLS disabled anywhere | 0 | **0** | — |
+| Grants | present | **present** | `anon, authenticated` usage, 21/21 tables, default privileges set |
+
+**The grant rows are the evidence that §0.1 was real.** The live project has exactly the grants
+the migration chain never contained — applied years ago by the stale `schema.sql`. `0000` now
+reproduces them.
+
+### Correction to this document: 40 expected policies, not 42 🔧
+The two `MISSING LIVE: policy` rows were **the audit script being wrong, not the database**:
+
+- `away_dates / members read away dates` — created by 0001, **dropped by 0002** (the privacy fix
+  that replaced it with `own away dates or super reads`).
+- `checkins / members write own checkin` — created by 0001, **dropped by 0003** (replaced by
+  `members check in to today's event`).
+
+Both are *correctly* absent live. The script had collected every `create policy` in the chain
+without subtracting later drops. Fixed: the expected list is now built by replaying creates and
+drops in file order, so it holds what the chain **leaves behind** — 40. That makes live 51 = 40 +
+11, which reconciles perfectly.
+
+### The real finding: three tables no migration recreates 🟡
+`notices`, `social_events`, `social_rsvps`, with 11 policies, 2 triggers, 3 realtime
+registrations and 3 indexes between them. These are **pre-rebuild leftovers** from the old
+`supabase/schema.sql`; `js/noticeboard.js` and `js/social.js` still exist in the repo but are not
+wired into `app.js`, and neither notices nor social appear anywhere in the Figma design. HANDOVER
+lists "broader social/notices" as deferred.
+
+**A fresh rebuild will not have them.** That is arguably the right outcome — but it must be a
+decision, not an accident. See §8 question 3.
+
+### Two unexpected things, neither Sonario's to fix
+- **Storage buckets `trip-photos` and `update-photos` exist in this project.** Neither name
+  suggests Sonario or Page Turners, and North Island Diary supposedly has its own project. Most
+  likely leftovers from before it moved.
+- **`public` holds 24 tables.** Page Turners' code references three (`books`, `ratings`,
+  `meetings`).
+
+If both are old North Island Diary residue, the shared project is carrying a third app's
+leftovers, and the storage-quota argument for splitting is stronger than assumed. **Out of scope
+either way** — this plan touches neither, and cleaning them is a separate conversation.
+
+### Data present
+2 terms · 21 events (1 cancelled) · 10 profiles · 8 active memberships, **2 super** · 7 check-ins
+· 2 absences · 2 away_dates · 11 part_labels · 0 songs/recordings/recaps.
+
+⚠️ **2 supers is one more than expected.** Nina is one. The follow-up query identifies the other,
+and specifically whether the Leave Test identity is an ordinary member — because if it is secretly
+a super, every "verified as a plain member" RLS result in this project's history is suspect.
+
+---
+
+## 8. Decisions
+
+1. ✅ **The Leave Test identity — recreate an equivalent.** Nina, 2026-09-10: "Recreate an
+   equivalent Leave Test ordinary-member identity in the new Sonario project. It does not need to
+   retain the same UUID; I just want a dedicated non-super identity for testing RLS, leave and
+   normal-member behaviour." **Must be `role = 'member'`, not super** — and the follow-up query
+   checks whether the current one actually is.
+2. ✅ **Carry the 8 fake members and the fabricated Term 3 attendance over.** Nina: "I want
+   realistic seeded data available for testing Home, My Term, Calendar, Attendance and Admin."
+3. ⏳ **The three legacy tables — carry them or drop them?** `notices`, `social_events`,
+   `social_rsvps` exist live but no migration recreates them, so the new project starts without
+   them unless we write a migration to add them back. They aren't wired into the app, aren't in
+   the Figma design, and social/notices is on the deferred list. **Recommendation: don't carry
+   them** — the new project gets a schema that matches the migrations exactly, which is the whole
+   point of rebuilding rather than dumping. Pending the follow-up query, which says whether they
+   hold any data worth keeping.
