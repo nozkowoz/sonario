@@ -1,8 +1,13 @@
 -- ============================================================================
 -- 0005 — Let a member actually cancel their own pending leave.
 --
--- NOT APPLIED YET. Written for review first, per Nina's standing instruction to stop and say
--- what needs a schema change before making one.
+-- APPLIED 2026-09-10 by Nina in the Supabase SQL editor, after review.
+--
+-- Verified afterwards as an ordinary active member: cancelling own pending leave now works and
+-- the row genuinely reads `cancelled`; the overlapping rehearsal returns from "You're away" to
+-- "You're expected". Adversarially, the same member could NOT self-confirm their own leave
+-- (blocked by the new WITH CHECK), could NOT reassign it to another member, and matched zero rows
+-- when trying to cancel anybody else's.
 --
 -- THE BUG. Migration 0001 created this:
 --
