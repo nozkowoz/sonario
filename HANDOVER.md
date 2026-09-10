@@ -509,13 +509,31 @@ Nina is **part-way through Phase B on the new project (`rwkaofshfatqqkupeqoe`)**
 `~/Downloads/sonario-phase-b-runbook.html` (regenerate with
 `python3 scripts/make-phase-b-runbook.py`). Her checkbox progress is saved in that browser.
 
-**Done — steps 1 to 5:** project created · `0000` run · `sonario` exposed in the Data API ·
-`0001`–`0007` run **with all 8 of `0007`'s verdicts `ok`** · Google provider configured, with the new callback URI **added** alongside the
-old one in Google Cloud Console.
+**Done:** project created · `0000` run · `sonario` exposed in the Data API · `0001`–`0007` run
+**with all 8 of `0007`'s verdicts `ok`** · new callback URI **added** alongside the old one in
+Google Cloud Console · `http://localhost:8777/**` added to Redirect URLs.
 
-**Next — step 6:** email provider + redirect URLs (must include `http://localhost:8777`, because
-the app passes `redirectTo: window.location.origin`). Then 7 (sign in, promote to super),
-8 (Leave Test identity), 9 (seed), 10 (verify).
+⚠️ **NOT done, and I had wrongly recorded it as done:** the **Google provider itself is not
+enabled in the new Supabase project**. Nina hit
+`{"code":400,"error_code":"validation_failed","msg":"Unsupported provider: provider is not
+enabled"}` from the sign-in tool — which is precisely the failure `js/auth.js` documents, since
+`signInWithOAuth` can't return an error for a disabled provider and instead navigates away to
+raw JSON.
+
+The lesson for this handover: I inferred "steps 1–5 done" from Nina saying she was "up to step
+6", rather than confirming each. **Don't record a step as done on inference.** Google setup is
+two halves in two different consoles — the redirect URI in Google Cloud, and the provider toggle
+plus client ID/secret in Supabase — and only the first was done.
+
+**Still to do:** enable Google in Supabase (Authentication → Sign In / Providers → Google, with
+the client ID and secret from Google Cloud Console → Credentials) · enable **Anonymous sign-ins**
+(off by default, needed for step 8) · then steps 7–10.
+
+**Next:** finish the auth config above, then 7 (sign in via
+`tools/phase-b-signin.html`, promote to super), 8 (Leave Test identity), 9 (seed), 10 (verify).
+
+Note the redirect URL needs the **wildcard** form `http://localhost:8777/**` — a bare origin
+entry matches only that exact URL, and the sign-in tool lives at a path. Nina has added it.
 
 ✅ **`0007` CONFIRMED CLEAN.** Nina re-ran it and reported every one of the 8 `verdict` rows
 reading `ok`. So the grant sweep and the revokes both applied: the four trigger functions are
