@@ -591,6 +591,14 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   **Always clean up afterward** — `delete from auth.users where id = '<anon uuid>'` cascades the
   profile and membership away with it. The ~182 leftover anonymous users earlier sessions had
   accumulated were deleted on 2026-09-09; don't let that build up again.
+- **KEEP the "Leave Test" identity — it is NOT residue.** Anonymous user
+  `e9854e83-5e93-482e-a1c3-bd2756086b8b`, profile "Leave Test", an *active member* (not a super).
+  Nina asked on 2026-09-10 for it to be kept: it's the only ordinary-member account available for
+  checking member-facing behaviour without demoting her own, and it gives Admin > Members a second
+  row to look at. It holds two `away_dates` rows, both `cancelled`, left from verifying the leave
+  path. **Do not delete it as part of a test-identity cleanup.** Its session lives in whichever
+  browser signed it in; a new session can't reuse it and should create its own throwaway.
+
 - **Anonymous users on this project are not all yours.** Page Turners shares this Supabase project
   and signs its own visitors in anonymously, so `auth.users` will always contain anonymous rows
   that have nothing to do with Sonario and must not be deleted as "test residue". Before any
