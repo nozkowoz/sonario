@@ -13,18 +13,47 @@ the truth and this document as wrong.
 
 ---
 
-## 0. Three findings that change the plan
+## 0. Findings that change the plan
 
-### 0.1 `create schema sonario` is missing from migration 0001 🔴
-It exists only in `supabase/schema.sql`, which HANDOVER §10 correctly calls stale. Every table in
-0001 is `create table if not exists sonario.…`, and **on a brand-new project the first one fails**
-because the schema doesn't exist yet.
+*Updated 2026-09-10 after Phase A1/A2. Verified findings are marked ✅.*
 
-Not a bug in the current project (the schema was created by the old `schema.sql` before the
-rebuild), but it makes 0001 non-replayable, which is exactly what this move needs. Fix: a new
-`0000_schema.sql` run first. One line, no risk.
+### 0.1 The migration chain could not build Sonario from scratch 🔴 ✅ FIXED
+Two things lived **only** in `supabase/schema.sql`, which HANDOVER §10 correctly calls stale:
 
-### 0.2 The `auth.users` trigger is the cross-app coupling, and it can break Page Turners 🔴
+- **`create schema sonario`.** Every table in 0001 is `create table if not exists sonario.…`, so
+  on a fresh project the very first one fails with "schema sonario does not exist".
+- **The API grants, which matter more.** Unlike `public`, a freshly created schema gives the
+  PostgREST roles nothing. Without `grant usage on schema sonario to anon, authenticated` and the
+  table grants, **every request fails 42501 "permission denied for schema sonario" regardless of
+  RLS** — RLS is only consulted once the base grant already allows the operation. The app would
+  look comprehensively broken while every table, policy and function was in fact correct. This
+  was the bigger of the two and was not in the first draft of this plan.
+
+Neither is visible in the shared project today, because both were applied by the old `schema.sql`
+before the rebuild. They only surface when Sonario is rebuilt elsewhere — i.e. now.
+
+**Fixed** by `migrations/0000_schema_and_grants.sql`. It also carries a grant *sweep* to be run
+again after 0006, plus the exact `revoke`s that sweep would otherwise undo on the
+security-definer helpers.
+
+### 0.1b Migration 0003 is NOT re-runnable 🟡 ✅ FOUND, NOT YET FIXED
+`0003_checkin_undo_window.sql` drops the OLD policy name (`members write own checkin`) but then
+creates two new policies — `members check in to today's event` and
+`members undo own checkin within an hour` — **without a preceding `drop policy if exists` for
+either**. A second run fails with "policy … already exists".
+
+Harmless on a single clean build. But it breaks the "each migration is idempotent, stop at the
+first error" instruction in Phase B3, and re-running part of the chain is a plausible recovery
+move. **Fix is two `drop policy if exists` lines; not applied yet, pending Nina's go-ahead** —
+it edits an already-applied migration, which deserves a yes even though the resulting state is
+identical.
+
+Every other statement in the chain is guarded: `if not exists` on all 18 tables, 12 indexes and
+the schema; `or replace` on all 8 functions; `add column if not exists` in 0002 and 0006;
+`on conflict` on both inserts; `drop … if exists` before all other policies and triggers; and
+0004's cleanup delete is naturally idempotent.
+
+### 0.2 The `auth.users` trigger is the cross-app coupling, and it can break Page Turners 🔴 ✅
 ```sql
 create trigger on_auth_user_created
   after insert on auth.users
@@ -42,7 +71,7 @@ entirely**, for an app that has real users. Page Turners calls `signInAnonymousl
 So Phase E has a mandatory order: **drop the trigger first, then the function, then the schema.**
 Never `drop schema sonario cascade` as the first move.
 
-### 0.3 No data needs exporting 🟢
+### 0.3 No data needs exporting 🟢 ✅
 Everything with rows in it is reproducible from SQL already in the repo:
 
 | What | Source | Reproducible? |
@@ -67,7 +96,7 @@ remapping. That removes most of the risk normally attached to this kind of move.
 `songs`, `song_assignments`, `recordings`, `rehearsal_songs`, `rehearsal_recaps`,
 `rehearsal_recap_items`, `push_subscriptions`, `notification_log`
 
-**9 functions**
+**8 functions** (the first draft said 9 — `handle_new_auth_user` was counted twice)
 
 | Function | Role |
 |---|---|
@@ -76,12 +105,14 @@ remapping. That removes most of the risk normally attached to this kind of move.
 | `member_directory()` | the ONLY safe way to resolve another member's name (`profiles` is own-row-or-super) |
 | `set_updated_at()`, `enforce_assignable_part()`, `enforce_checkin_timestamp()` | triggers |
 
-**6 triggers** — `on_auth_user_created` (on `auth.users`), `checkins_server_timestamp`,
+**6 triggers — 5 on `sonario` tables plus 1 on `auth.users`.** `checkins_server_timestamp`,
 `song_assignments_enforce_assignable`, and three `set_updated_at` on `rehearsals`, `songs`,
-`rehearsal_recaps`.
+`rehearsal_recaps`; then `on_auth_user_created` on `auth.users`, which is the cross-app one.
 
-**43 RLS policies.** Not restated here — they're in the migrations, and the point of replaying the
-migrations rather than hand-copying is that these come across exactly.
+**42 RLS policies.** (The first draft said 43: it counted `members cancel own pending away dates`
+twice, since 0005 redefines the policy 0001 created.) Not restated here — they're in the
+migrations, and the point of replaying the migrations rather than hand-copying is that these come
+across exactly.
 
 **Grants:** `execute … to authenticated` on `current_membership`, `is_super`,
 `is_active_member`, `member_directory`; `revoke … from public` on those plus
@@ -92,7 +123,9 @@ migrations rather than hand-copying is that these come across exactly.
 `songs`, `song_assignments`, `recordings`, `rehearsal_songs`, `rehearsal_recaps`,
 `rehearsal_recap_items`, `memberships`. The block is guarded and re-runnable.
 
-**Storage:** none. No buckets, no objects, no storage policies. The `recordings` table is *built*
+**Storage:** none for Sonario. No buckets, no objects, no storage policies. ⚠️ The audit's
+`pageturners: storage buckets` row reports buckets for the **whole shared project** — if Page
+Turners has any, they stay exactly where they are and this plan never touches them. The `recordings` table is *built*
 for Storage (`storage_path`, `mime_type`, a 50MB `file_size_bytes` cap) but nothing has ever been
 uploaded. The bucket gets created fresh in the new project as part of the Recordings build.
 
@@ -154,12 +187,19 @@ the shared `auth.users` and that one trigger.
 
 ### Phase A — prepare (zero risk, nothing changes)
 
-- **A1. Reconcile this inventory against the live database.** Run `supabase/split_audit.sql`
-  (to be written) against the CURRENT project and diff it against §1. Anything present live but
-  absent from the migrations is a hand-applied change that would be silently lost.
-- **A2. Add `migrations/0000_schema.sql`** — `create schema if not exists sonario;` plus the
-  `authenticated` usage grant. Fixes §0.1.
-- **A3. Decide the two open questions in §8.**
+- **A1. Reconcile this inventory against the live database.** ⏳ **Needs Nina to run it** —
+  `supabase/split_audit.sql`, read-only, against the CURRENT project. Claude cannot: the MCP in
+  this session is pointed at a third project (North Island Diary — confirmed by a `trip-photos`
+  bucket and 41 anonymous users). The script prints counts, both-directions discrepancy lists,
+  the grant state, Page Turners safety checks and row counts, and is written so a clean database
+  returns only `summary:` and `pageturners:` rows.
+- **A2. Add `migrations/0000_schema_and_grants.sql`.** ✅ Done. Fixes §0.1.
+- **A2b. Verify the chain replays.** ✅ Done, statically: all 185 statements across 0000–0006
+  parse under the real Postgres grammar (`libpg_query`), and a dependency walk confirms every
+  table, function, trigger, policy and index is created after everything it depends on. **The
+  chain builds Sonario cleanly from an empty database.** Not a substitute for actually running
+  it in Phase B, but the ordering and syntax classes of failure are ruled out.
+- **A3. Decide the questions in §8.** ✅ Answered 2026-09-10 — see §8.
 
 ### Phase B — build the new project (nothing live changes)
 
@@ -167,8 +207,11 @@ the shared `auth.users` and that one trigger.
   in Melbourne and the current project should be checked to match.
 - **B2.** Add `sonario` to Settings → API → **Exposed schemas**. Do this early; it's the one that
   silently breaks everything.
-- **B3.** Run, in order: `0000` → `0001` → `0002` → `0003` → `0004` → `0005` → `0006`. Each is
-  idempotent. Stop at the first error rather than pressing on.
+- **B3.** Run, in order: `0000` → `0001` → `0002` → `0003` → `0004` → `0005` → `0006`, then
+  **`0000` once more** as the grant sweep, then the `revoke`/`grant` block quoted at the bottom of
+  `0000` to restore the security-definer restrictions the sweep loosens. Stop at the first error
+  rather than pressing on. Note §0.1b: **0003 cannot be re-run** as it stands, so if you have to
+  restart partway, either fix it first or skip it if it already succeeded.
 - **B4.** Configure auth per §2. Add the new callback URI in Google Cloud Console.
 - **B5.** Nina signs in with Google against the new project → a real `auth.users` row appears →
   promote it to `active` / `super` with the bootstrap query in `0001` §11 (it deliberately looks
