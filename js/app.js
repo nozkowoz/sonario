@@ -1,14 +1,14 @@
-import { html, render } from './lib.js';
+import { html, render, useState } from './lib.js';
 import { supabase } from './supabaseClient.js';
 import {
-  useSession, useMyMembership, useAllMemberships, displayNameOf, isSuper,
+  useSession, useMyMembership, displayNameOf, isSuper,
   useEvents, useTerms, useAbsences, useCheckins, useMemberDirectory,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
-import { ApprovalQueue } from './approvals.js';
 import { LoadingState, ErrorState, EmptyState, BottomNav, useActiveTab } from './shell.js';
 import { HomeTab } from './home.js';
 import { CalendarTab } from './events.js';
+import { AdminTab } from './admin.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
 // Home and More are deliberately role-blind: a super sees exactly what an ordinary member sees,
@@ -52,6 +52,10 @@ function Main({ session, membership, profile }) {
   // If a super is demoted while sitting on the Admin tab (role arrives over realtime), fall back
   // rather than leaving them on a screen that no longer belongs to them.
   const activeTab = tab === 'admin' && !canManage ? 'home' : tab;
+  // Which Admin screen is open, and optionally which event to edit — set from Calendar's
+  // "Manage this event" so an organiser doesn't have to find the event again in a second list.
+  const [adminView, setAdminView] = useState(null);
+  const manageEvent = (ev) => { setAdminView({ section: 'events', editId: ev.id }); setTab('admin'); };
 
   // Events/terms/absences/check-ins load once here rather than per tab: both Home and Calendar need the
   // same rows, useLiveTable names its realtime channel after the table, and switching tabs
@@ -93,11 +97,13 @@ function Main({ session, membership, profile }) {
             profileId=${profile.id} canManage=${canManage}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins} directory=${directory}
+            onManageEvent=${canManage ? manageEvent : null}
           />
         ` : null}
         ${activeTab === 'more' ? html`<${MoreTab} profile=${profile} />` : null}
         ${activeTab === 'admin' && canManage
-          ? html`<${AdminTab} session=${session} />`
+          ? html`<${AdminTab} session=${session} view=${adminView} setView=${setAdminView}
+              events=${events} eventsLoading=${eventsLoading} terms=${terms} />`
           : null}
       </main>
       <p class="app-footer">${APP_VERSION}</p>
@@ -117,21 +123,6 @@ function MoreTab({ profile }) {
         <p class="more-account-name">${displayNameOf(profile)}</p>
         <button class="btn btn-outline btn-sm" onClick=${() => supabase.auth.signOut()}>Sign out</button>
       </div>
-    </div>
-  `;
-}
-
-// Everything an organiser can do that isn't tied to a specific event. For now that's the
-// membership approval queue, moved off More so More reads the same for everyone. Event management
-// deliberately stays inline on Calendar: managing a rehearsal from a different tab than the one
-// showing the rehearsals would be worse, not tidier.
-function AdminTab({ session }) {
-  const { memberships } = useAllMemberships();
-
-  return html`
-    <div class="tab-content">
-      <h2>Admin</h2>
-      <${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} />
     </div>
   `;
 }

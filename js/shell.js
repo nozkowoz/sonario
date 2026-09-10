@@ -1,5 +1,5 @@
 import { html, useState } from './lib.js';
-import { IconHome, IconCalendar, IconMore, IconAdmin } from './icons.js';
+import { IconHome, IconCalendar, IconMore, IconCrown } from './icons.js';
 
 // Reusable states so every tab handles loading/empty/error the same way, rather than each
 // screen inventing its own copy and layout.
@@ -35,14 +35,14 @@ export function ErrorState({ title = 'Something went wrong', body, onRetry }) {
 // Repertoire still isn't here: it has no screen behind it yet (Checkpoints 6-8), and a nav item
 // that leads nowhere is worse than one that isn't there.
 //
-// Admin is appended LAST rather than slotted before More, so the three tabs everyone shares stay
-// in the same positions whether you're a super or not — a member's nav is a prefix of a super's.
-// Muscle memory doesn't shift when someone is promoted.
+// Admin sits third with a crown, per Nina's mockup. That does shift More from third to fourth for
+// a super, which an earlier pass avoided by appending Admin last — but with a handful of supers
+// who each know they're a super, matching the intended design wins over that.
 const TABS = [
   { key: 'home', label: 'Home', Icon: IconHome },
   { key: 'calendar', label: 'Calendar', Icon: IconCalendar },
+  { key: 'admin', label: 'Admin', Icon: IconCrown, superOnly: true },
   { key: 'more', label: 'More', Icon: IconMore },
-  { key: 'admin', label: 'Admin', Icon: IconAdmin, superOnly: true },
 ];
 
 export function useActiveTab(initial = 'home') {

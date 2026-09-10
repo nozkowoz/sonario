@@ -461,6 +461,43 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .detail-notes svg { color: var(--ink-soft); flex-shrink: 0; margin-top: 2px; }
 .detail-notes p { margin: 0; font-size: 15px; white-space: pre-wrap; }
 
+/* --- Admin console ------------------------------------------------------ */
+.admin-intro { margin: -6px 0 18px; font-size: 14px; color: var(--ink-soft); }
+.admin-head-title {
+  font-family: 'Oswald', sans-serif; font-size: 18px; text-transform: uppercase;
+  letter-spacing: 0.5px; margin: 0; flex: 1; min-width: 0;
+}
+.admin-menu { display: flex; flex-direction: column; gap: 10px; }
+.admin-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  background: var(--purple-light); border: none; border-radius: var(--radius-lg);
+  padding: 16px; cursor: pointer;
+  transition: transform 0.15s var(--ease), background-color 0.15s var(--ease);
+}
+.admin-row:hover { transform: translateY(-1px); background: #e8e2f8; }
+.admin-row:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+/* Listed but not built. Dimmed rather than hidden, so the shape of the console is visible —
+   and it still opens, to a screen that says plainly that it isn't built. */
+.admin-row-soon { background: #f3f1f8; }
+.admin-row-soon .admin-row-icon { color: var(--ink-soft); background: #fff; }
+.admin-row-icon {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px;
+  background: #fff; color: var(--purple-dark); flex-shrink: 0;
+}
+.admin-row-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.admin-row-label { font-size: 16px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.admin-row-body { font-size: 13px; color: var(--ink-soft); line-height: 1.35; }
+.admin-soon {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  background: #fff; color: var(--ink-soft); border-radius: 8px; padding: 2px 7px;
+}
+.admin-row-chev { color: var(--ink-soft); flex-shrink: 0; display: grid; place-items: center; }
+
+.super-card { display: flex; gap: 12px; align-items: center; margin-top: 16px; background: var(--purple-light); box-shadow: none; }
+.super-card-icon { color: var(--purple-dark); flex-shrink: 0; display: grid; place-items: center; }
+.super-card-title { margin: 0; font-size: 14px; font-weight: 700; }
+.super-card-body { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
+
 /* --- More tab account block --------------------------------------------- */
 .more-account { margin-top: 8px; }
 .more-account-name { margin: 0 0 10px; font-size: 15px; font-weight: 600; }

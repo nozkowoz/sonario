@@ -79,3 +79,20 @@ export const IconAdmin = ({ size }) => svg(html`
   <circle cx="16" cy="7" r="2.2" />
   <circle cx="8" cy="17" r="2.2" />
 `, { size });
+
+// Admin gets the crown from Nina's mockup, replacing the sliders.
+export const IconCrown = ({ size }) => svg(html`
+  <path d="M4 18h16l1.2-9-5.2 3.4L12 5.5l-4 6.9L2.8 9 4 18Z" fill="currentColor" stroke="none" />
+`, { size });
+
+export const IconChevron = ({ size }) => svg(html`<path d="M9 5l7 7-7 7" />`, { size });
+
+export const IconBell = ({ size }) => svg(html`
+  <path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4 1.5 5.5 1.5 5.5H5S6.5 14 6.5 10Z" />
+  <path d="M10 19a2 2 0 0 0 4 0" />
+`, { size });
+
+export const IconCheckSquare = ({ size }) => svg(html`
+  <rect x="4" y="4" width="16" height="16" rx="4" fill="currentColor" stroke="none" />
+  <path d="M8 12.3l2.7 2.7L16 9.7" stroke="#fff" stroke-width="2.1" />
+`, { size });

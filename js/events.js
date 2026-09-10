@@ -224,9 +224,8 @@ export function EventRow({
 // ---------------------------------------------------------------------------
 export function EventDetail({
   event, term, myAbsence, myCheckin, absencesForEvent = [], checkinsForEvent = [],
-  canManage, profileId, directory = {}, onBack, onEdit, onReschedule,
+  canManage, profileId, directory = {}, onBack, onManage,
 }) {
-  const { busy, error, flip } = useStatusFlip(event);
   const cancelled = event.status === 'cancelled';
   const past = isPast(event);
 
@@ -237,12 +236,7 @@ export function EventDetail({
           <${IconBack} size=${20} />
         </button>
         <h2 class="detail-title">${formatWeekdayLong(event.rehearsal_date)} ${eventTitle(event)}</h2>
-        ${canManage
-          ? html`<${KebabMenu} items=${adminMenuItems(event, { onEdit, onReschedule, flip, busy })} />`
-          : null}
       </div>
-
-      ${error ? html`<p class="absence-error">${error}</p>` : null}
 
       <div class="card detail-when">
         <p class="detail-weekday">${formatWeekdayLong(event.rehearsal_date)}</p>
@@ -290,6 +284,12 @@ export function EventDetail({
                 absencesForEvent=${absencesForEvent} directory=${directory} />`
             : html`<${AbsenceSummary} event=${event} absencesForEvent=${absencesForEvent} directory=${directory} />`}
         </div>
+      ` : null}
+
+      ${canManage && onManage ? html`
+        <button class="btn btn-outline home-link-btn" onClick=${() => onManage(event)}>
+          Manage this event
+        </button>
       ` : null}
     </div>
   `;
@@ -423,10 +423,13 @@ export function EventForm({ event, terms, onDone, focusField = null }) {
 // ---------------------------------------------------------------------------
 // Calendar / My Term — a list of rows, with one event opened at a time as a detail screen.
 // ---------------------------------------------------------------------------
+// The member calendar, and now identical for everyone: creating, editing and cancelling events
+// all moved to Admin > Events. The only role-dependent things left are on the event *detail*
+// screen — a read-only attendance view and a "Manage this event" shortcut — and both are there
+// so an organiser doesn't lose information or context that Admin > Attendance will later absorb.
 export function CalendarTab({
-  profileId, canManage, events, loading, terms, absences, checkins, directory,
+  profileId, canManage, events, loading, terms, absences, checkins, directory, onManageEvent,
 }) {
-  const [editing, setEditing] = useState(null);   // null | { event: null|row, focus: null|'date' }
   const [openId, setOpenId] = useState(null);     // id of the event shown as a detail screen
 
   const termsById = useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
@@ -459,9 +462,6 @@ export function CalendarTab({
   }, [checkins]);
 
   const openEvent = openId ? events.find((e) => e.id === openId) : null;
-  // Opening the form always returns to the list, so there's never a form floating over a detail
-  // screen with two different "back" meanings.
-  const startEdit = (event, focus = null) => { setOpenId(null); setEditing({ event, focus }); };
 
   if (openId && openEvent) {
     return html`
@@ -476,8 +476,7 @@ export function CalendarTab({
         profileId=${profileId}
         directory=${directory}
         onBack=${() => setOpenId(null)}
-        onEdit=${(e) => startEdit(e)}
-        onReschedule=${(e) => startEdit(e, 'date')}
+        onManage=${onManageEvent}
       />
     `;
   }
@@ -493,24 +492,17 @@ export function CalendarTab({
     event: e,
     myAbsence: myAbsenceByEvent[e.id],
     myCheckin: myCheckinByEvent[e.id],
-    canManage,
+    canManage: false,
     onOpen: (ev) => setOpenId(ev.id),
-    onEdit: (ev) => startEdit(ev),
-    onReschedule: (ev) => startEdit(ev, 'date'),
   });
 
   return html`
     <div class="tab-content">
       <div class="section-header">
         <h2>${currentTerm ? 'My term' : 'Calendar'}</h2>
-        ${canManage && !editing
-          ? html`<button class="btn btn-dark btn-sm" onClick=${() => setEditing({ event: null, focus: null })}>
-              + Add event
-            </button>`
-          : null}
       </div>
 
-      ${currentTerm && !editing ? html`
+      ${currentTerm ? html`
         <div class="card term-card">
           <p class="eyebrow eyebrow-tight">${currentTerm.name}</p>
           <p class="term-card-range">
@@ -522,23 +514,12 @@ export function CalendarTab({
         </div>
       ` : null}
 
-      ${editing ? html`
-        <${EventForm}
-          event=${editing.event}
-          focusField=${editing.focus}
-          terms=${terms}
-          onDone=${() => setEditing(null)}
-        />
-      ` : null}
-
       ${loading ? html`<${LoadingState} label="Loading events…" />` : null}
 
       ${!loading && events.length === 0 ? html`
         <${EmptyState}
           title="No events yet"
-          body=${canManage
-            ? 'Add your first rehearsal, workshop, performance or social and it will show up here.'
-            : 'Rehearsals, workshops and performances will appear here once they\u2019re scheduled.'}
+          body="Rehearsals, workshops and performances will appear here once they\u2019re scheduled." 
         />
       ` : null}
 
