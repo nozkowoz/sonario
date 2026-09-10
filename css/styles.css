@@ -331,7 +331,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 /* Small-caps section label, used everywhere a group of cards needs naming. */
 .eyebrow {
   font-family: 'Oswald', sans-serif; font-size: 13px; text-transform: uppercase;
-  letter-spacing: 0.7px; color: var(--ink-soft); margin: 24px 0 10px;
+  letter-spacing: 0.7px; color: var(--ink-soft); margin: 16px 0 8px;
 }
 .eyebrow-tight { margin: 0 0 4px; color: var(--purple-dark); }
 
@@ -521,32 +521,32 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 
 /* --- Calendar: purple header block -------------------------------------- */
 .cal-top {
-  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 18px;
-  padding: 0 var(--main-pad) 20px;
+  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) 14px;
+  padding: 0 var(--main-pad) 14px;
   background: linear-gradient(180deg, #6547be 0%, #5e40b6 100%);
 }
 .cal-top-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.tab-content h2.cal-title { font-family: 'Oswald', sans-serif; font-size: 30px; text-transform: none; letter-spacing: -0.2px; margin: 0; color: #fff; }
-.cal-term { margin: 2px 0 0; font-size: 15px; color: rgba(255, 255, 255, 0.8); }
+.tab-content h2.cal-title { font-family: 'Oswald', sans-serif; font-size: 25px; text-transform: none; letter-spacing: -0.2px; margin: 0; color: #fff; }
+.cal-term { margin: 1px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.8); }
 /* A white pill on the purple — the same job the dark pill does on a light screen. */
 .btn-on-purple { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.5); color: #fff; }
 .btn-on-purple:hover { background: rgba(255, 255, 255, 0.26); transform: translateY(-1px); }
 
 /* --- Calendar: month grid ----------------------------------------------- */
-.month-card { padding: 14px 12px 10px; }
-.month-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.month-title { font-size: 17px; font-weight: 700; margin: 0; }
+.month-card { padding: 10px 10px 8px; margin-bottom: 12px; }
+.month-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.month-title { font-size: 16px; font-weight: 700; margin: 0; }
 .month-dow, .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
 .month-dow { margin-bottom: 2px; }
-.month-dow span { text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-soft); padding: 4px 0; }
+.month-dow span { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); padding: 2px 0; }
 .month-cell {
-  border: none; background: none; cursor: pointer; padding: 4px 0 6px;
-  display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 10px;
+  border: none; background: none; cursor: pointer; padding: 1px 0 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 10px;
 }
 .month-cell:disabled { cursor: default; }
 .month-cell-num {
-  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
-  font-size: 15px; font-weight: 600; color: var(--ink);
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  font-size: 14px; font-weight: 600; color: var(--ink);
 }
 .month-cell-out .month-cell-num { color: #b9b2cf; }
 .month-cell-today .month-cell-num { box-shadow: inset 0 0 0 1.5px var(--purple); color: var(--purple-dark); }
@@ -554,8 +554,8 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .month-cell:hover:not(:disabled) .month-cell-num { background: var(--purple-light); }
 .month-cell-sel:hover .month-cell-num { background: var(--purple); }
 /* Fixed-height dot row so cells with and without events line up. */
-.month-dots { display: flex; gap: 3px; height: 6px; align-items: center; }
-.month-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.month-dots { display: flex; gap: 3px; height: 5px; align-items: center; }
+.month-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 /* THE DOT COLOUR IS THE MEANING — semantic palette, see DESIGN-RULES.md. */
 .dot-rehearsal { background: var(--purple); }
 .dot-workshop { background: #b9a7e8; }
@@ -564,15 +564,21 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .dot-tentative { background: #e6b422; }
 .dot-cancelled { background: #e8695f; }
 
-.legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 12px 2px 16px; }
-.legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-soft); }
+/* Wraps rather than scrolls: all five items don't fit on one line at 375px, and a legend with
+   "Cancelled" hidden off the edge is worse than one that costs an extra 10px. */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 4px 11px; margin: 6px 2px 2px; padding-top: 7px;
+  border-top: 1px solid var(--border);
+}
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
 
 /* --- Calendar: filter chips --------------------------------------------- */
-.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; }
+.chips { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 2px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
 .chip {
-  border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0; line-height: 1.2;
   background: var(--purple-light); color: var(--purple-dark);
-  font-size: 14px; font-weight: 600; padding: 9px 16px; border-radius: 99px;
+  font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 99px;
 }
 .chip-on { background: var(--purple); color: #fff; }
 

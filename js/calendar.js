@@ -19,13 +19,16 @@ export function eventDotClass(ev) {
   return `dot-${ev.event_type}`;
 }
 
-// A month's worth of cells, Monday-first, padded with the neighbouring months' days so the grid
-// is always six clean rows.
+// A month's worth of cells, Monday-first, padded with the neighbouring months' days to complete
+// the first and last weeks — and only as many WEEKS as the month actually spans. A fixed six-row
+// grid meant most months carried a whole row of nothing but greyed-out next-month days, which
+// cost about 55px of a screen where the event list was already being squeezed off the bottom.
 function monthCells(year, month) {
-  const first = new Date(year, month, 1);
-  const lead = (first.getDay() + 6) % 7;          // JS weeks start Sunday; ours start Monday
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7;   // JS weeks start Sunday; ours Monday
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const weeks = Math.ceil((lead + daysInMonth) / 7);
   const cells = [];
-  for (let i = 0; i < 42; i += 1) {
+  for (let i = 0; i < weeks * 7; i += 1) {
     const d = new Date(year, month, 1 - lead + i);
     cells.push({ date: localDateStr(d), inMonth: d.getMonth() === month, day: d.getDate() });
   }
@@ -69,6 +72,7 @@ function MonthGrid({ year, month, eventsByDate, selected, onSelect, onStep }) {
           `;
         })}
       </div>
+      <${Legend} />
     </div>
   `;
 }
@@ -347,7 +351,6 @@ export function CalendarTab({
 
       <${MonthGrid} year=${cursor.year} month=${cursor.month} eventsByDate=${eventsByDate}
         selected=${selected} onSelect=${selectDate} onStep=${step} />
-      <${Legend} />
 
       <div class="chips">
         ${FILTERS.map(([key, label]) => html`
