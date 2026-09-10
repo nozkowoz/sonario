@@ -3,7 +3,7 @@ import { formatDateRail, formatDayMonthLong, formatWeekdayLong, formatTimeRange,
   relativeDayLabel, todayStr } from './lib.js';
 import { EVENT_TYPE_LABEL, nextEvent, AbsenceToggle } from './events.js';
 import { CheckInPanel, AttendanceStatus, isCheckInDay } from './checkin.js';
-import { IconAlert } from './icons.js';
+import { IconMegaphone } from './icons.js';
 import { LoadingState, EmptyState } from './shell.js';
 
 // Home follows the mockup's Option B: the date is the loudest thing on the screen, set as a big
@@ -90,7 +90,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
 
       ${next.description ? html`
         <div class="note-band">
-          <span class="note-band-icon"><${IconAlert} size=${20} /></span>
+          <span class="note-band-icon"><${IconMegaphone} size=${20} /></span>
           <div>
             <p class="eyebrow-sm">${isCheckInDay(next) ? 'Tonight' : 'Note'}</p>
             <p class="note-band-body">${next.description}</p>

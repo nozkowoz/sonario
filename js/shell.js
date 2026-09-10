@@ -63,7 +63,7 @@ export function BottomNav({ active, onChange, canManage = false }) {
           aria-current=${active === t.key ? 'page' : 'false'}
           onClick=${() => onChange(t.key)}
         >
-          <${t.Icon} />
+          <${t.Icon} active=${active === t.key} />
           <span class="bottom-nav-label">${t.label}</span>
         </button>
       `)}

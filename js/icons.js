@@ -9,15 +9,30 @@ const svg = (children, { size = 22, fill = 'none', stroke = true } = {}) => html
     stroke-linecap="round" stroke-linejoin="round">${children}</svg>
 `;
 
-export const IconHome = ({ size }) => svg(html`
-  <path d="M3 10.5 12 3l9 7.5" />
-  <path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5" />
-`, { size });
+// Nav icons take `active` and switch between outline and filled, per the icon sheet's
+// unselected/selected pair. Done in SVG rather than as the sheet's PNG exports: one definition
+// covers both states, it scales, and it inherits the active colour from `currentColor`.
+export const IconHome = ({ size, active }) => (active
+  ? svg(html`
+      <path d="M3 10.9 12 3.2l9 7.7v9.1a1 1 0 0 1-1 1h-5.2v-5.6H9.2V21H4a1 1 0 0 1-1-1v-9.1Z"
+        fill="currentColor" stroke="none" />
+    `, { size })
+  : svg(html`
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5" />
+    `, { size }));
 
-export const IconCalendar = ({ size }) => svg(html`
-  <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
-  <path d="M3.5 9.5h17M8.5 3v4M15.5 3v4" />
-`, { size });
+export const IconCalendar = ({ size, active }) => (active
+  ? svg(html`
+      <path d="M3.5 9.5h17V18a2.5 2.5 0 0 1-2.5 2.5H6A2.5 2.5 0 0 1 3.5 18V9.5Z"
+        fill="currentColor" stroke="none" />
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M8.5 3v4M15.5 3v4" />
+    `, { size })
+  : svg(html`
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 9.5h17M8.5 3v4M15.5 3v4" />
+    `, { size }));
 
 export const IconMore = ({ size }) => svg(html`
   <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
@@ -66,10 +81,12 @@ export const IconUsers = ({ size }) => svg(html`
   <path d="M16 5.6a3.2 3.2 0 0 1 0 6.3M17.5 14.9c2.1.5 3.5 2.3 3.5 4.4" />
 `, { size });
 
-export const IconAlert = ({ size }) => svg(html`
-  <circle cx="12" cy="12" r="9" fill="currentColor" stroke="none" />
-  <path d="M12 7.5v5.5" stroke="#fff" stroke-width="2" />
-  <circle cx="12" cy="16.4" r="1.15" fill="#fff" stroke="none" />
+// "Notice / Alert" on the icon sheet is a megaphone rather than a warning symbol — which reads
+// better anyway: an organiser's note about tonight is an announcement, not a hazard.
+export const IconMegaphone = ({ size }) => svg(html`
+  <path d="M4 10.5v3a1.5 1.5 0 0 0 1.5 1.5H7l9.5 4V5L7 9H5.5A1.5 1.5 0 0 0 4 10.5Z"
+    fill="currentColor" stroke="none" />
+  <path d="M19 9.5a3.2 3.2 0 0 1 0 5M7 15v3.5a1.5 1.5 0 0 0 3 0V16" />
 `, { size });
 
 // Sliders rather than a shield: this tab is where an organiser adjusts things, not a security
@@ -80,10 +97,14 @@ export const IconAdmin = ({ size }) => svg(html`
   <circle cx="8" cy="17" r="2.2" />
 `, { size });
 
-// Admin gets the crown from Nina's mockup, replacing the sliders.
-export const IconCrown = ({ size }) => svg(html`
-  <path d="M4 18h16l1.2-9-5.2 3.4L12 5.5l-4 6.9L2.8 9 4 18Z" fill="currentColor" stroke="none" />
-`, { size });
+// Admin's crown, outline when unselected and filled when selected like the other nav icons.
+export const IconCrown = ({ size, active }) => (active
+  ? svg(html`
+      <path d="M4 18h16l1.2-9-5.2 3.4L12 5.5l-4 6.9L2.8 9 4 18Z" fill="currentColor" stroke="none" />
+    `, { size })
+  : svg(html`
+      <path d="M4.6 17.5h14.8l1.4-9.4-5.6 3.6L12 4.8 8.8 11.7 3.2 8.1l1.4 9.4Z" />
+    `, { size }));
 
 export const IconChevron = ({ size }) => svg(html`<path d="M9 5l7 7-7 7" />`, { size });
 
