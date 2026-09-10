@@ -161,6 +161,7 @@ ol,ul{margin:0 0 10px;padding-left:22px}li{margin:4px 0}
 .order span{font:800 12px/1 ui-monospace,Menlo,monospace;background:var(--lav);color:var(--p);
 padding:7px 9px;border-radius:7px}
 .order span.last{background:var(--p);color:#fff}
+.order span.prev{background:var(--okbg);color:var(--ok)}
 .foot{text-align:center;color:var(--meta);font-size:13px;margin:26px 0 0}
 h3{font-size:14px;margin:16px 0 6px;letter-spacing:-.1px}
 """
@@ -289,25 +290,46 @@ steps.append(step('Create the new Supabase project', 'dash', """
 <p>Note the <b>project ref</b> (the <code>xxxxxxxx</code> in <code>https://xxxxxxxx.supabase.co</code>). Needed at cutover, not now.</p>
 """ + EXP('A new project, provisioning for a minute or two. Nothing else changes.')))
 
+steps.append(step('Run migration <code>0000</code> — it creates the schema', 'sql', """
+<p>SQL Editor → new query → paste → Run.</p>
+""" + WARN("""<b>This has to come before exposing the schema.</b> An earlier version of this runbook had
+those two the other way round, which is impossible: <code>sonario</code> can't appear in the Exposed
+schemas dropdown until it exists, and only <code>0000</code> creates it. If that dropdown shows just
+<code>public</code> and <code>graphql_public</code>, this step hasn't run yet.""")
++ sqlblock('mig0000', '0000_schema_and_grants.sql', mig='0000')
++ EXP('<code>Success. No rows returned.</code>')
++ STOP('If this errors, stop. Everything downstream assumes the schema and its grants exist.')))
+
 steps.append(step('Expose the <code>sonario</code> schema', 'dash', """
-<p>Settings → API → Data API → <b>Exposed schemas</b> → add <code>sonario</code>, keep <code>public</code>.</p>
-""" + WARN("""<b>Do this before anything else.</b> The app is pinned to <code>db.schema = 'sonario'</code>.
-Without this, every single request 404s and the app looks completely broken while the database is perfectly
-correct. There is no SQL that can set it, and nothing later in this runbook will catch it.""")
-+ EXP('<code>sonario</code> listed alongside <code>public</code> in Exposed schemas.')))
+<p>Settings → API → Data API → <b>Exposed schemas</b> → tick <code>sonario</code>, keep
+<code>public</code> and <code>graphql_public</code> as they are.</p>
+""" + WARN("""<b>Do not skip this.</b> The app is pinned to <code>db.schema = 'sonario'</code>. Without
+it, every single request 404s and the app looks completely broken while the database is perfectly correct.
+No SQL can set it, and nothing later in this runbook will catch it.""")
++ '''<p>Two other settings on that page, for reference — <b>leave both alone</b>:</p>
+<ul>
+<li><b>Automatically expose new tables</b> — on by default. Supabase suggests disabling it for manual
+control, but Sonario's migrations grant privileges <i>explicitly</i> (<code>0000</code> sets default
+privileges, <code>0007</code> sweeps), so it makes no difference either way. Not worth changing mid-build.</li>
+<li><b>Extra search path</b> (<code>public, extensions</code>) — correct as-is. Every Sonario function sets
+<code>search_path = ''</code> and fully qualifies its names, so it doesn't rely on this.</li>
+</ul>'''
++ EXP('<code>sonario</code> ticked, and the count reads <b>3 of 3 schemas exposed</b>.')))
 
 order = '<div class="order">' + ''.join(
-    f'<span class="{"last" if k=="0007" else ""}">{k}</span>' for k in
+    f'<span class="{"last" if k=="0007" else ("prev" if k=="0000" else "")}">{k}'
+    f'{" ✓" if k=="0000" else ""}</span>' for k in
     ['0000','0001','0002','0003','0004','0005','0006','0007']) + '</div>'
 
-mig_html = [f"""<p>SQL Editor → new query → paste → Run. <b>One at a time, in this order.</b></p>
+mig_html = [f"""<p>SQL Editor → new query → paste → Run. <b>One at a time, in this order.</b>
+<code>0000</code> already ran in step 2.</p>
 {order}
 <p><code>0007</code> is always last: it's the grant sweep, the explicit revokes, and a verification
 readout.</p>""" + STOP("""If any migration errors, <b>stop there</b>. Do not run the next one, and do not
 re-run the failed one hoping it settles. Paste the error to Claude — the order matters and a partial
 chain is diagnosable, whereas a chain you kept pushing through is not.""")]
 
-for m in ['0000_schema_and_grants.sql','0001_foundation.sql','0002_events_and_privacy.sql',
+for m in ['0001_foundation.sql','0002_events_and_privacy.sql',
           '0003_checkin_undo_window.sql','0004_signup_trigger_skips_anonymous.sql',
           '0005_members_can_actually_cancel_leave.sql','0006_voice_parts.sql',
           '0007_grant_sweep_and_revokes.sql']:
@@ -323,7 +345,7 @@ Don't seed on top of it — paste the 8 rows to Claude first."""))
     else:
         mig_html.append(EXP('<code>Success. No rows returned.</code>'))
 
-steps.append(step('Run the migration chain', 'sql', ''.join(mig_html)))
+steps.append(step('Run <code>0001</code> through <code>0007</code>', 'sql', ''.join(mig_html)))
 
 steps.append(step('Google sign-in', 'dash', """
 <p><b>4a — Supabase:</b> Authentication → Providers → <b>Google</b> → enable, and paste the same
@@ -422,11 +444,11 @@ html = f"""<!DOCTYPE html>
 <style>{CSS}</style></head><body>
 <header><div class="hin">
 <h1>Sonario — Phase B runbook</h1>
-<p class="sub">Build the new dedicated Supabase project. Nine steps. Progress saves in this browser.<br />Every SQL block has <b>Copy</b>, and <b>Select</b> if your browser blocks clipboard access — then ⌘C.</p>
+<p class="sub">Build the new dedicated Supabase project. Ten steps. Progress saves in this browser.<br />Every SQL block has <b>Copy</b>, and <b>Select</b> if your browser blocks clipboard access — then ⌘C.</p>
 <div class="banner">⚠️ The old shared Supabase project must remain untouched during Phase B.
 No cutover, no decommissioning.</div>
 <div class="bar"><i></i></div>
-<div class="barlab"><span id="cnt">0 of 9 done</span><button id="reset">Reset progress</button></div>
+<div class="barlab"><span id="cnt">0 of 10 done</span><button id="reset">Reset progress</button></div>
 </div></header>
 <div class="wrap">
 {''.join(steps)}

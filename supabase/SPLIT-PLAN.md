@@ -208,8 +208,11 @@ the shared `auth.users` and that one trigger.
 
 - **B1.** Nina creates a new Supabase project. Region: **Sydney (ap-southeast-2)** — the choir is
   in Melbourne and the current project should be checked to match.
-- **B2.** Add `sonario` to Settings → API → **Exposed schemas**. Do this early; it's the one that
-  silently breaks everything.
+- **B2. Run `0000` FIRST, then expose the schema.** Corrected 2026-09-10 during the actual run:
+  the original order said to expose `sonario` before running anything, which is impossible — the
+  schema doesn't appear in the Exposed schemas dropdown until it exists, and only `0000` creates
+  it. So: `0000`, then Settings → API → **Exposed schemas** → tick `sonario`. Still the setting
+  that silently breaks everything if missed.
 - **B3. THE CANONICAL MIGRATION ORDER, settled by Nina 2026-09-10:**
 
   ```
