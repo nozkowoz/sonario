@@ -378,17 +378,20 @@ the local sign-in you need in the very next step will fail.""")
 + EXP('Email provider on; both URLs in the redirect allow-list.')))
 
 steps.append(step('Sign in once, then promote yourself', 'both', """
-<p>Your <code>auth.users</code> row only exists once you've signed in. So, temporarily:</p>
+<p>Your <code>auth.users</code> row on the new project only exists once you've signed in. Use the
+purpose-built tool rather than editing the app's config:</p>
 <ol>
-<li>Edit <code>js/config.js</code> — swap <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>
-for the new project's (Settings → API).</li>
-<li>Serve the folder locally and open it: <code>python3 -m http.server 8777</code></li>
-<li>Sign in with Google.</li>
-<li><b>Revert <code>js/config.js</code> immediately.</b></li>
+<li><code>cd ~/Documents/Claude/sonario &amp;&amp; python3 -m http.server 8777</code></li>
+<li>Open <code>http://localhost:8777/tools/phase-b-signin.html</code></li>
+<li>Paste the new project's URL and anon key (Settings → API), then <b>Sign in with Google</b>.</li>
 </ol>
-""" + WARN("""<b>Never commit that edit.</b> Committing it would cut the deployed app over by accident,
-silently, mid-Phase-B. <code>git checkout js/config.js</code> reverts it. Cutover is a separate, explicitly
-approved step.""") + """
+""" + WARN("""<b>Redirect URLs need the wildcard form</b> — <code>http://localhost:8777/**</code>.
+A bare <code>http://localhost:8777</code> matches only that exact URL, and the tool lives at a path, so
+Google would bounce back and be refused.""")
++ WARN("""<b><code>js/config.js</code> is never edited.</b> An earlier version of this runbook had you
+swap it temporarily and revert — which worked, but a forgotten revert or a stray <code>git add -A</code>
+would have cut the deployed app over by accident, silently, mid-Phase-B. The tool holds the new
+credentials in its own page instead, so the risk simply doesn't exist.""") + """
 <p>Then promote the membership the signup trigger created:</p>
 """ + sqlblock('promote', 'recreate_test_identities.sql — step 1')
 + EXP('<b>Exactly one row</b>, showing <code>active</code> / <code>super</code>.')
@@ -399,13 +402,16 @@ purpose.""")))
 steps.append(step('Create the Leave Test identity', 'both', """
 <p>A dedicated <b>ordinary member</b> for testing RLS, leave and normal-member behaviour. It doesn't
 need the old UUID.</p>
-<p>In a private window on the locally-served app, open the browser console:</p>
-""" + sqlblock('anon_console', 'browser console — not SQL') + """
-<p>Then paste that uuid into <b>both</b> places below:</p>
-""" + sqlblock('leavetest', 'recreate_test_identities.sql — step 3')
+<p>Same tool as step 7 — <code>http://localhost:8777/tools/phase-b-signin.html</code>. Press
+<b>Sign out</b>, then <b>Create anonymous identity</b>. It prints the SQL <b>with the UUID already
+filled in</b>, so there is nothing to paste by hand.</p>
+""" + WARN("""<b>Anonymous sign-ins are OFF by default</b> on a new project. Enable them first at
+Authentication → Sign In / Providers → <b>Anonymous sign-ins</b>.""")
 + WARN("""This is manual because migration <code>0004</code> makes the signup trigger <b>skip anonymous
 identities</b> — the fix for Page Turners visitors filling Sonario's approval queue. So no profile or
 membership is created automatically.""")
++ '<p>For reference, this is the shape the tool generates:</p>'
++ sqlblock('leavetest', 'generated for you — UUID already substituted')
 + EXP("Two inserts succeed. The role must be <code>member</code>, never <code>super</code> — if it were a super, every &ldquo;verified as a plain member&rdquo; RLS result obtained with it would be worthless.")))
 
 steps.append(step('Seed the data — in this order', 'sql', """

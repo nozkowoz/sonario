@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sonario · Phase B sign-in tool</title>
+<style>
+:root{--p:#7052CD;--lav:#EEE6FF;--ink:#111827;--meta:#6B7280;--mute:#9CA3AF;--hair:#E5E7EB;
+--ok:#15803D;--okbg:#DCFCE7;--warn:#854D0E;--warnbg:#FEF9C3;--stop:#B91C1C;--stopbg:#FEF2F2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--lav);color:var(--ink);padding:0 20px 80px;
+font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.w{max-width:680px;margin:0 auto}
+header{background:var(--p);color:#fff;margin:0 -20px 22px;padding:18px 20px}
+h1{margin:0;font-size:19px;font-weight:800}
+header p{margin:4px 0 0;font-size:13.5px;color:rgba(255,255,255,.78)}
+.card{background:#fff;border-radius:16px;padding:20px;margin:0 0 16px}
+h2{margin:0 0 4px;font-size:15px;font-weight:800}
+.hint{margin:0 0 14px;font-size:13.5px;color:var(--meta)}
+label{display:block;font-size:12px;font-weight:700;letter-spacing:.4px;color:var(--meta);
+margin:12px 0 4px;text-transform:uppercase}
+input{width:100%;padding:10px 12px;border:1px solid var(--hair);border-radius:9px;font:13px
+ui-monospace,Menlo,monospace;background:#FCFCFD}
+input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(112,82,205,.13)}
+button{cursor:pointer;font:700 14px/1 inherit;border:none;border-radius:99px;padding:12px 20px}
+.pri{background:var(--p);color:#fff}.pri:hover{background:#5b3fac}
+.sec{background:#fff;border:1.5px solid var(--p);color:var(--p)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.warn{background:var(--warnbg);border-left:4px solid #CA8A04;color:var(--warn);
+padding:11px 14px;border-radius:0 8px 8px 0;margin:14px 0;font-size:13.5px}
+.stop{background:var(--stopbg);border:2px solid var(--stop);color:#7F1D1D;padding:12px 14px;
+border-radius:11px;margin:14px 0;font-size:13.5px}
+.res{background:var(--okbg);border:1.5px solid var(--ok);border-radius:12px;padding:16px;
+margin-top:16px;display:none}
+.res.show{display:block}
+.res h3{margin:0 0 8px;font-size:14px;color:var(--ok)}
+pre{margin:8px 0 0;padding:12px;background:#fff;border:1px solid var(--hair);border-radius:9px;
+font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;
+max-height:260px;overflow:auto}
+code{background:var(--lav);color:#4c3a8f;padding:1px 5px;border-radius:4px;font:12.5px ui-monospace,Menlo,monospace}
+.uuid{font:700 14px ui-monospace,Menlo,monospace;color:var(--p);word-break:break-all}
+.err{background:var(--stopbg);border:1.5px solid var(--stop);color:#7F1D1D;border-radius:11px;
+padding:13px;margin-top:14px;display:none;font-size:13.5px}
+.err.show{display:block}
+</style></head><body>
+<header><div class="w"><h1>Sonario — Phase B sign-in tool</h1>
+<p>Steps 7 and 8. Creates your auth user and the Leave Test identity on the NEW project —
+without touching <code>js/config.js</code>.</p></div></header>
+<div class="w">
+
+<div class="card">
+<h2>The new project's credentials</h2>
+<p class="hint">Supabase → your <b>Sonario</b> project → Settings → API. Saved in this browser only,
+never sent anywhere except Supabase itself.</p>
+<label for="url">Project URL</label>
+<input id="url" placeholder="https://rwkaofshfatqqkupeqoe.supabase.co" spellcheck="false" />
+<label for="key">Anon / publishable key</label>
+<input id="key" placeholder="eyJhbGciOi..." spellcheck="false" />
+<div class="stop"><b>Check the URL before you click anything.</b> It must be
+<code>rwkaofshfatqqkupeqoe</code> — the NEW project. If you paste the old shared project's URL,
+you'll be signing into the wrong database.</div>
+</div>
+
+<div class="card">
+<h2>Step 7 — sign in with Google</h2>
+<p class="hint">This creates your <code>auth.users</code> row on the new project. The signup
+trigger will make a profile and a <code>pending</code> membership; the SQL afterwards promotes it
+to super.</p>
+<div class="warn"><b>Needs the wildcard form</b> in the new project's <b>Authentication → URL
+Configuration → Redirect URLs</b>:<br /><code>http://localhost:8777/**</code><br />
+A bare <code>http://localhost:8777</code> entry matches only that exact URL, and this page lives
+at a path — so without the <code>/**</code> Google will bounce back and be refused.</div>
+<div class="row"><button class="pri" id="google">Sign in with Google</button></div>
+</div>
+
+<div class="card">
+<h2>Step 8 — the Leave Test identity</h2>
+<p class="hint">An anonymous identity, used as a dedicated <b>ordinary member</b> for testing RLS,
+leave and normal-member behaviour. Migration <code>0004</code> makes the signup trigger skip
+anonymous identities, so its profile and membership have to be inserted by hand — this page
+generates that SQL with the UUID already filled in.</p>
+<div class="warn"><b>Sign out first</b> if you're currently signed in as yourself, or you'll just
+see your own session again.<br /><br />
+Also: <b>anonymous sign-ins are OFF by default</b> on a new project. Turn them on at
+<b>Authentication → Sign In / Providers → Anonymous sign-ins</b> before using this button.</div>
+<div class="row">
+<button class="sec" id="anon">Create anonymous identity</button>
+<button class="sec" id="signout">Sign out</button>
+</div>
+</div>
+
+<div class="res" id="res"></div>
+<div class="err" id="err"></div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+
+const $ = (id) => document.getElementById(id);
+const K = 'sonario-signin-tool';
+try {
+  const v = JSON.parse(localStorage.getItem(K) || '{}');
+  if (v.url) $('url').value = v.url;
+  if (v.key) $('key').value = v.key;
+} catch (e) {}
+const remember = () => {
+  try { localStorage.setItem(K, JSON.stringify({ url: $('url').value.trim(), key: $('key').value.trim() })); }
+  catch (e) {}
+};
+$('url').addEventListener('input', remember);
+$('key').addEventListener('input', remember);
+
+const fail = (m) => { $('err').textContent = m; $('err').classList.add('show'); };
+const clearFail = () => $('err').classList.remove('show');
+
+function client() {
+  const url = $('url').value.trim(), key = $('key').value.trim();
+  if (!url || !key) { fail('Paste both the project URL and the anon key first.'); return null; }
+  if (!/^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(url)) {
+    fail('That project URL looks wrong. It should be exactly https://<ref>.supabase.co'); return null;
+  }
+  // No `db.schema` here on purpose: this tool only ever touches auth, never sonario tables.
+  return createClient(url.replace(/\/$/, ''), key);
+}
+
+function show(html) { $('res').innerHTML = html; $('res').classList.add('show'); }
+
+const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+async function report(sb) {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return false;
+  const anon = !!user.is_anonymous;
+  if (anon) {
+    const sql = `insert into sonario.profiles (id, display_name, google_email)
+values ('${user.id}', 'Leave Test', '')
+on conflict (id) do nothing;
+
+insert into sonario.memberships (profile_id, status, role, decided_at)
+values ('${user.id}', 'active', 'member', now())
+on conflict (profile_id) do update set status = 'active', role = 'member';`;
+    show(`<h3>Anonymous identity created</h3>
+      <p>UUID: <span class="uuid">${esc(user.id)}</span></p>
+      <p style="margin:10px 0 0;font-size:13.5px">Run this in the <b>new project's</b> SQL editor —
+      the UUID is already filled in, so there is nothing to paste by hand:</p>
+      <pre>${esc(sql)}</pre>
+      <p style="margin:10px 0 0;font-size:13px;color:var(--meta)">Role is <code>member</code>,
+      never <code>super</code> — a super would invalidate every plain-member RLS result you get
+      with it.</p>`);
+  } else {
+    show(`<h3>Signed in</h3>
+      <p>${esc(user.email || '(no email)')}</p>
+      <p>UUID: <span class="uuid">${esc(user.id)}</span></p>
+      <p style="margin:10px 0 0;font-size:13.5px">Now run step 7's promote SQL in the new project.
+      It looks you up by email, so there's no UUID to paste.</p>`);
+  }
+  return true;
+}
+
+$('google').addEventListener('click', async () => {
+  clearFail();
+  const sb = client(); if (!sb) return;
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href.split('#')[0] },
+  });
+  // Same trap the app documents: a disabled provider doesn't error here, it navigates away and
+  // renders raw JSON. If we're still on the page with an error, it's a real one.
+  if (error) fail('Sign-in failed: ' + error.message);
+});
+
+$('anon').addEventListener('click', async () => {
+  clearFail();
+  const sb = client(); if (!sb) return;
+  const { error } = await sb.auth.signInAnonymously();
+  if (error) { fail('Anonymous sign-in failed: ' + error.message +
+    ' — check Authentication → Sign In / Providers → Anonymous sign-ins is enabled.'); return; }
+  await report(sb);
+});
+
+$('signout').addEventListener('click', async () => {
+  clearFail();
+  const sb = client(); if (!sb) return;
+  await sb.auth.signOut();
+  show('<h3>Signed out</h3><p>Ready for the next sign-in.</p>');
+});
+
+// Coming back from the Google redirect: supabase-js parses the URL fragment itself.
+(async () => {
+  const sb = client(); if (!sb) return;
+  clearFail();
+  await report(sb);
+})();
+</script></body></html>
