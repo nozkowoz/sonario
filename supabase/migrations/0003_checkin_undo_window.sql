@@ -68,6 +68,12 @@ revoke execute on function sonario.enforce_checkin_timestamp() from public;
 -- the previous day for most of a Melbourne evening rehearsal — the same class of bug the
 -- localDateStr()/todayStr() helpers exist to prevent on the client side).
 drop policy if exists "members write own checkin" on sonario.checkins;
+-- AMENDED 2026-09-10, for repeatability only. This line and its twin below the next policy were
+-- added so this historical migration can be re-run during a clean fresh-project rebuild or a
+-- partial recovery; without them a second run fails with "policy already exists". The shared
+-- live project applied this migration in its original form and the resulting state is identical,
+-- so this is NOT intended to change any live behaviour. Policy logic below is untouched.
+drop policy if exists "members check in to today's event" on sonario.checkins;
 create policy "members check in to today's event" on sonario.checkins for insert
   with check (
     sonario.is_active_member()
@@ -85,6 +91,7 @@ create policy "members check in to today's event" on sonario.checkins for insert
 -- Deleting the row is the whole undo — same shape as reversing an absence. Unlike an absence
 -- (which a member may change freely right up until the event, decision 7), a check-in is a
 -- statement about something that already happened, so it stops being editable an hour later.
+drop policy if exists "members undo own checkin within an hour" on sonario.checkins;
 create policy "members undo own checkin within an hour" on sonario.checkins for delete
   using (
     profile_id = auth.uid()

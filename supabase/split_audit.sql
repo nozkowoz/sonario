@@ -46,6 +46,31 @@ live_realtime as (
 live_indexes as (
   select indexname::text as name from pg_indexes where schemaname = 'sonario'),
 
+-- ---- AM I IN THE RIGHT PROJECT? ------------------------------------------
+-- Read this row FIRST. The shared project is the only one with BOTH the `sonario` schema and
+-- Page Turners' tables in `public`. North Island Diary has neither. A dedicated Sonario project
+-- (once it exists) will have the schema but not books/ratings/meetings. This is a self-contained
+-- check that doesn't require reading a project ref off the dashboard.
+identity as (
+  select 0 as ord, '00: WHICH PROJECT AM I IN?' as section,
+         'shared (sonario + page turners)' as expected,
+         (case
+            when exists (select 1 from pg_namespace where nspname = 'sonario')
+             and (select count(*) from information_schema.tables
+                  where table_schema = 'public'
+                    and table_name in ('books', 'ratings', 'meetings')) = 3
+              then 'SHARED PROJECT — correct, carry on'
+            when exists (select 1 from pg_namespace where nspname = 'sonario')
+              then 'sonario present but Page Turners tables absent — a dedicated Sonario project?'
+            when (select count(*) from information_schema.tables
+                  where table_schema = 'public'
+                    and table_name in ('books', 'ratings', 'meetings')) > 0
+              then 'Page Turners present, NO sonario schema — STOP, wrong project'
+            else 'NEITHER found — STOP, this is some other project entirely'
+          end) as live,
+         'if this row does not say SHARED PROJECT, stop and ignore every row below it' as detail
+),
+
 -- ---- counts, so a single glance says whether anything is off at all --------
 summary as (
   select 1 as ord, 'summary: tables' as section,
@@ -195,7 +220,7 @@ rowcounts as (
 
 select section, expected, live, detail
 from (
-  select * from summary union all select * from grants union all
+  select * from identity union all select * from summary union all select * from grants union all
   select * from pageturners union all select * from diff union all select * from rowcounts
 ) x
 order by ord, section, expected, live;
