@@ -486,9 +486,23 @@ check-in-only-on-the-day rule was a call made while building Step D rather than 
 agreed decision. It's flagged in the migration's own comments as a one-line relaxation if the
 choir wants a grace window.
 
-**The very next task:** Nina's own hands-on test — real Google sign-in, promoted to super by the
-SQL above, then clicking through Home, Calendar and More against the seed data. Nothing new
-should be built until that has happened and she's said what she wants changed.
+**THE VERY NEXT TASK (set 2026-09-10, after a session restart):**
+
+1. **Apply the real rehearsal schedule.** `supabase/real_schedule_2026.sql` is written, verified
+   and committed but **NOT YET RUN**. It creates Term 3 and Term 4 2026 with a rehearsal on every
+   Tuesday, 7-9pm, at EASTMINT, Northcote (10 and 11 Tuesdays respectively), and cancels the one
+   that lands on Melbourne Cup Day. Use the **`supabase-sonario`** MCP server for this, not
+   `supabase` — see §11. Confirm the closing SELECT reports 10 and 11.
+2. **Push.** There is at least one local commit ahead of `origin/main`; Nina runs `git push`
+   herself.
+3. Then the thing that still hasn't happened: **Nina's own hands-on pass** through the app as a
+   real signed-in super, and whatever she wants changed as a result.
+
+Known open questions, none blocking: whether to relax the check-in-only-on-the-day rule (§6
+decision 13, one line in migration 0003); custom SMTP before email sign-in is usable by the whole
+choir; and adding choir members as Google OAuth test users while the consent screen is in Testing
+mode. The eight fake seed members are staying for now — Nina's explicit call on 2026-09-10, on the
+grounds that the app hasn't been shared with anyone yet. Delete them before it is.
 
 ---
 
