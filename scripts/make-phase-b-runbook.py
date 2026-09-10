@@ -136,8 +136,11 @@ border-radius:0 8px 8px 0;padding:11px 14px;margin:12px 0;font-size:14px}
 .exp .h{font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mute);margin:0 0 4px}
 .exp p{margin:0;font-size:14px}
 .sqlwrap{margin:14px 0 0;border:1px solid var(--hair);border-radius:12px;overflow:hidden;background:#fff}
+/* NOTHING in the block header may be selectable. Nina's first paste of 0000 began with the literal
+   text "0000" — the migration badge — and Postgres duly failed with a syntax error on line 1. A
+   stray drag, or Cmd-A on the page, must not be able to pick up a label and turn it into SQL. */
 .sqlhead{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#F9FAFB;
-border-bottom:1px solid var(--hair)}
+border-bottom:1px solid var(--hair);user-select:none;-webkit-user-select:none}
 .sqlname{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--meta);flex:1;
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mig{display:inline-block;font:900 13px/1 ui-monospace,Menlo,monospace;color:#fff;background:var(--p);
@@ -213,6 +216,12 @@ function copyText(t){
 // activation needed. So it is both the fallback for Copy and a button of its own — because the
 // clipboard API can refuse for reasons the page can't see or fix, and the runbook must not be
 // dependent on it. Select, then Cmd-C.
+// Belt and braces: if a leading line is nothing but a migration number, drop it before copying.
+// user-select:none on the header should make this unreachable — but a paste that silently begins
+// with "0000" costs a confusing error and a round trip, so it is cheap to make certain.
+function cleanSql(t){
+  return t.replace(/^\s*0{3}\d\s*\n/, '');
+}
 function selectBlock(id){
   const pre=document.getElementById(id);
   pre.classList.add('show');
@@ -231,7 +240,7 @@ document.addEventListener('click',e=>{
   if(s){ selectBlock(s.dataset.for); flash(s,'Selected — press ⌘C','ok'); return; }
   const b=e.target.closest('button.copy');
   if(b){
-    const t=document.getElementById(b.dataset.for).textContent;
+    const t=cleanSql(document.getElementById(b.dataset.for).textContent);
     copyText(t).then(()=>flash(b,'Copied','ok'))
       .catch(()=>{ selectBlock(b.dataset.for); flash(b,'Selected — press ⌘C','ok'); });
     return;
