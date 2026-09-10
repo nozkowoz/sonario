@@ -240,16 +240,18 @@ per test rather than letting that build again.
 |---|---|
 | `sonario` schema, RLS, security-definer functions (Checkpoint 2) | Implemented and verified (adversarial RLS testing done: self-approval, check-in-as-someone-else, role self-edit all confirmed blocked) |
 | Google OAuth sign-in screen + membership status screens (Checkpoint 3) | Implemented; **sign-in flow itself not verified with a real Google account** — only simulated via anonymous test identities promoted by SQL. See §9. |
-| Membership approval queue (approve/decline/deactivate/reactivate, bulk-approve) | Implemented and verified live (via anonymous test identities) |
+| Membership approval queue (approve/decline/deactivate/reactivate, bulk-approve) | Implemented and verified live. Lives on **Admin > Members** since 2026-09-10, not More |
+| Promote/demote supers | Implemented 2026-09-10. No policy change was needed — `super decides memberships` already allowed it. Two-step confirm; disabled on your own row |
+| Admin console (`js/admin.js`) | Implemented 2026-09-10: landing menu, Events, Members. Attendance/Notifications/Settings are listed but marked "Soon" and open a not-built screen |
 | App shell: bottom nav (Home/Calendar/More), header, visual system (`#7052CD`) | Implemented and verified live (screenshotted through all three tabs as a super test identity) |
 | Loading/empty/error state components (`js/shell.js`) | Loading and empty states verified live; **error state built but not exercised live** (would need a simulated network failure) |
 | Unified event model (`event_type`, `counts_towards_attendance` on `rehearsals`) | Schema and UI both implemented and verified live — all four event types render, and `counts_towards_attendance` is shown independently of type |
 | Away-dates privacy correction | Implemented and verified (RLS policy confirmed live via `pg_policies` query) |
 | Home tab | Implemented (Step C) and verified live: greeting, next non-cancelled event, absence toggle, check-in on the day, organiser shortcuts for supers |
 | Calendar tab | Implemented (Step C) and verified live: Coming up / Earlier grouping, all event types, relative day labels, cancelled events, term banner |
-| Admin event management (create/edit/cancel/reschedule) | Implemented (Step C) and verified live, including that an RLS-blocked write (no error, zero rows) is reported as a failure rather than silent success |
+| Admin event management (create/edit/cancel/reschedule) | Implemented and verified live. Moved off Calendar to **Admin > Events** on 2026-09-10; an RLS-blocked write (no error, zero rows) is reported as a failure rather than silent success |
 | Check-in / attendance UI | Implemented (Step D) and verified live: member self check-in, one-hour undo (policy-enforced), super attendance view via `member_directory()`. Migration `0003` applied |
-| Seed/test data | Implemented (Step E): `supabase/seed_test_data.sql`, applied live, re-runnable, dates relative to today |
+| Seed/test data | `supabase/seed_test_data.sql` — now **test members only**. The real schedule is `supabase/real_schedule_2026.sql`, applied 2026-09-10: Victorian school terms, every Tuesday 7-9pm at EASTMINT, Northcote |
 | Repertoire, recordings, practice mode, leaderboard, Message a Friend, recaps, push, social/notices/More, profile photo | All planned only — deliberately deferred past MVP |
 
 ---
@@ -275,6 +277,16 @@ beneath it for supers, and the member's avatar top-right. The avatar is the Goog
 captured at sign-in, falling back to initials for an email sign-in — this is **not** the deferred
 profile-photo *upload*, just what the provider already returned. Tapping it opens More.
 
+**ROLE-BLINDNESS IS A DELIBERATE RULE as of 2026-09-10.** Home, More and the header render
+identically whether you are a super or an ordinary member: no "Super access" badge, no organiser
+shortcuts, no role branches in copy. The reason is that Nina needs to judge the member experience
+without keeping a second account, and an organiser browsing the app shouldn't be able to cancel a
+rehearsal by mis-tapping. Every organiser action lives on the Admin tab. Two exceptions, both
+deliberate and both on the event *detail* screen: a read-only attendance summary, and a pencil
+that jumps to the admin editor for that event. There is also a pencil on each Calendar row for
+supers — the one control on a member-facing list, added because "cancel tonight, the hall
+flooded" shouldn't require finding the event again in a second list.
+
 **Screen structure (as built):**
 - **Home** — follows mockup "Option B": no greeting line, a large weekday/day numeral beside the
   next event's details, then the two member actions stacked full width ("I'm here" once it's the
@@ -294,8 +306,17 @@ profile-photo *upload*, just what the provider already returned. Tapping it open
   or your check-in with its Undo, or your noted absence), the notes, and for supers the
   attendance or who-can't-make-it view. Opening the admin form always returns to the list, so a
   form never floats over a detail screen with two meanings of "back".
-- **More** — the membership Approval Queue for supers, an empty placeholder for members, and the
-  Account block with Sign out (moved here from the header).
+- **More** — identical for everyone: an empty placeholder plus the Account block with Sign out.
+  The approval queue used to live here and now doesn't.
+- **Admin** (super only, `js/admin.js`) — a landing menu of five sections with a "Super user
+  access" footer card. **Events** and **Members** are built; **Attendance**, **Notifications** and
+  **Settings** are listed, badged "Soon", and open a screen that says plainly they aren't built.
+  Listing them shows the intended shape without pretending it's finished. Attendance is real work
+  (cross-event reporting); Notifications is the deferred push stack; Settings would cover choir
+  details and term dates, replacing `real_schedule_2026.sql`.
+  - **Admin > Events** is now the only place events are created, edited, rescheduled or cancelled.
+    Tapping a row there opens the editor, not the member detail screen.
+  - **Admin > Members** is the approval queue plus promote/demote to super.
 
 **Visual system / colours:** Primary purple **`#7052CD`** with `--purple-dark: #5b3fac` and
 `--purple-light: #F1EEFA`; headings Oswald condensed/bold, body Inter. Event-type pills keep
@@ -486,23 +507,32 @@ check-in-only-on-the-day rule was a call made while building Step D rather than 
 agreed decision. It's flagged in the migration's own comments as a one-line relaxation if the
 choir wants a grace window.
 
-**THE VERY NEXT TASK (set 2026-09-10, after a session restart):**
+**THE VERY NEXT TASK (updated 2026-09-10, evening):**
 
-1. ~~Apply the real rehearsal schedule.~~ **DONE 2026-09-10**, run by Nina in the Supabase SQL
-   editor (the MCP server in that session was pointed at the wrong project — see §11). Verified
-   output: Term 3 2026 = 10 rehearsals, 14 Jul - 15 Sep, 0 cancelled; Term 4 2026 = 11
-   rehearsals, 6 Oct - 15 Dec, 1 cancelled (Melbourne Cup Day, Tue 3 Nov). The invented seed
-   events are gone. `supabase/real_schedule_2026.sql` is re-runnable if the schedule ever needs
-   regenerating, and extending it to 2027 is two more rows in its terms insert.
-2. **Push.** There are local commits ahead of `origin/main`; Nina runs `git push` herself.
-3. Then the thing that still hasn't happened: **Nina's own hands-on pass** through the app as a
-   real signed-in super, and whatever she wants changed as a result.
+Everything committed is pushed and deployed at **v17-promote-supers**, and the real schedule is in
+the database. The next thing is not a build task — it's **Nina clicking through the app as her real
+signed-in super account** and saying what's wrong. That still hasn't happened properly; every real
+bug today came from running the app, not from reading it.
 
-Known open questions, none blocking: whether to relax the check-in-only-on-the-day rule (§6
-decision 13, one line in migration 0003); custom SMTP before email sign-in is usable by the whole
-choir; and adding choir members as Google OAuth test users while the consent screen is in Testing
-mode. The eight fake seed members are staying for now — Nina's explicit call on 2026-09-10, on the
-grounds that the app hasn't been shared with anyone yet. Delete them before it is.
+Things she has not yet exercised herself: the pencil shortcut from Calendar into the admin editor,
+Admin > Members promote/demote, and Admin > Events cancel/reinstate.
+
+**Open items, none blocking:**
+- **Admin > Attendance** — the obvious next build. Cross-event reporting (who came to what, per
+  member and per event). Would absorb the read-only attendance block currently on the event detail
+  screen. Nina chose "Events + Members only" for the first pass, so this is the agreed next slice.
+- **Repertoire** — schema exists and is empty (see §5), so a songs list plus per-event setlists
+  needs no database work; recordings do, because that table is built around Storage.
+- **Check-in only on the day** — §6 decision 13, mine not hers, one line in migration 0003 to
+  relax if the choir wants a grace window.
+- **Custom SMTP** before email sign-in is usable by the whole choir (the built-in service sends
+  about two an hour), and **Google OAuth test users** while the consent screen is in Testing mode.
+- **The eight fake seed members are still in the database.** Nina's explicit call on 2026-09-10:
+  fine while the app hasn't been shared with anyone. Delete them before it is —
+  `delete from auth.users where id::text like 'f0000000-0000-0000-0000-%';`
+- **Google shows the project ref, not "Sonario"**, on the consent screen. Setting the Branding app
+  name did not fix it; Google appears to display the redirect host for unverified apps. Judged not
+  worth chasing.
 
 ---
 
