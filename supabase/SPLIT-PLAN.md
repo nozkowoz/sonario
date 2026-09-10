@@ -382,6 +382,34 @@ either way** — this plan touches neither, and cleaning them is a separate conv
 2 terms · 21 events (1 cancelled) · 10 profiles · 8 active memberships, **2 super** · 7 check-ins
 · 2 absences · 2 away_dates · 11 part_labels · 0 songs/recordings/recaps.
 
+### Follow-up results (2026-09-10) ✅ both gating questions answered
+
+**1. The three legacy tables are EMPTY.** `notices` 0, `social_events` 0, `social_rsvps` 0. Nina's
+condition for carrying them was content "genuinely still needed" — there is none, so **they are
+not recreated**. §8 q3 is settled. They remain untouched in the old project.
+
+**2. The Leave Test identity is an ordinary member.** `active` / `member` / anonymous test
+identity. **So no prior plain-member RLS result needs re-running** — §8 q5 does not trigger, and
+the leave log→cancel verification in `0005`'s header plus the Step C adversarial results in
+HANDOVER §7 both stand as recorded.
+
+The full picture, which reconciles exactly with the counts in §9:
+
+| Who | Status | Role | Kind |
+|---|---|---|---|
+| Nina Kowalski | active | **super** | real sign-in |
+| Marguerite Okafor | active | **super** | seeded fake — `seed_test_data.sql:52`, deliberate |
+| Leave Test | active | member | anonymous test identity |
+| Bea Nowak, Dev Raman, Ines Ferreira, Priya Venkatesan, Tom Hollis | active | member | seeded fakes |
+| Callum Whitmore | pending | member | seeded fake |
+| Rowan Deakin | deactivated | member | seeded fake |
+
+10 profiles · 8 active · 2 super. Exactly as predicted from the seed file.
+
+Questions 3 and 4 (the Storage buckets, and the `public` table list) are **identify-only and do
+not gate Phase B** — they exist for the record, per Nina's "identify them only; do not delete,
+migrate, or modify them".
+
 ### The "2 supers" alarm was mine, and it was wrong 🔧
 Raised as a possible integrity problem, then resolved by reading the file that causes it.
 `supabase/seed_test_data.sql:52` **deliberately** makes seeded fake #1
@@ -415,25 +443,27 @@ expected value there too, and a validation check that expects 1 would be wrong.
 
 ## 8. Decisions
 
-1. ✅ **The Leave Test identity — recreate an equivalent.** Nina, 2026-09-10: "Recreate an
+1. ✅ **The Leave Test identity — recreate an equivalent.** Confirmed by the follow-up to be
+   `active` / `member` today, so the replacement must match that exactly. Nina, 2026-09-10: "Recreate an
    equivalent Leave Test ordinary-member identity in the new Sonario project. It does not need to
    retain the same UUID; I just want a dedicated non-super identity for testing RLS, leave and
    normal-member behaviour." **Must be `role = 'member'`, not super** — and the follow-up query
    checks whether the current one actually is.
 2. ✅ **Carry the 8 fake members and the fabricated Term 3 attendance over.** Nina: "I want
    realistic seeded data available for testing Home, My Term, Calendar, Attendance and Admin."
-3. ✅ **The three legacy tables are LEGACY and will not be recreated.** Nina, 2026-09-10: "treat
+3. ✅ **SETTLED — the three legacy tables are not recreated.** Nina, 2026-09-10: "treat
    `notices`, `social_events`, and `social_rsvps` as legacy and do not recreate them in the new
    Sonario project **unless the follow-up shows they contain data that is genuinely still
-   needed**." So: the new project gets a schema matching the migrations exactly, and the only
-   thing that could change this is real content in those tables — which the follow-up settles.
-   They stay untouched in the old project either way.
+   needed**." The follow-up returned **0 rows in all three**, so the condition is not met. The new
+   project gets a schema matching the migrations exactly. They stay untouched in the old project.
 4. ✅ **`trip-photos`, `update-photos` and the extra `public` tables are OUT OF SCOPE.** Nina:
    "Identify them only; do not delete, migrate, or modify them." Identified in §9. **No step of
    this plan touches them at any phase**, including Phase E — whose `drop` statements are scoped
    to the `sonario` schema and its `auth.users` trigger, and never to `public` or `storage`.
-5. ✅ **If a plain-member RLS result turns out to have been obtained with a super identity, it is
-   unverified.** Nina: "prior plain-member RLS testing should be treated as unverified and re-run
+5. ✅ **NOT TRIGGERED — the test identity was a genuine ordinary member.** The follow-up confirms
+   Leave Test is `active` / `member`, so nothing needs re-running. Kept on record in case it ever
+   recurs: if a plain-member RLS result turns out to have been obtained with a super identity, it
+   is unverified. Nina: "prior plain-member RLS testing should be treated as unverified and re-run
    later with a true ordinary member." The specific claims that would be affected, so they can be
    found if it ever comes up: the leave log→cancel verification recorded in the header of
    `0005_members_can_actually_cancel_leave.sql`, and the Step C adversarial results in HANDOVER
