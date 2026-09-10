@@ -718,7 +718,7 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   since the convention below means local can run ahead again at any time. Latest commits,
   newest first:
   ```
-  <new>  Re-render the app icons from Big Shoulders Display 900
+  02ca7d5 Re-render the app icons from Big Shoulders Display 900
   dc8b56d Correct the claim that Repertoire needs a schema from scratch
   06f4ebe HANDOVER: record the Home rebuild commit hash
   c3c5a5e Rebuild Home from the Figma spec; Inter + Big Shoulders app-wide
