@@ -102,7 +102,8 @@ function termStats({ term, events, checkins, profileId }) {
   };
 }
 
-export function HomeTab({ profile, events, loading, terms, absences, checkins, onNavigate }) {
+export function HomeTab({ profile, events, loading, terms, absences, checkins, onNavigate,
+  onOpenEvent }) {
   const next = useMemo(() => nextEvent(events), [events]);
   const term = useMemo(() => currentTermOf(terms), [terms]);
   const myAbsence = useMemo(
@@ -239,7 +240,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
         </div>
         <div class="rail-list">
           ${upcoming.map((e) => html`
-            <${RailRow} key=${e.id} event=${e} onOpen=${() => onNavigate('calendar')} />
+            <${RailRow} key=${e.id} event=${e} onOpen=${onOpenEvent} />
           `)}
         </div>
       ` : null}

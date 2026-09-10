@@ -5,8 +5,8 @@ import { EVENT_TYPES, createEvent, updateEvent, setEventStatus, markAbsent, clea
 import { LoadingState, EmptyState } from './shell.js';
 import { CHOIR_NAME } from './config.js';
 import { CheckInPanel, AttendanceStatus, AttendanceSummary, isCheckInDay } from './checkin.js';
-import { IconKebab, IconPin, IconBack, IconCheck, IconNote, IconEdit, IconReschedule, IconCancel,
-  IconChevron } from './icons.js';
+import { IconKebab, IconCheck, IconNote, IconEdit, IconReschedule, IconCancel, IconChevron,
+  IconClock, IconExternal, IconPinFilled, IconCalendar } from './icons.js';
 
 // The unified event model in product language. `event_type` is purely what kind of thing it is;
 // whether it counts towards attendance is a separate, independent flag on the same row (a
@@ -330,88 +330,108 @@ export function EventRow({
 // ---------------------------------------------------------------------------
 export function EventDetail({
   event, term, myAbsence, myCheckin, myAway, absencesForEvent = [], checkinsForEvent = [],
-  canManage, profileId, directory = {}, onBack, onManage,
+  canManage, profileId, directory = {}, onManage,
 }) {
   const cancelled = event.status === 'cancelled';
   const past = isPast(event);
+  const showAdmin = canManage && !cancelled && (past || isCheckInDay(event) || absencesForEvent.length > 0);
 
   return html`
-    <div class="tab-content">
-      <div class="detail-head">
-        <button class="icon-btn" aria-label="Back to calendar" onClick=${onBack}>
-          <${IconBack} size=${20} />
-        </button>
-        <h2 class="detail-title">${formatWeekdayLong(event.rehearsal_date)} ${eventTitle(event)}</h2>
-        ${canManage && onManage ? html`
-          <button class="icon-btn" aria-label="Edit this event" onClick=${() => onManage(event)}>
-            <${IconEdit} size=${20} />
-          </button>
-        ` : null}
-      </div>
+    <div class="sheet-detail">
+      <p class="sheet-date">${formatEventDateLong(event.rehearsal_date)}</p>
 
-      <div class="card detail-when">
-        <p class="detail-weekday">${formatWeekdayLong(event.rehearsal_date)}</p>
-        <p class="detail-date">${formatDayMonthLong(event.rehearsal_date)}</p>
-        ${event.start_time
-          ? html`<p class="detail-time">${formatTimeRange(event.start_time, event.end_time)}</p>`
-          : null}
-        ${event.location ? html`
-          <p class="detail-loc"><${IconPin} size=${18} />${event.location}</p>
-        ` : null}
-        <div class="event-row-tags">
-          <span class="event-type-badge event-type-${event.event_type}">${EVENT_TYPE_LABEL[event.event_type]}</span>
-          ${cancelled ? html`<span class="event-type-badge event-cancelled-badge">Cancelled</span>` : null}
-          ${!event.counts_towards_attendance
-            ? html`<span class="event-type-badge event-type-neutral">Doesn't count towards attendance</span>`
-            : null}
-          ${term ? html`<span class="event-type-badge event-type-neutral">${term.name}</span>` : null}
+      <div class="sheet-title-row">
+        <h2 class="sheet-title">${eventTitle(event)}</h2>
+        <div class="sheet-title-actions">
+          <span class=${`sheet-type sheet-type-${cancelled ? 'cancelled' : event.event_type}`}>
+            <span class="sheet-type-dot" aria-hidden="true"></span>
+            ${cancelled ? 'Cancelled' : EVENT_TYPE_LABEL[event.event_type]}
+          </span>
+          ${canManage && onManage ? html`
+            <button class="icon-btn" aria-label="Edit this event" onClick=${() => onManage(event)}>
+              <${IconEdit} size=${18} />
+            </button>
+          ` : null}
         </div>
       </div>
 
-      <p class="eyebrow">Your status</p>
-      <div class="card detail-status">
-        <${AttendanceStatus} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
-          myAway=${myAway} />
-        ${myAway && myAway.note ? html`<p class="detail-away-note">Your leave: ${myAway.note}</p>` : null}
-        ${cancelled ? null : html`
-          <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence} profileId=${profileId} />
-          ${myCheckin
-            ? null
-            : html`<${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId} />`}
-        `}
+      <div class="sheet-meta">
+        ${event.start_time ? html`
+          <p class="sheet-meta-line">
+            <${IconClock} size=${18} />${formatTimeRange(event.start_time, event.end_time)}
+          </p>
+        ` : null}
+        ${event.location ? html`
+          <p class="sheet-meta-line">
+            <${IconPinFilled} size=${18} />
+            <span class="sheet-meta-text">${event.location}</span>
+            <a class="sheet-meta-link" aria-label=${`Find ${event.location} on a map`}
+              href=${`https://maps.google.com/?q=${encodeURIComponent(event.location)}`}
+              target="_blank" rel="noopener noreferrer"><${IconExternal} size=${14} /></a>
+          </p>
+        ` : null}
       </div>
 
-      ${event.status !== 'cancelled' ? html`
-        <p class="eyebrow">Add to your calendar</p>
-        <div class="card add-cal">
-          <a class="btn btn-outline btn-sm" href=${icsHref(event, term)}
-            download=${`${eventTitle(event).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`}>
-            Apple / iCal
-          </a>
-          <a class="btn btn-outline btn-sm" href=${googleCalHref(event)}
-            target="_blank" rel="noopener noreferrer">Google Calendar</a>
+      <${AttendanceStatus} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
+        myAway=${myAway} detailed=${true} />
+
+      ${cancelled ? null : html`
+        <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
+          profileId=${profileId} />
+      `}
+
+      ${!cancelled ? html`
+        <div class="sheet-rule"></div>
+        <div class="sheet-section">
+          <p class="sheet-section-head"><${IconCalendar} size=${20} />Add to calendar</p>
+          <div class="sheet-cal">
+            <a class="sheet-cal-btn" href=${icsHref(event, term)}
+              download=${`${eventTitle(event).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`}>
+              Apple / iCal
+            </a>
+            <a class="sheet-cal-btn" href=${googleCalHref(event)}
+              target="_blank" rel="noopener noreferrer">Google Calendar</a>
+          </div>
         </div>
       ` : null}
 
       ${event.description ? html`
-        <p class="eyebrow">Notes</p>
-        <div class="card detail-notes">
-          <${IconNote} size=${18} />
-          <p>${event.description}</p>
+        <div class="sheet-rule"></div>
+        <div class="sheet-section sheet-notes">
+          <${IconNote} size=${20} />
+          <div>
+            <p class="sheet-section-head sheet-section-head-plain">Notes</p>
+            <p class="sheet-notes-body">${event.description}</p>
+          </div>
         </div>
       ` : null}
 
-      ${canManage && !cancelled ? html`
-        <p class="eyebrow">${past || isCheckInDay(event) ? 'Attendance' : 'Who can\'t make it'}</p>
-        <div class="card">
+      ${/* The one action, last and on its own, so "I can't come" is never the thing your thumb
+            lands on first.
+            Absent once you've checked in — you evidently came. Also absent while you're on
+            LEAVE: the two are deliberately different things (one event vs. a period away, see
+            DESIGN-RULES.md), and leave already covers this rehearsal, so offering it here would
+            invite a second, redundant row saying the same thing. Cancel the leave if it's
+            wrong. */
+        cancelled || myCheckin || myAway ? null : html`
+        <div class="sheet-rule"></div>
+        <div class="sheet-action">
+          <${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId} />
+        </div>
+      `}
+
+      ${showAdmin ? html`
+        <div class="sheet-rule"></div>
+        <div class="sheet-section">
+          <p class="sheet-section-head sheet-section-head-plain">
+            ${past || isCheckInDay(event) ? 'Attendance' : 'Who can\'t make it'}
+          </p>
           ${past || isCheckInDay(event)
             ? html`<${AttendanceSummary} checkinsForEvent=${checkinsForEvent}
                 absencesForEvent=${absencesForEvent} directory=${directory} />`
             : html`<${AbsenceSummary} event=${event} absencesForEvent=${absencesForEvent} directory=${directory} />`}
         </div>
       ` : null}
-
-
     </div>
   `;
 }

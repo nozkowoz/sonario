@@ -1,7 +1,7 @@
 import { html, useState, useMemo } from './lib.js';
 import { formatEventDate, formatEventDateLong, parseLocalDate, todayStr, localDateStr } from './lib.js';
 import { logLeave, cancelLeave, awayRangeFor } from './store.js';
-import { EventDetail, RailRow, currentTermOf } from './events.js';
+import { RailRow, currentTermOf } from './events.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { IconChevron, IconBack, IconCheckCircle, IconMinusCircle } from './icons.js';
 
@@ -211,10 +211,8 @@ function LeaveList({ leave }) {
 
 // --- The tab ----------------------------------------------------------------
 export function CalendarTab({
-  profileId, canManage, events, loading, terms, absences, checkins, awayDates, directory,
-  onManageEvent,
+  profileId, events, loading, terms, absences, checkins, awayDates, onOpenEvent,
 }) {
-  const [openId, setOpenId] = useState(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
   // Which day the strip highlights. Defaults to today, which is what the design shows.
   const [selected, setSelected] = useState(todayStr());
@@ -224,7 +222,6 @@ export function CalendarTab({
   const [weekStart, setWeekStart] = useState(() => mondayOf(todayStr()));
   const [filter, setFilter] = useState('all');
 
-  const termsById = useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const currentTerm = useMemo(() => currentTermOf(terms), [terms]);
 
   // Written out rather than routed through a helper that calls useMemo: hooks inside a nested
@@ -242,20 +239,6 @@ export function CalendarTab({
     return m;
   }, [checkins, profileId]);
 
-  // Super-only in practice: RLS returns a member only their own rows, so for them these hold
-  // just themselves and are never rendered anyway.
-  const absencesByEvent = useMemo(() => {
-    const m = {};
-    for (const a of absences) (m[a.rehearsal_id] ||= []).push(a);
-    return m;
-  }, [absences]);
-
-  const checkinsByEvent = useMemo(() => {
-    const m = {};
-    for (const c of checkins) (m[c.rehearsal_id] ||= []).push(c);
-    return m;
-  }, [checkins]);
-
   const myLeave = useMemo(
     () => awayDates.filter((a) => a.profile_id === profileId && a.status !== 'cancelled'),
     [awayDates, profileId],
@@ -267,32 +250,11 @@ export function CalendarTab({
     return map;
   }, [events]);
 
-  const openEvent = openId ? events.find((e) => e.id === openId) : null;
-
-  if (openId && openEvent) {
-    return html`
-      <${EventDetail}
-        event=${openEvent}
-        term=${openEvent.term_id ? termsById[openEvent.term_id] : null}
-        myAbsence=${myAbsenceByEvent[openEvent.id]}
-        myCheckin=${myCheckinByEvent[openEvent.id]}
-        myAway=${awayRangeFor(openEvent, awayDates, profileId)}
-        absencesForEvent=${absencesByEvent[openEvent.id] || []}
-        checkinsForEvent=${checkinsByEvent[openEvent.id] || []}
-        canManage=${canManage}
-        profileId=${profileId}
-        directory=${directory}
-        onBack=${() => setOpenId(null)}
-        onManage=${onManageEvent}
-      />
-    `;
-  }
-
   // Tapping a date opens the event when there's only one, which is the common case for a choir
   // rehearsing weekly; with more than one it narrows the list to that day instead.
   const selectDate = (date, evs) => {
     setSelected(date);
-    if (evs.length === 1) { setOpenId(evs[0].id); return; }
+    if (evs.length === 1) { onOpenEvent(evs[0]); return; }
     setDayFilter(evs.length > 1 ? date : null);
   };
 
@@ -349,7 +311,7 @@ export function CalendarTab({
   };
 
   const row = (e) => html`
-    <${RailRow} key=${e.id} event=${e} onOpen=${(ev) => setOpenId(ev.id)}
+    <${RailRow} key=${e.id} event=${e} onOpen=${onOpenEvent}
       trailing=${stateMark(e) || html`<span class="rail-chev"><${IconChevron} size=${14} /></span>`} />
   `;
 

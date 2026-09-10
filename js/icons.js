@@ -159,3 +159,16 @@ export const IconMinusCircle = ({ size = 16 }) => svg(html`
   <circle cx="12" cy="12" r="8.5" />
   <path d="M8.5 12h7" />
 `, { size });
+
+// The detail sheet's meta lines: a clock beside the time, an external-link mark on the location
+// (it opens a map, which leaves the app, and a link that leaves should say so).
+export const IconClock = ({ size }) => svg(html`
+  <circle cx="12" cy="12" r="8.5" />
+  <path d="M12 7.5V12l2.5 1.5" />
+`, { size });
+
+export const IconExternal = ({ size }) => svg(html`
+  <path d="M14 4h6v6" />
+  <path d="M20 4l-8 8" />
+  <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+`, { size });

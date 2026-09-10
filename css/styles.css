@@ -332,6 +332,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .att-off { color: var(--ink); font-weight: 600; background: var(--purple-light); border-radius: 12px; padding: 8px 12px; }
 .att-muted { color: var(--ink-soft); font-weight: 500; }
 .att-tick { color: var(--pill-green-icon); flex-shrink: 0; display: grid; place-items: center; }
+.att-lines { display: flex; flex-direction: column; min-width: 0; }
 /* On purple the 92% green reads slightly warmer than a flat fill, which is what the design file
    specifies — the hero's purple shows through just enough to tie the pill to the card. */
 .next-detail .att-good { background: rgba(220, 252, 231, 0.92); }
@@ -611,22 +612,119 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .kebab-item-danger svg { color: var(--error); }
 .kebab-item-danger:hover { background: var(--error-bg); }
 
-/* --- Event detail screen ------------------------------------------------- */
-.detail-head { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
-.detail-head .icon-btn { margin-left: -6px; }
-.tab-content h2.detail-title {
-  font-family: 'Inter', system-ui, sans-serif; font-size: 15px; text-transform: uppercase;
-  letter-spacing: 0.8px; margin: 0; flex: 1; min-width: 0; color: var(--ink-soft);
+/* --- Event detail sheet -------------------------------------------------- */
+/* Nina's Figma opens an event as a bottom sheet over the screen you were on, so this is a panel
+   rather than a page. One sheet serves Home and Calendar (owned by app.js) — see the Sheet
+   comment in js/shell.js for the three things a sheet has to get right. */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: sheet-fade 0.18s var(--ease);
 }
-.detail-when { background: var(--purple-light); box-shadow: none; padding: 20px; }
-.detail-weekday { margin: 0; font-size: 15px; font-weight: 600; color: var(--purple-dark); }
-.detail-date { font-family: 'Inter', system-ui, sans-serif; font-weight: 700; font-size: 32px; line-height: 1.05; margin: 2px 0 8px; }
-.detail-time { margin: 0; font-size: 17px; font-weight: 600; }
-.detail-loc { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; font-size: 14px; color: var(--ink-soft); }
-.detail-loc svg { flex-shrink: 0; }
-.detail-notes { display: flex; gap: 12px; align-items: flex-start; }
-.detail-notes svg { color: var(--ink-soft); flex-shrink: 0; margin-top: 2px; }
-.detail-notes p { margin: 0; font-size: 15px; white-space: pre-wrap; }
+.sheet {
+  position: relative;
+  width: 100%; max-width: 780px; max-height: 88vh;
+  background: #fff; border-radius: 24px 24px 0 0;
+  display: flex; flex-direction: column;
+  animation: sheet-rise 0.22s var(--ease);
+}
+.sheet:focus { outline: none; }
+@keyframes sheet-fade { from { opacity: 0; } }
+@keyframes sheet-rise { from { transform: translateY(14px); } }
+@media (prefers-reduced-motion: reduce) {
+  .sheet-backdrop, .sheet { animation: none; }
+}
+/* The grab handle is decoration — there's no drag-to-dismiss behind it — but it's the thing that
+   makes a panel read as dismissable at all, so the backdrop tap gets discovered. */
+.sheet-grip { padding: 12px 0 4px; display: flex; justify-content: center; flex-shrink: 0; }
+.sheet-grip span { width: 36px; height: 4px; border-radius: 2px; background: #E5E7EB; }
+.sheet-close {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  border: none; background: none; cursor: pointer;
+  width: 32px; height: 32px; border-radius: 50%;
+  font-size: 22px; line-height: 1; color: var(--fig-mute);
+}
+.sheet-close:hover { background: var(--fig-hair); color: var(--fig-ink); }
+.sheet-body {
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 12px 20px calc(32px + env(safe-area-inset-bottom, 0px));
+}
+
+.sheet-date { margin: 0; font-size: 13px; font-weight: 600; line-height: 19.5px; color: var(--purple); }
+.sheet-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.sheet-detail h2.sheet-title {
+  margin: 0; font-size: 28px; font-weight: 800; line-height: 30.8px; letter-spacing: -0.4px;
+  color: var(--fig-ink); text-transform: none; min-width: 0;
+}
+.sheet-title-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+/* The type pill: a dot in the type's own colour plus its name. Semantic, per DESIGN-RULES.md —
+   the same palette the row tints use, so a lilac row and a lilac pill mean the same thing. */
+.sheet-type {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 6px 12px; border-radius: 99px;
+  font-size: 12px; font-weight: 600; line-height: 18px;
+  background: var(--fig-lav); color: var(--purple);
+}
+.sheet-type-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.sheet-type-workshop { background: var(--tint-workshop); color: var(--lilac); }
+.sheet-type-performance { background: var(--tint-performance); color: var(--green); }
+.sheet-type-social { background: var(--tint-social); color: var(--teal); }
+.sheet-type-cancelled { background: var(--tint-cancelled); color: var(--coral); }
+
+.sheet-meta { padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.sheet-meta-line {
+  display: flex; align-items: center; gap: 12px; margin: 0;
+  font-size: 15px; font-weight: 500; line-height: 22.5px; color: var(--fig-ink);
+}
+.sheet-meta-line > svg { color: var(--purple); flex-shrink: 0; }
+.sheet-meta-text { flex: 1; min-width: 0; }
+.sheet-meta-link { color: var(--fig-mute); display: grid; place-items: center; flex-shrink: 0; }
+.sheet-meta-link:hover { color: var(--purple); }
+
+/* The status card, at the design's values: a softer green ground than the Home pill's, because
+   here it's a block rather than an inline badge. */
+.sheet-detail .att-status { margin-top: 16px; }
+.sheet-detail .att-good { background: #F0FDF4; border-radius: 12px; padding: 14px; }
+.sheet-detail .att-off { border-radius: 12px; padding: 14px; }
+.sheet-detail .att-text { font-size: 14px; font-weight: 700; line-height: 21px; }
+/* The sub-line follows its card's tone rather than being green everywhere — "away for work"
+   inside a lavender card must not be rendered in the positive colour. */
+.sheet-detail .att-sub { font-size: 12px; font-weight: 400; line-height: 18px; color: var(--fig-meta); }
+.sheet-detail .att-good .att-sub { color: var(--pill-green-icon); }
+.sheet-detail .checkin-row { margin-top: 14px; padding-top: 0; border-top: 0; }
+
+.sheet-rule { height: 1px; background: var(--fig-hair); margin: 16px 0 0; }
+.sheet-section { padding-top: 16px; }
+.sheet-section-head {
+  display: flex; align-items: center; gap: 10px; margin: 0;
+  font-size: 14px; font-weight: 600; line-height: 21px; color: var(--fig-ink);
+}
+.sheet-section-head > svg { color: var(--purple); flex-shrink: 0; }
+.sheet-section-head-plain { display: block; }
+.sheet-cal { display: flex; gap: 8px; padding-top: 12px; }
+.sheet-cal-btn {
+  flex: 1; text-align: center; text-decoration: none;
+  background: var(--fig-hair); border-radius: 99px; padding: 8px 10px;
+  font-size: 12px; font-weight: 600; line-height: 18px; color: #374151;
+}
+.sheet-cal-btn:hover { background: #E5E7EB; color: #374151; }
+.sheet-notes { display: flex; gap: 10px; align-items: flex-start; }
+.sheet-notes > svg { color: var(--purple); flex-shrink: 0; margin-top: 1px; }
+.sheet-notes-body { margin: 1px 0 0; font-size: 12px; line-height: 18px; color: var(--fig-meta); white-space: pre-wrap; }
+
+/* "Can't make it?" as its own lavender block at the very bottom — the design's placement, and
+   the right one: it's the only action on the sheet and it should be the last thing, not
+   something a thumb finds on the way to the time. */
+.sheet-action { padding-top: 16px; }
+.sheet-action .absence-row {
+  margin: 0; padding: 14px 16px; border-top: 0;
+  background: var(--fig-lav); border-radius: 12px; align-items: flex-start;
+}
+.sheet-action .btn-quiet {
+  font-size: 14px; font-weight: 700; line-height: 21px; color: var(--purple); text-decoration: none;
+}
+.sheet-action .btn-quiet:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* --- Calendar: purple hero + week strip --------------------------------- */
 /* The hero now carries the week strip as well as the title, so it bleeds to both edges the same
@@ -712,8 +810,6 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
    "confirmed" just because both currently count for the You're away calculation. */
 .leave-pending { font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--ink-soft); }
 .detail-away-note { margin: 0; font-size: 13px; color: var(--ink-soft); }
-.add-cal { display: flex; gap: 10px; flex-wrap: wrap; }
-.add-cal .btn { text-decoration: none; }
 
 /* --- Member management rows --------------------------------------------- */
 .member-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -727,11 +823,16 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .member-confirm-text { margin: 0; font-size: 13px; color: var(--ink); }
 
 /* --- Admin console ------------------------------------------------------ */
-.admin-intro { margin: -6px 0 18px; font-size: 14px; color: var(--ink-soft); }
+/* Back-bar for Admin's sub-screens. This outlived the full-screen event detail it was written
+   for — that became a sheet — and Admin > Events / Members are now its only users. */
+.detail-head { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+.detail-head .icon-btn { margin-left: -6px; }
+/* Sentence case, matching every other screen title since the Figma pass. */
 .tab-content h2.admin-head-title {
-  font-family: 'Inter', system-ui, sans-serif; font-size: 18px; text-transform: uppercase;
-  letter-spacing: 0.5px; margin: 0; flex: 1; min-width: 0;
+  font-size: 20px; font-weight: 800; letter-spacing: -0.2px; text-transform: none;
+  margin: 0; flex: 1; min-width: 0;
 }
+.admin-intro { margin: -6px 0 18px; font-size: 14px; color: var(--ink-soft); }
 .admin-menu { display: flex; flex-direction: column; gap: 10px; }
 .admin-row {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
@@ -774,7 +875,6 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   :root { --main-pad: 16px; }
   .app-header-inner { padding: 12px 16px 2px; }
   .tab-row { padding: 0 16px; }
-  .detail-date { font-size: 28px; }
   .event-row { padding: 13px 8px 13px 13px; gap: 11px; }
   .date-rail { width: 48px; }
 }

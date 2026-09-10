@@ -162,8 +162,25 @@ purple hero**:
   where cancelled events already use a coral tint and a struck-through title, an X beside a
   healthy concert reads as the event being off rather than the member being absent. The words
   live on the detail screen; at 358px wide the row title needs the space.
-- **Still to do:** the event **detail screen** is unchanged and does not match the Figma's bottom
-  sheet (date line, 28px title, type pill, status card, Add to calendar, Notes, Can't make it).
+
+### The event sheet
+
+**Built 2026-09-10.** An event opens as a **bottom sheet over whatever screen you were on**, not
+as a screen that replaces it — you're glancing at one rehearsal, not navigating away from your
+term. There is exactly ONE sheet, owned by `js/app.js`, so Home and Calendar share it and it has
+the data (terms, absences, check-ins, leave, directory) already loaded there. It's keyed by event
+**id**, not by the row object, so a realtime change while the sheet is open shows up instead of
+being frozen at the moment it was tapped.
+
+- Order is: date line, title + type pill, time and location, **status**, then Add to calendar,
+  Notes, and **"Can't make it?" last, on its own**. That placement is deliberate: it's the only
+  action on the sheet and it must never be what a thumb finds on the way to reading the time.
+- **"Can't make it?" is hidden when you've checked in** (you evidently came) **and while you're
+  on leave**. Leave already covers that rehearsal, and offering it would invite a second,
+  redundant row saying the same thing. Cancel the leave if it's wrong.
+- The status card's second line is state-aware: "See you there!" when expected, and **the
+  member's own leave note** when away — in the neutral grey, not the positive green, because
+  "away for work" is not a positive state.
 
 - **No global Subscribe button.**
 - Normal rehearsals **do not use RSVP** — members are expected by default. An individual event may

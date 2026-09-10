@@ -40,7 +40,9 @@ export const timeOfDay = (iso) =>
 // either do nothing or reintroduce the RSVP that decision deliberately removed. It gets a
 // button's visual weight without a button's promise.
 // ---------------------------------------------------------------------------
-export function AttendanceStatus({ event, myCheckin, myAbsence, myAway }) {
+// `detailed` adds the design's second line. It exists only on the detail sheet: Home's pill is a
+// compact one-liner and a subtitle there would push the hero taller for no new information.
+export function AttendanceStatus({ event, myCheckin, myAbsence, myAway, detailed = false }) {
   const past = event.rehearsal_date < todayStr();
 
   // Order matters. Turning up beats everything, so a check-in wins even over logged leave — you
@@ -51,20 +53,27 @@ export function AttendanceStatus({ event, myCheckin, myAbsence, myAway }) {
     : myCheckin
       ? { text: `You're here${myCheckin.checked_in_at ? ` — checked in at ${timeOfDay(myCheckin.checked_in_at)}` : ''}`, tone: 'good' }
       : myAway
-        ? { text: "You're away", tone: 'off' }
+        // The note the member wrote when logging the leave, so the card says WHY as well as
+        // what. Second line rather than appended to the first: "You're away" is the status and
+        // "away for work" is their own words, and running them together reads as one sentence
+        // the app wrote.
+        ? { text: "You're away", tone: 'off', sub: myAway.note || null }
         : myAbsence
           ? { text: "You've told us you can't make it.", tone: 'off' }
           : past
             ? { text: 'No check-in was recorded for you.', tone: 'muted' }
-            : { text: "You're expected", tone: 'good' };
+            : { text: "You're expected", tone: 'good', sub: 'See you there!' };
 
   return html`
-    <p class="att-status att-${state.tone}">
+    <div class="att-status att-${state.tone}">
       ${state.tone === 'good'
         ? html`<span class="att-tick"><${IconCheckCircle} size=${18} /></span>`
         : null}
-      ${state.text}
-    </p>
+      <span class="att-lines">
+        <span class="att-text">${state.text}</span>
+        ${detailed && state.sub ? html`<span class="att-sub">${state.sub}</span>` : null}
+      </span>
+    </div>
   `;
 }
 

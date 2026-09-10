@@ -2,10 +2,11 @@ import { html, render, useState } from './lib.js';
 import { supabase } from './supabaseClient.js';
 import {
   useSession, useMyMembership, displayNameOf, isSuper,
-  useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useMemberDirectory,
+  useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useMemberDirectory, awayRangeFor,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
-import { LoadingState, ErrorState, EmptyState, BottomNav, useActiveTab } from './shell.js';
+import { LoadingState, ErrorState, EmptyState, BottomNav, Sheet, useActiveTab } from './shell.js';
+import { EventDetail, eventTitle } from './events.js';
 import { HomeTab } from './home.js';
 import { CalendarTab } from './calendar.js';
 import { AdminTab } from './admin.js';
@@ -56,6 +57,12 @@ function Main({ session, membership, profile }) {
   // "Manage this event" so an organiser doesn't have to find the event again in a second list.
   const [adminView, setAdminView] = useState(null);
   const manageEvent = (ev) => { setAdminView({ section: 'events', editId: ev.id }); setTab('admin'); };
+  // ONE event sheet for the whole app, owned here rather than by a tab. Nina's Figma opens an
+  // event as a sheet over whatever screen you were on, so Home and Calendar both need it — and
+  // this is also where the data it wants (terms, absences, check-ins, leave, the directory)
+  // already lives. Keyed by id, not by the row object, so a realtime update to the event while
+  // the sheet is open is reflected instead of being frozen at the moment it was tapped.
+  const [openEventId, setOpenEventId] = useState(null);
 
   // Events/terms/absences/check-ins load once here rather than per tab: both Home and Calendar need the
   // same rows, useLiveTable names its realtime channel after the table, and switching tabs
@@ -67,6 +74,11 @@ function Main({ session, membership, profile }) {
   const { awayDates } = useAwayDates();
   // Only supers ever render another member's name, so members don't call the directory at all.
   const { directory } = useMemberDirectory(canManage);
+
+  const termsById = Object.fromEntries(terms.map((t) => [t.id, t]));
+  const openEvent = openEventId ? events.find((e) => e.id === openEventId) : null;
+  const forEvent = (rows, id) => rows.filter((r) => r.rehearsal_id === id);
+  const mineFor = (rows, id) => rows.find((r) => r.rehearsal_id === id && r.profile_id === profile.id);
 
   return html`
     <div>
@@ -91,15 +103,15 @@ function Main({ session, membership, profile }) {
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins}
             onNavigate=${setTab}
+            onOpenEvent=${(ev) => setOpenEventId(ev.id)}
           />
         ` : null}
         ${activeTab === 'calendar' ? html`
           <${CalendarTab}
-            profileId=${profile.id} canManage=${canManage}
+            profileId=${profile.id}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins} awayDates=${awayDates}
-            directory=${directory}
-            onManageEvent=${canManage ? manageEvent : null}
+            onOpenEvent=${(ev) => setOpenEventId(ev.id)}
           />
         ` : null}
         ${activeTab === 'repertoire' ? html`
@@ -117,6 +129,24 @@ function Main({ session, membership, profile }) {
       </main>
       <p class="app-footer">${APP_VERSION}</p>
       <${BottomNav} active=${activeTab} onChange=${setTab} canManage=${canManage} />
+
+      ${openEvent ? html`
+        <${Sheet} label=${eventTitle(openEvent)} onClose=${() => setOpenEventId(null)}>
+          <${EventDetail}
+            event=${openEvent}
+            term=${openEvent.term_id ? termsById[openEvent.term_id] : null}
+            myAbsence=${mineFor(absences, openEvent.id)}
+            myCheckin=${mineFor(checkins, openEvent.id)}
+            myAway=${awayRangeFor(openEvent, awayDates, profile.id)}
+            absencesForEvent=${forEvent(absences, openEvent.id)}
+            checkinsForEvent=${forEvent(checkins, openEvent.id)}
+            canManage=${canManage}
+            profileId=${profile.id}
+            directory=${directory}
+            onManage=${canManage ? (ev) => { setOpenEventId(null); manageEvent(ev); } : null}
+          />
+        <//>
+      ` : null}
     </div>
   `;
 }
