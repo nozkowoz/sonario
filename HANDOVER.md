@@ -474,6 +474,33 @@ Membership status copy is exact, agreed wording — see `js/auth.js`, don't casu
 
 ---
 
+## 6b. THE THREE SUPABASE PROJECT REFS — check before every write
+
+Pointing at the wrong project has cost time repeatedly in this work. The refs are in public URLs,
+so there is nothing secret here, and having them written down is worth more than the tidiness of
+leaving them out.
+
+| Ref | What it is | Sonario's status |
+|---|---|---|
+| `rwkaofshfatqqkupeqoe` | **NEW dedicated Sonario project** (created 2026-09-10) | being built — Phase B |
+| `jpffnazfjxvdzqnfueue` | **OLD shared project**: Sonario + Page Turners + a trip-journal app | live, and the rollback. **Do not touch during Phase B** |
+| `ylrcotvnrvvfosuvtleh` | North Island Diary — **unrelated** | what this session's MCP is bound to, which is why every migration has been pasted by hand |
+
+`js/config.js` still points at the OLD ref and **must keep doing so until cutover is approved**.
+
+**Before any SQL that writes, confirm the project.** The one-liner that distinguishes all three:
+
+```sql
+select case
+  when exists (select 1 from pg_namespace where nspname = 'sonario')
+   and (select count(*) from information_schema.tables where table_schema = 'public'
+        and table_name in ('books','ratings','meetings')) = 3 then 'OLD SHARED project'
+  when exists (select 1 from pg_namespace where nspname = 'sonario') then 'NEW Sonario project'
+  else 'NEITHER — some other project' end as which_project;
+```
+
+---
+
 ## 7. Current work / exact stopping point
 
 **Updated 2026-09-10 (latest). PHASE B OF THE SUPABASE SPLIT IS HANDED TO NINA AND IN PROGRESS.**
