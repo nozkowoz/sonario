@@ -406,9 +406,28 @@ The full picture, which reconciles exactly with the counts in §9:
 
 10 profiles · 8 active · 2 super. Exactly as predicted from the seed file.
 
-Questions 3 and 4 (the Storage buckets, and the `public` table list) are **identify-only and do
-not gate Phase B** — they exist for the record, per Nina's "identify them only; do not delete,
-migrate, or modify them".
+**3. The Storage buckets are not Sonario's, and they are nearly empty.** Identify-only per Nina's
+instruction; nothing in this plan touches them at any phase.
+
+| Bucket | Public? | Created | Objects | Size |
+|---|---|---|---|---|
+| `trip-photos` | private | 2026-09-01 | **0** | 0 bytes |
+| `update-photos` | **public** | 2026-09-01 | 8 | 6.6 MB |
+
+Two things follow.
+
+**A correction to §9.** It said that if these were another app's residue, "the storage-quota
+argument for splitting is stronger than assumed". At 6.6 MB against a 1 GB allowance that is
+wrong — existing usage is negligible. The quota argument was always about **future** usage:
+Sonario's recordings are capped at 50 MB each and a term of per-part audio would dominate the
+allowance. That part stands; the existing-residue part does not.
+
+**`update-photos` is a PUBLIC bucket holding 8 files.** Public means readable by anyone with the
+URL, no authentication. Flagged because it is worth knowing, not because this plan does anything
+about it — it is outside scope and stays untouched. Whose it is remains unidentified; both buckets
+were created 2026-09-01, the day Sonario was scaffolded.
+
+Question 4 (the `public` table list) is likewise identify-only and does **not gate Phase B**.
 
 ### The "2 supers" alarm was mine, and it was wrong 🔧
 Raised as a possible integrity problem, then resolved by reading the file that causes it.
