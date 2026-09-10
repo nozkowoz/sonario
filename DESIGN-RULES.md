@@ -13,14 +13,13 @@ rules were written after the mockups and generally win.
   Ink `#1E0355`, background `#EEE6FF`.
 - **The wordmark keeps its tall, narrow, condensed face.** Do not substitute or redraw the logo
   with a generic S or another font.
-- ⚠️ **Two condensed faces are now in play, and they have NOT been reconciled.** The Figma
-  (2026-09-10) sets the in-app wordmark as **Big Shoulders Display 900**, 26px/39px, 1.04px
-  tracking — and that is what the app now renders, because the design file says so explicitly.
-  The **app icons** are still rendered from **Oswald Bold** by `scripts/make-icons.py`. Both are
-  tall condensed sans faces and the difference is slight at icon size (Big Shoulders is a little
-  wider and blockier), so nothing looks wrong today. But it is a real inconsistency: either
-  re-render the icons from Big Shoulders, or move the wordmark back to Oswald. **Nina's call** —
-  don't quietly pick one.
+- **The face is Big Shoulders Display 900, everywhere.** Settled by Nina 2026-09-10: "Use Big
+  Shoulders 900 consistently. The Figma design is the approved visual source of truth." The
+  wordmark is 26px/39px with 1.04px tracking; the app icons were re-rendered from the same face
+  at weight 900, keeping composition, tile sizes, glyph proportions and colours unchanged. The
+  ink height of the S is identical to the Oswald version — only the letterform is wider and
+  blockier. **Oswald is gone from this project.** `scripts/make-icons.py` is still the sanctioned
+  way to produce new sizes; it now takes the Big Shoulders variable TTF.
 - **Careful:** the branding sheet uses TWO darks and they are not interchangeable — the
   **wordmark** is near-black `#090223`, the **S mark / app icon** is indigo `#1E0355`.
 
@@ -90,6 +89,23 @@ a mixed list reads evenly.
 
 One component renders these on both Home and Calendar — `RailRow` in `js/events.js`. Keep it that
 way, so a change to how an event reads in a list can't land on one screen and miss the other.
+
+## Voice parts
+
+Set by Nina 2026-09-10. Ten assignable parts, of which **four are standard** and six are
+subdivisions that stay selectable but shouldn't crowd the picker.
+
+| Standard | Subdivisions |
+|---|---|
+| Sop, Alto, Tenor, **Barry** | Sop 1, Sop 2, Alto 1, Alto 2, Tenor 1, Tenor 2 |
+
+- **"Barry" means baritone.** It is what the choir says, so it is what the app says. Don't
+  "correct" it.
+- A picker shows the four standard parts up front and the six subdivisions behind a *more*
+  affordance — the `common` boolean on `part_labels` (migration 0006) is what that reads.
+- **`Full choir` is not a person's part.** It exists so a *recording* can be of the whole choir;
+  the `enforce_assignable_part()` trigger rejects it on `song_assignments`.
+- One live part per person per song, enforced by a partial unique index rather than by the UI.
 
 ## General visual direction
 
@@ -198,9 +214,21 @@ render. None of them blocks current work.
       is authoritative.
     - **New infrastructure, not schema:** a Supabase **Storage bucket plus bucket policies**
       mirroring the RLS model, for the audio itself. The app has never used Storage.
-  Ask Nina before building: semester vs term (the app's unit is *term*, the Figma says
-  *semester*), and who may upload a recording (the policy currently allows **any active
-  member**).
+  **Answered by Nina, 2026-09-10 — these are settled:**
+    - **Semester for repertoire folders, term for attendance.** Both units coexist on purpose and
+      must not be unified: a song library is browsed by semester ("Semester 2 · 2026"), while
+      attendance, My Term and the last-week notice all stay on `terms`. Don't "tidy" one into the
+      other.
+    - **Any active member may upload a recording.** That's what the existing 0001 policy already
+      allows, so no policy change. Admin's Recordings section is therefore oversight (see what's
+      there, remove something), not an upload gate — note 0001 lets the **uploader or a super**
+      delete.
+    - **Voice part is one per person PER SONG**, not a profile field. This is already the shape of
+      `song_assignments`, and migration 0006 adds the partial unique index that actually enforces
+      it. **Consequence for the More screen:** its Figma line "Soprano · Melbourne City Choir"
+      cannot be read off a profile, because there is no profile-level part. Either derive
+      something (most-assigned part this semester) or drop the part from that line — an open
+      design question, not a data one.
 - **Admin gains a Recordings section**, listed above Events in the Figma. Blocked on the Storage
   bucket rather than on schema — `recordings` already exists.
 

@@ -281,10 +281,12 @@ database does or doesn't have** — §3 and the migration files, not memory of a
 What those screens actually need is (a) a table for named song collections that aren't events,
 (b) a decision on profile-level voice part vs per-song assignment, and (c) a Storage bucket.
 
-**Type, as of v24:** Inter 400–900 for everything, Big Shoulders Display 900 for the SONARIO
-wordmark only. **Oswald is gone from the app** — it survives only inside `scripts/make-icons.py`,
-which still renders the app icons from it. That is an unreconciled inconsistency and it is
-Nina's call; it is flagged at the top of `DESIGN-RULES.md`.
+**Type, as of v25:** Inter 400–900 for everything, Big Shoulders Display 900 for the SONARIO
+wordmark. **Oswald is gone from this project entirely** — Nina settled it on 2026-09-10 ("Use Big
+Shoulders 900 consistently. The Figma design is the approved visual source of truth"), and
+`scripts/make-icons.py` re-rendered the whole icon set from Big Shoulders at weight 900. The
+script now takes the Big Shoulders variable TTF; composition, tile sizes, glyph proportions and
+both colours are unchanged from the Oswald version, and the S's ink height is identical.
 
 **Older note, still true except where the above supersedes it (2026-09-09 evening):**
 
@@ -473,6 +475,34 @@ Membership status copy is exact, agreed wording — see `js/auth.js`, don't casu
 ---
 
 ## 7. Current work / exact stopping point
+
+**Updated 2026-09-10 (latest).** Since the Home rebuild:
+
+- **App icons re-rendered from Big Shoulders Display 900** (typography only — see §5).
+- **`supabase/migrations/0006_voice_parts.sql` is WRITTEN AND NOT APPLIED.** It needs Nina to run
+  it. Three things, each of which genuinely needs schema: adds `sop_1`/`sop_2` (0001 seeded
+  numbered Altos and Tenors but no Sops); adds a `common` boolean to `part_labels` so a picker
+  can put Sop/Alto/Tenor/Barry forward and tuck the six subdivisions behind a *more* affordance;
+  and adds a **partial** unique index on `song_assignments (song_id, profile_id) where
+  archived_at is null`, because "one part per person per song" was Nina's rule and nothing but
+  the UI was enforcing it. Partial because removal in that table is an archive, not a delete, so
+  a plain constraint would let someone's own history block their reassignment.
+- **Three product questions answered and recorded in `DESIGN-RULES.md`:** semester for repertoire
+  folders / term for attendance (both units coexist deliberately), any active member may upload a
+  recording (matches the existing policy — no change), and voice part is per person **per song**,
+  not a profile field. That last one has a consequence: the Figma's More screen shows a fixed
+  "Soprano · …" which cannot be read off a profile. Open design question.
+- ⚠️ **THE SUPABASE MCP IS STILL POINTED AT THE WRONG PROJECT.** Verified again 2026-09-10:
+  `select count(*) from information_schema.schemata where schema_name = 'sonario'` returns **0**,
+  and the schema list is a bare Supabase default — i.e. this is North Island Diary, not Sonario.
+  **Run that check before any write**, and hand Nina SQL to paste rather than applying it. The
+  `supabase-sonario` entry added to `~/.claude.json` still needs a session restart to load.
+- **Nina pushed** on 2026-09-10, so `origin/main` includes the Home rebuild.
+- **Nina's UI icon PNGs are in `~/Downloads/sonario_individual_icons_7052CD/`** (12 files) and
+  `sonario_active_icons_png/`. They are 512px flat `#7052CD` rasters, **filled state only**. The
+  app's nav uses hand-drawn inline SVGs from `js/icons.js` instead, which carry outline/filled
+  pairs and follow `currentColor`. Swapping in the PNGs would lose the inactive state and the
+  ability to recolour, so it was NOT done — it's a question for Nina, not an oversight.
 
 **Updated 2026-09-10 (late).** Home has been rebuilt to Nina's Figma spec and the type system
 changed app-wide (commit below, NOT pushed). What that pass did and did not do:
@@ -688,6 +718,9 @@ Nina's consistent, explicitly repeated instruction throughout the project.
   since the convention below means local can run ahead again at any time. Latest commits,
   newest first:
   ```
+  <new>  Re-render the app icons from Big Shoulders Display 900
+  dc8b56d Correct the claim that Repertoire needs a schema from scratch
+  06f4ebe HANDOVER: record the Home rebuild commit hash
   c3c5a5e Rebuild Home from the Figma spec; Inter + Big Shoulders app-wide
   d90de73 Pin a "last week of term" notice to Home
   1836779 Shrink the calendar chrome so the event list is actually visible
