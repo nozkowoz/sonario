@@ -89,12 +89,21 @@ Also: <b>anonymous sign-ins are OFF by default</b> on a new project. Turn them o
 
 <div class="res" id="res"></div>
 <div class="err" id="err"></div>
+
+<div class="card" id="diagcard">
+<h2>Diagnostics</h2>
+<p class="hint">Filled in automatically on load. If a button seems to do nothing, read this and
+send it to Claude — it turns "not working" into something specific.</p>
+<pre id="diag">checking…</pre>
+</div>
 </div>
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 const $ = (id) => document.getElementById(id);
+const diag = [];
+const d = (k, v) => { diag.push(k.padEnd(22) + v); $('diag').textContent = diag.join('\n'); };
 const K = 'sonario-signin-tool';
 try {
   const v = JSON.parse(localStorage.getItem(K) || '{}');
@@ -157,14 +166,16 @@ on conflict (profile_id) do update set status = 'active', role = 'member';`;
 
 $('google').addEventListener('click', async () => {
   clearFail();
-  const sb = client(); if (!sb) return;
+  d('google clicked', new Date().toLocaleTimeString());
+  const sb = client(); if (!sb) { d('google blocked', 'credentials missing or URL malformed'); return; }
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.href.split('#')[0] },
   });
   // Same trap the app documents: a disabled provider doesn't error here, it navigates away and
   // renders raw JSON. If we're still on the page with an error, it's a real one.
-  if (error) fail('Sign-in failed: ' + error.message);
+  if (error) { fail('Sign-in failed: ' + error.message); d('google error', error.message); }
+  else d('google', 'no error — the browser should now be navigating to Google');
 });
 
 $('anon').addEventListener('click', async () => {
@@ -183,10 +194,28 @@ $('signout').addEventListener('click', async () => {
   show('<h3>Signed out</h3><p>Ready for the next sign-in.</p>');
 });
 
+// ---- Diagnostics ---------------------------------------------------------
+// Written because "the button isn't working" could be a dozen things, and a page that reports
+// its own state beats another round trip of guessing.
+d('page origin', location.origin);
+d('served over', location.protocol);
+d('on localhost:8777', location.origin === 'http://localhost:8777' ? 'yes'
+   : 'NO — Supabase will refuse the redirect. Serve the repo with: python3 -m http.server 8777');
+d('redirect it will use', location.href.split('#')[0]);
+d('supabase-js loaded', typeof createClient === 'function' ? 'yes' : 'NO');
+d('project url field', $('url').value.trim() || '(empty)');
+d('key field', $('key').value.trim() ? $('key').value.trim().slice(0, 18) + '…' : '(empty)');
+window.addEventListener('error', (e) => d('PAGE ERROR', e.message));
+window.addEventListener('unhandledrejection', (e) => d('PROMISE REJECTED', e.reason?.message || String(e.reason)));
+
 // Coming back from the Google redirect: supabase-js parses the URL fragment itself.
 (async () => {
-  const sb = client(); if (!sb) return;
+  const sb = client(); if (!sb) { d('session check', 'skipped — credentials not filled in yet'); return; }
   clearFail();
-  await report(sb);
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    d('existing session', session ? 'yes — ' + (session.user.email || 'anonymous') : 'none');
+    await report(sb);
+  } catch (e) { d('session check FAILED', e.message); }
 })();
 </script></body></html>
