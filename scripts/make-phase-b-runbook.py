@@ -357,8 +357,18 @@ Don't seed on top of it — paste the 8 rows to Claude first."""))
 steps.append(step('Run <code>0001</code> through <code>0007</code>', 'sql', ''.join(mig_html)))
 
 steps.append(step('Google sign-in', 'dash', """
-<p><b>4a — Supabase:</b> Authentication → Providers → <b>Google</b> → enable, and paste the same
-client ID and secret the old project uses (Google Cloud Console → Clients).</p>
+<p><b>4a — Supabase:</b> Authentication → Sign In / Providers → <b>Google</b> → enable, and paste
+the client ID and secret.</p>
+""" + WARN("""<b>Copy the ID and the secret from the SAME place, as a pair.</b> This cost an hour
+on 2026-09-11. Google no longer lets you view an existing client secret, and caps a client at two —
+so the temptation is to take the ID from Google Cloud and the secret from wherever you happen to
+have one. A mismatched pair fails <b>late and unhelpfully</b>: Google accepts the sign-in, issues a
+code, and only then does Supabase bounce back with
+<code>Unable to exchange external code</code>. Nothing about that message points at the secret.<br /><br />
+<b>Easiest source:</b> the OLD Supabase project → Authentication → Providers → Google, which shows
+both and is guaranteed to be a working pair. If the secret is masked there, create a <b>second
+OAuth client</b> in Google Cloud rather than deleting one of the two existing secrets — one of them
+is what the live app's sign-in depends on, and you cannot tell which.""") + """
 <p><b>4b — Google Cloud Console:</b> the same OAuth client → Authorised redirect URIs → <b>add</b>:</p>
 <pre class="show" style="max-height:none">https://&lt;NEW-PROJECT-REF&gt;.supabase.co/auth/v1/callback</pre>
 """ + WARN("""<b>Add it, don't replace the old one.</b> The deployed app still points at the old project

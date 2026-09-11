@@ -525,9 +525,23 @@ The lesson for this handover: I inferred "steps 1–5 done" from Nina saying she
 two halves in two different consoles — the redirect URI in Google Cloud, and the provider toggle
 plus client ID/secret in Supabase — and only the first was done.
 
-**Still to do:** enable Google in Supabase (Authentication → Sign In / Providers → Google, with
-the client ID and secret from Google Cloud Console → Credentials) · enable **Anonymous sign-ins**
-(off by default, needed for step 8) · then steps 7–10.
+✅ **Google is enabled and step 7's sign-in is DONE** (2026-09-11): the new project has 1 real
+user and 1 profile, so the signup trigger fired correctly.
+
+**What that cost, and the lesson.** Sign-in failed repeatedly with
+`Unable to exchange external code`. The cause was a **mismatched client ID / secret pair** — the
+ID from one source, the secret from another. It fails late and unhelpfully: Google accepts the
+sign-in and issues a code, and only then does the exchange fail, so the error names nothing
+useful. Google no longer lets you view an existing client secret and caps a client at two, which
+is what pushes people into mixing sources. **Take both values from the same screen.** The old
+Supabase project's Google provider page shows both and is a guaranteed-working pair.
+
+Two red herrings burned time first: the new `sb_publishable_` key format (tested — fine, the
+client accepts it) and a sign-in that appeared to have worked but was the **old** project's user
+list being read.
+
+**Still to do:** promote to super · enable **Anonymous sign-ins** (off by default, needed for
+step 8) · then steps 8–10.
 
 **Next:** finish the auth config above, then 7 (sign in via
 `tools/phase-b-signin.html`, promote to super), 8 (Leave Test identity), 9 (seed), 10 (verify).
