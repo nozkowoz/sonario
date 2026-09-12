@@ -520,62 +520,46 @@ select case
 
 ## 7. Current work / exact stopping point
 
-### 📍 EXACT STOPPING POINT — end of 2026-09-10
+### 📍 EXACT STOPPING POINT — 2026-09-12
 
-Nina is **part-way through Phase B on the new project (`rwkaofshfatqqkupeqoe`)**, working from
-`~/Downloads/sonario-phase-b-runbook.html` (regenerate with
-`python3 scripts/make-phase-b-runbook.py`). Her checkbox progress is saved in that browser.
+**Phase B, step 8 of 10.** New project `rwkaofshfatqqkupeqoe`. Runbook:
+`~/Downloads/sonario-phase-b-runbook.html` (regenerate: `python3 scripts/make-phase-b-runbook.py`).
 
 **Done:** project created · `0000` run · `sonario` exposed in the Data API · `0001`–`0007` run
-**with all 8 of `0007`'s verdicts `ok`** · new callback URI **added** alongside the old one in
-Google Cloud Console · `http://localhost:8777/**` added to Redirect URLs.
+with all 8 of `0007`'s verdicts `ok` · Google enabled and **signed in** (1 real user, 1 profile) ·
+**promoted to active/super** · `http://localhost:8777/**` in Redirect URLs · new callback URI
+added alongside the old one in Google Cloud.
 
-⚠️ **NOT done, and I had wrongly recorded it as done:** the **Google provider itself is not
-enabled in the new Supabase project**. Nina hit
-`{"code":400,"error_code":"validation_failed","msg":"Unsupported provider: provider is not
-enabled"}` from the sign-in tool — which is precisely the failure `js/auth.js` documents, since
-`signInWithOAuth` can't return an error for a disabled provider and instead navigates away to
-raw JSON.
+**BLOCKED ON ONE TOGGLE:** creating the Leave Test identity returns
+`{"code":422,"error_code":"anonymous_provider_disabled"}`. **Anonymous sign-ins are still off.**
+Enable at Authentication → Sign In / Providers → Anonymous sign-ins, then run:
 
-The lesson for this handover: I inferred "steps 1–5 done" from Nina saying she was "up to step
-6", rather than confirming each. **Don't record a step as done on inference.** Google setup is
-two halves in two different consoles — the redirect URI in Google Cloud, and the provider toggle
-plus client ID/secret in Supabase — and only the first was done.
+```bash
+curl -s -X POST 'https://rwkaofshfatqqkupeqoe.supabase.co/auth/v1/signup' \
+  -H 'apikey: sb_publishable_W230RnUpaZ6PnTKHns4GVQ_VmFG5Aux' \
+  -H 'Content-Type: application/json' -d '{}'
+```
 
-✅ **Google is enabled and step 7's sign-in is DONE** (2026-09-11): the new project has 1 real
-user and 1 profile, so the signup trigger fired correctly.
+Take the returned `user.id` and insert the profile + membership (role **`member`**, never super):
 
-**What that cost, and the lesson.** Sign-in failed repeatedly with
-`Unable to exchange external code`. The cause was a **mismatched client ID / secret pair** — the
-ID from one source, the secret from another. It fails late and unhelpfully: Google accepts the
-sign-in and issues a code, and only then does the exchange fail, so the error names nothing
-useful. Google no longer lets you view an existing client secret and caps a client at two, which
-is what pushes people into mixing sources. **Take both values from the same screen.** The old
-Supabase project's Google provider page shows both and is a guaranteed-working pair.
+```sql
+insert into sonario.profiles (id, display_name, google_email)
+values ('<UUID>', 'Leave Test', '') on conflict (id) do nothing;
 
-Two red herrings burned time first: the new `sb_publishable_` key format (tested — fine, the
-client accepts it) and a sign-in that appeared to have worked but was the **old** project's user
-list being read.
+insert into sonario.memberships (profile_id, status, role, decided_at)
+values ('<UUID>', 'active', 'member', now())
+on conflict (profile_id) do update set status = 'active', role = 'member';
+```
 
-**Still to do:** promote to super · enable **Anonymous sign-ins** (off by default, needed for
-step 8) · then steps 8–10.
+**Then step 9** — seed in this order: `real_schedule_2026.sql` → `seed_test_data.sql` →
+`dev_my_attendance_term3.sql`. **Then step 10** — run `supabase/phase_b_verify.sql` and assess.
+**Then STOP.** Cutover is a separate approval.
 
-**Next:** finish the auth config above, then 7 (sign in via
-`tools/phase-b-signin.html`, promote to super), 8 (Leave Test identity), 9 (seed), 10 (verify).
-
-Note the redirect URL needs the **wildcard** form `http://localhost:8777/**` — a bare origin
-entry matches only that exact URL, and the sign-in tool lives at a path. Nina has added it.
-
-✅ **`0007` CONFIRMED CLEAN.** Nina re-ran it and reported every one of the 8 `verdict` rows
-reading `ok`. So the grant sweep and the revokes both applied: the four trigger functions are
-unreachable from the API, and the four callable ones are `authenticated`-only. That was the gate
-before seeding, and it is passed — the migration chain built the new project correctly.
-
-**Two errors already hit and fixed in the runbook**, so they don't recur: the expose-schema step
-was ordered before `0000` (impossible — the schema must exist first), and the migration-number
-badge was selectable, so a paste began with the literal text `0000` and Postgres rejected line 1.
-
----
+**Hard constraints, set by Nina and not negotiable:**
+- The **old shared project stays untouched**. Page Turners has real users; protecting it outranks
+  tidying Sonario.
+- **No cutover**, no `js/config.js` change, no decommissioning.
+- Old project is the rollback for **at least a week** after cutover.
 
 **Updated 2026-09-10 (latest). PHASE B OF THE SUPABASE SPLIT IS HANDED TO NINA AND IN PROGRESS.**
 Read `supabase/PHASE-B-RUNBOOK.md` and `supabase/SPLIT-PLAN.md` before touching anything
