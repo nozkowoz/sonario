@@ -484,7 +484,24 @@ leaving them out.
 |---|---|---|
 | `rwkaofshfatqqkupeqoe` | **NEW dedicated Sonario project** (created 2026-09-10) | being built — Phase B |
 | `jpffnazfjxvdzqnfueue` | **OLD shared project**: Sonario + Page Turners + a trip-journal app | live, and the rollback. **Do not touch during Phase B** |
-| `ylrcotvnrvvfosuvtleh` | North Island Diary — **unrelated** | what this session's MCP is bound to, which is why every migration has been pasted by hand |
+| `ylrcotvnrvvfosuvtleh` | North Island Diary — **unrelated** | what the default `supabase` MCP was bound to for most of this work |
+
+🔴 **THE `supabase-sonario` MCP IS BOUND TO THE OLD SHARED PROJECT.** It finally loaded on
+2026-09-12 — and `get_project_url` returns `jpffnazfjxvdzqnfueue`, i.e. **the shared project that
+Page Turners depends on and that this plan requires to stay untouched**, not the new dedicated
+one. The name invites exactly the wrong assumption.
+
+**Do not write through it.** Read-only use is fine and genuinely handy (it's the fastest way to
+inspect the old project), but any write believed to be landing on "the new Sonario project" would
+in fact land on Page Turners' database. **Call `get_project_url` before the first write of every
+session**, and prefer `curl` against an explicitly-named project URL for anything touching the
+new project:
+
+```
+curl -s -X POST 'https://rwkaofshfatqqkupeqoe.supabase.co/auth/v1/...' -H 'apikey: <publishable>' ...
+```
+
+The URL is right there in the command, so there is nothing to assume.
 
 `js/config.js` still points at the OLD ref and **must keep doing so until cutover is approved**.
 
