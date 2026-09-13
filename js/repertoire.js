@@ -1,5 +1,5 @@
 import { html, useState, useMemo, formatEventDateLong } from './lib.js';
-import { displayNameOf, setSongPart } from './store.js';
+import { displayNameOf, setSongPart, clearSongPart } from './store.js';
 import { LoadingState, EmptyState, Sheet } from './shell.js';
 import { IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck } from './icons.js';
 
@@ -53,7 +53,7 @@ function SongRow({ song, assignments, partLabels, profileId, onEditPart }) {
 
 // --- The part picker sheet --------------------------------------------------
 // Tap-to-select-and-close, no separate Save button — matches the Figma's own picker flow exactly.
-function PartPickerSheet({ song, currentPartKey, partLabels, saving, error, onPick, onClose }) {
+function PartPickerSheet({ song, currentPartKey, partLabels, saving, error, onPick, onClear, onClose }) {
   const [showMore, setShowMore] = useState(false);
   const assignable = partLabels.filter((p) => p.assignable);
   const common = assignable.filter((p) => p.common);
@@ -75,6 +75,11 @@ function PartPickerSheet({ song, currentPartKey, partLabels, saving, error, onPi
       </div>
       ${!showMore && rest.length > 0
         ? html`<button class="btn-quiet" onClick=${() => setShowMore(true)}>More parts</button>`
+        : null}
+      ${currentPartKey
+        ? html`<button class="btn-quiet" disabled=${saving} onClick=${onClear} style="margin-top:8px;">
+            No part on this song
+          </button>`
         : null}
       ${error ? html`<p class="absence-error">${error}</p>` : null}
     </${Sheet}>
@@ -276,6 +281,18 @@ export function RepertoireTab({
     setEditingSong(null);
   };
 
+  const clearPart = async () => {
+    const existing = myAssignment(assignments, editingSong.id, profile.id);
+    if (!existing) { setEditingSong(null); return; }
+    setSaving(true);
+    setPickError(null);
+    const { data, error } = await clearSongPart(existing.id, profile.id);
+    setSaving(false);
+    if (error) { setPickError(error.message); return; }
+    if (!data || data.length === 0) { setPickError("That didn't save — reload and try again."); return; }
+    setEditingSong(null);
+  };
+
   if (songsLoading) {
     return html`<div class="tab-content"><${LoadingState} label="Loading repertoire…" /></div>`;
   }
@@ -284,7 +301,7 @@ export function RepertoireTab({
     song=${editingSong}
     currentPartKey=${myAssignment(assignments, editingSong.id, profile.id)?.part_label ?? null}
     partLabels=${partLabels} saving=${saving} error=${pickError}
-    onPick=${savePart} onClose=${closePicker} />` : null;
+    onPick=${savePart} onClear=${clearPart} onClose=${closePicker} />` : null;
 
   if (detail?.type === 'collection') {
     const collection = collections.find((c) => c.id === detail.id);

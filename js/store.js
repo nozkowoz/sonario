@@ -230,6 +230,17 @@ export async function setSongPart({ existingAssignmentId, songId, profileId }, p
     .select();
 }
 
+// Un-setting a part is an archive, not a delete — there is no delete policy on song_assignments
+// (removal has always meant archived_at, same as everywhere else in this app: nothing hard-deletes
+// a record of who had what part when). Once archived, the partial unique index no longer counts
+// this row, so the same song/person can get a fresh live row later without conflict.
+export async function clearSongPart(assignmentId, profileId) {
+  return supabase.from('song_assignments')
+    .update({ archived_at: new Date().toISOString(), updated_by: profileId })
+    .eq('id', assignmentId)
+    .select();
+}
+
 export function useNotices() {
   const { rows, loading } = useLiveTable('notices', {
     orderFn: (a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at),
