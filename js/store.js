@@ -212,6 +212,24 @@ export function usePartLabels() {
   return { partLabels: rows, loading };
 }
 
+// Setting your own part on a song (Stage 4). Not a plain upsert: the "one live part per person
+// per song" rule is a PARTIAL unique index (song_id, profile_id) where archived_at is null, and
+// PostgREST's upsert can't target a partial index (an ON CONFLICT column list only infers a
+// non-partial constraint, or a partial one whose WHERE clause is also given — which upsert has no
+// way to pass). So this looks up whether a live row already exists and updates it, or inserts a
+// new one — the same shape as every other mutation in this file, not a generic helper.
+export async function setSongPart({ existingAssignmentId, songId, profileId }, partLabel) {
+  if (existingAssignmentId) {
+    return supabase.from('song_assignments')
+      .update({ part_label: partLabel, updated_by: profileId })
+      .eq('id', existingAssignmentId)
+      .select();
+  }
+  return supabase.from('song_assignments')
+    .insert({ song_id: songId, profile_id: profileId, part_label: partLabel, updated_by: profileId })
+    .select();
+}
+
 export function useNotices() {
   const { rows, loading } = useLiveTable('notices', {
     orderFn: (a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at),

@@ -951,10 +951,22 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 }
 .rep-song-title { font-size: 14px; font-weight: 600; color: var(--fig-ink); }
 /* The unmistakably-empty state: dashed border, muted text — never styled to look like a real
-   assignment. No part editing yet (Stage 4), so this pill is never a button at this stage. */
+   assignment. */
 .part-pill-empty {
   background: transparent; color: var(--fig-mute); border: 1.36px dashed var(--fig-hair);
 }
+
+/* --- Repertoire: the part picker sheet (Stage 4) --------------------------- */
+.part-picker-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.part-picker-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; text-align: left; padding: 13px 16px; border-radius: var(--radius-lg);
+  border: 1.36px solid var(--fig-hair); background: #fff; font-size: 14px; font-weight: 600;
+  color: var(--fig-ink); cursor: pointer;
+}
+.part-picker-option:hover { border-color: var(--purple); }
+.part-picker-option:disabled { opacity: 0.6; cursor: default; }
+.part-picker-option svg { color: var(--purple); flex-shrink: 0; }
 
 @media (max-width: 480px) {
   /* Must be a real rule, and --main-pad must be the ONLY place the body padding is set: the Home
