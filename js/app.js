@@ -4,7 +4,7 @@ import {
   useSession, useMyMembership, displayNameOf, isSuper,
   useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useMemberDirectory, awayRangeFor,
   useSongs, useSongCollections, useSongCollectionItems, useSongAssignments, useRehearsalSongs,
-  usePartLabels,
+  usePartLabels, useRecordings,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
 import { LoadingState, ErrorState, BottomNav, Sheet, useActiveTab } from './shell.js';
@@ -78,8 +78,10 @@ function Main({ session, membership, profile }) {
   const { absences } = useAbsences();
   const { checkins } = useCheckins();
   const { awayDates } = useAwayDates();
-  // Only supers ever render another member's name, so members don't call the directory at all.
-  const { directory } = useMemberDirectory(canManage);
+  // Used to be super-only ("members don't render anyone else's name"), but Stage 6 needs the
+  // directory for every active member — a recording's uploader is shown to whoever can see the
+  // recording at all, not just organisers. Always on now.
+  const { directory } = useMemberDirectory(true);
   // Repertoire (Stage 3) — fetched here rather than lazily on tab-open, same as everything above.
   const { songs, loading: songsLoading } = useSongs();
   const { collections } = useSongCollections();
@@ -87,6 +89,7 @@ function Main({ session, membership, profile }) {
   const { assignments } = useSongAssignments();
   const { rehearsalSongs } = useRehearsalSongs();
   const { partLabels } = usePartLabels();
+  const { recordings } = useRecordings();
 
   const termsById = Object.fromEntries(terms.map((t) => [t.id, t]));
   const openEvent = openEventId ? events.find((e) => e.id === openEventId) : null;
@@ -133,6 +136,7 @@ function Main({ session, membership, profile }) {
             collections=${collections} collectionItems=${collectionItems}
             assignments=${assignments} partLabels=${partLabels}
             events=${events} rehearsalSongs=${rehearsalSongs}
+            recordings=${recordings} directory=${directory}
           />
         ` : null}
         ${activeTab === 'more' ? html`

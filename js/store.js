@@ -205,6 +205,62 @@ export function useRehearsalSongs() {
   return { rehearsalSongs: rows, loading };
 }
 
+export function useRecordings() {
+  const { rows, loading } = useLiveTable('recordings', {
+    orderFn: (a, b) => b.uploaded_at.localeCompare(a.uploaded_at),
+  });
+  return { recordings: rows, loading };
+}
+
+// Storage/DB together (Stage 6) — the pair the storage.objects policies from migration 0009 were
+// written around. DB-row-first: the id is generated client-side (not left to the DB default) so
+// the storage path can be built from it before either write happens. The Storage insert policy
+// requires a matching recordings row (same storage_path, same uploaded_by) to already exist, so
+// this order isn't a preference, it's the only order that can work at all.
+//
+// The path shape is fixed: {song_id}/{part_label}/{id}.{ext} — agreed when the bucket was built.
+const extOf = (mimeType) => ({
+  'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/wav': 'wav',
+}[mimeType] || 'bin');
+
+export async function uploadRecording({ songId, partLabel, profileId, file, title, durationSeconds }) {
+  const id = crypto.randomUUID();
+  const path = `${songId}/${partLabel}/${id}.${extOf(file.type)}`;
+
+  const { data: row, error: insertError } = await supabase.from('recordings').insert({
+    id, song_id: songId, part_label: partLabel, storage_path: path,
+    title: title || '', uploaded_by: profileId, mime_type: file.type,
+    file_size_bytes: file.size, duration_seconds: durationSeconds ?? null,
+  }).select();
+  if (insertError) return { error: insertError };
+  if (!row || row.length === 0) return { error: { message: "That didn't save — reload and try again." } };
+
+  const { error: uploadError } = await supabase.storage.from('recordings').upload(path, file, {
+    contentType: file.type,
+  });
+  if (uploadError) {
+    // The DB row now points at a file that was never written — remove it rather than leave a
+    // recording that can never actually play. This is the one failure case DB-row-first accepts.
+    await supabase.from('recordings').delete().eq('id', id);
+    return { error: uploadError };
+  }
+  return { data: row };
+}
+
+export async function getRecordingUrl(storagePath) {
+  return supabase.storage.from('recordings').createSignedUrl(storagePath, 3600);
+}
+
+// Storage object first, then the DB row — the reverse order breaks the delete RLS policy, which
+// joins storage.objects back to this same recordings row to decide who's allowed to remove it.
+// Not wired to any UI yet (Stage 7); exists now so the three delete checks deferred from Stage 2
+// can finally be run for real, through the real Storage API.
+export async function deleteRecording({ id, storagePath }) {
+  const { error: storageError } = await supabase.storage.from('recordings').remove([storagePath]);
+  if (storageError) return { error: storageError };
+  return supabase.from('recordings').delete().eq('id', id).select();
+}
+
 export function usePartLabels() {
   const { rows, loading } = useLiveTable('part_labels', {
     orderFn: (a, b) => a.sort_order - b.sort_order,

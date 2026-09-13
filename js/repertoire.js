@@ -1,7 +1,11 @@
 import { html, useState, useMemo, formatEventDateLong } from './lib.js';
-import { displayNameOf, setSongPart, clearSongPart } from './store.js';
+import {
+  displayNameOf, setSongPart, clearSongPart, uploadRecording, getRecordingUrl,
+} from './store.js';
 import { LoadingState, EmptyState, Sheet } from './shell.js';
-import { IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck } from './icons.js';
+import {
+  IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconUpload,
+} from './icons.js';
 
 // Repertoire. Stage 3 (2026-09-13) built the read-only screens against the final Figma design
 // (Browse/All Songs toggle, Concert Playlists, Your Library) and the real
@@ -37,14 +41,12 @@ function PartPill({ song, assignments, partLabels, profileId }) {
     : html`<span class="event-type-badge part-pill-empty">Set part</span>`;
 }
 
-// The whole row opens the part picker for YOUR OWN part on this song — matching the Figma
-// exactly (every "Set part"/pill tap in the design opens "Your voice part for this song").
-// song_assignments' RLS allows any active member to edit anyone's part (collaborative editing,
-// per the original brief), but no screen anywhere in the approved Figma offers editing someone
-// else's — so that capability exists in the database and isn't built as a UI feature yet.
-function SongRow({ song, assignments, partLabels, profileId, onEditPart }) {
+// The whole row opens Song Detail — the canonical screen for a song regardless of where it was
+// tapped from (All Songs, a Semester, Classics, a Concert Playlist). Part editing lives inside
+// that screen now (Stage 6), not on tap-from-a-list directly.
+function SongRow({ song, assignments, partLabels, profileId, onOpen }) {
   return html`
-    <button class="rep-song-row" onClick=${() => onEditPart(song)}>
+    <button class="rep-song-row" onClick=${() => onOpen(song)}>
       <span class="rep-song-title">${song.title}</span>
       <${PartPill} song=${song} assignments=${assignments} partLabels=${partLabels} profileId=${profileId} />
     </button>
@@ -97,8 +99,280 @@ function DetailHead({ title, onBack }) {
   `;
 }
 
+// --- Recordings (Stage 6) ----------------------------------------------------
+const shortDate = new Intl.DateTimeFormat('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+function formatShortDate(isoTimestamp) {
+  return shortDate.format(new Date(isoTimestamp));
+}
+function formatDuration(seconds) {
+  const s = Math.round(seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+// "A_Little_More_Light_Alto.m4a" -> "A Little More Light Alto". A starting point the member can
+// edit, never a mandatory value — the filename convention varies per phone/recorder app.
+function titleFromFilename(filename) {
+  return filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ').trim();
+}
+
+const ALLOWED_MIME = ['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/wav'];
+const MAX_BYTES = 50 * 1024 * 1024;
+
+// Reads a file's duration via a throwaway <audio> element rather than a library — best effort
+// only. `duration_seconds` is nullable for exactly this reason: if a browser can't report it,
+// leave it unset rather than guess.
+function readDuration(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio();
+    const cleanup = () => URL.revokeObjectURL(url);
+    audio.addEventListener('loadedmetadata', () => {
+      const d = Number.isFinite(audio.duration) ? audio.duration : null;
+      cleanup();
+      resolve(d);
+    });
+    audio.addEventListener('error', () => { cleanup(); resolve(null); });
+    audio.src = url;
+  });
+}
+
+function RecordingRow({ recording, uploaderName }) {
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const [playError, setPlayError] = useState(null);
+
+  const play = async () => {
+    if (audioUrl || loadingUrl) return;
+    setLoadingUrl(true);
+    setPlayError(null);
+    const { data, error } = await getRecordingUrl(recording.storage_path);
+    setLoadingUrl(false);
+    if (error || !data?.signedUrl) { setPlayError("Couldn't load this recording — try again."); return; }
+    setAudioUrl(data.signedUrl);
+  };
+
+  return html`
+    <div class="rep-recording-row">
+      <button class="rep-play-btn" onClick=${play} disabled=${loadingUrl} aria-label=${`Play ${recording.title || 'recording'}`}>
+        <${IconPlay} size=${16} />
+      </button>
+      <div class="rep-recording-body">
+        <p class="rep-recording-title">${recording.title || 'Untitled recording'}</p>
+        <p class="form-hint" style="margin:0;">
+          ${uploaderName || 'Someone'} · ${formatShortDate(recording.uploaded_at)}${recording.duration_seconds ? ` · ${formatDuration(recording.duration_seconds)}` : ''}
+        </p>
+        ${audioUrl ? html`<audio controls autoplay src=${audioUrl} style="width:100%;margin-top:8px;" />` : null}
+        ${playError ? html`<p class="absence-error">${playError}</p>` : null}
+      </div>
+    </div>
+  `;
+}
+
+// The upload flow: choose a part (all 11 labels, including Full choir — recordings allow it even
+// though a person can never BE Full choir on song_assignments) -> see what's already there for
+// that part, so uploading a fourth Alto recording is a deliberate choice, not an accident ->
+// choose a file -> an editable, filename-derived title -> upload.
+function AddRecordingSheet({ song, partLabels, songRecordings, profile, directory, onDone, onClose }) {
+  const [step, setStep] = useState('part'); // 'part' | 'upload' | 'success'
+  const [partLabel, setPartLabel] = useState(null);
+  const [file, setFile] = useState(null);
+  const [title, setTitle] = useState('');
+  const [duration, setDuration] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const [uploaded, setUploaded] = useState(null);
+
+  const partsSorted = useMemo(() => [...partLabels].sort((a, b) => a.sort_order - b.sort_order), [partLabels]);
+  const existingForPart = partLabel
+    ? songRecordings.filter((r) => r.part_label === partLabel).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
+    : [];
+
+  const pickPart = (key) => { setPartLabel(key); setStep('upload'); };
+
+  const pickFile = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setError(null);
+    if (!ALLOWED_MIME.includes(f.type)) {
+      setError('That file type isn\'t supported — use MP3, M4A or WAV.');
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      setError('That file is over the 50MB limit.');
+      return;
+    }
+    setFile(f);
+    setTitle(titleFromFilename(f.name));
+    setDuration(await readDuration(f));
+  };
+
+  const upload = async () => {
+    setUploading(true);
+    setError(null);
+    const { data, error: err } = await uploadRecording({
+      songId: song.id, partLabel, profileId: profile.id, file, title, durationSeconds: duration,
+    });
+    setUploading(false);
+    if (err) { setError(err.message); return; }
+    setUploaded(data[0]);
+    setStep('success');
+  };
+
+  const uploadAnother = () => {
+    setFile(null); setTitle(''); setDuration(null); setUploaded(null); setStep('part'); setPartLabel(null);
+  };
+
+  return html`
+    <${Sheet} label="Add a recording" onClose=${onClose}>
+      <h3 class="form-heading">Add a recording</h3>
+      <p class="form-hint">${song.title}</p>
+
+      ${step === 'part' ? html`
+        <div class="part-picker-list" style="margin-top:12px;">
+          ${partsSorted.map((p) => html`
+            <button key=${p.key} class="part-picker-option" onClick=${() => pickPart(p.key)}>
+              <span>${p.label}</span>
+            </button>
+          `)}
+        </div>
+      ` : null}
+
+      ${step === 'upload' ? html`
+        <div style="margin-top:12px;">
+          <p class="form-hint" style="margin:0 0 10px;">
+            Part: <strong>${partLabelText(partLabel, partLabels)}</strong>
+            — <button class="btn-quiet" style="padding:0;" onClick=${() => setStep('part')}>Change</button>
+          </p>
+
+          ${existingForPart.length > 0 ? html`
+            <p class="eyebrow eyebrow-tight">Existing ${partLabelText(partLabel, partLabels)} recordings (${existingForPart.length})</p>
+            <div class="rep-song-list" style="margin-bottom:14px;">
+              ${existingForPart.map((r) => html`<${RecordingRow} key=${r.id} recording=${r}
+                uploaderName=${r.uploaded_by === profile.id ? 'You' : displayNameOf(directory[r.uploaded_by])} />`)}
+            </div>
+            <p class="form-hint" style="margin:-4px 0 14px;">You can still upload a new recording even if one already exists.</p>
+          ` : null}
+
+          <label>
+            Audio file
+            <input type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a,.wav"
+              onChange=${pickFile} />
+          </label>
+          <p class="form-hint" style="margin:4px 0 14px;">MP3, M4A or WAV, up to 50MB.</p>
+
+          ${file ? html`
+            <label>
+              Title
+              <input type="text" value=${title} maxlength="120"
+                onInput=${(e) => setTitle(e.target.value)} placeholder="Optional" />
+            </label>
+          ` : null}
+
+          ${error ? html`<p class="absence-error">${error}</p>` : null}
+
+          <div class="form-actions" style="margin-top:14px;">
+            <button class="btn btn-primary" disabled=${!file || uploading} onClick=${upload}>
+              ${uploading ? 'Uploading…' : 'Upload'}
+            </button>
+          </div>
+        </div>
+      ` : null}
+
+      ${step === 'success' ? html`
+        <div style="margin-top:12px;">
+          <p class="form-saved" style="font-size:15px;">Recording uploaded.</p>
+          <p class="form-hint">
+            Your ${partLabelText(uploaded.part_label, partLabels)} recording has been added to ${song.title}.
+          </p>
+          <div class="form-actions" style="margin-top:10px;">
+            <button class="btn btn-primary" onClick=${onDone}>View in song</button>
+            <button class="btn btn-outline" onClick=${uploadAnother}>Upload another</button>
+          </div>
+        </div>
+      ` : null}
+    </${Sheet}>
+  `;
+}
+
+// --- Song Detail — the canonical screen for a song, reached from anywhere ---
+function SongDetail({
+  song, collections, collectionItems, assignments, partLabels, recordings, profile, directory,
+  onBack, onEditPart,
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+
+  const myCollections = collections.filter((c) =>
+    collectionItems.some((i) => i.collection_id === c.id && i.song_id === song.id));
+  const songRecordings = recordings.filter((r) => r.song_id === song.id);
+  const mine = myAssignment(assignments, song.id, profile.id);
+
+  const groups = useMemo(() => {
+    const byPart = {};
+    for (const r of songRecordings) (byPart[r.part_label] ||= []).push(r);
+    return partLabels
+      .filter((p) => byPart[p.key]?.length)
+      .map((p) => ({ part: p, recordings: byPart[p.key].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at)) }));
+  }, [songRecordings, partLabels]);
+
+  // Prefer the member's own part expanded, if it actually has recordings — otherwise nothing
+  // starts open. Recomputed if the song changes; not meant to track later toggling.
+  const [expanded, setExpanded] = useState(() => new Set(
+    mine && groups.some((g) => g.part.key === mine.part_label) ? [mine.part_label] : [],
+  ));
+  const toggle = (key) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  return html`
+    <div class="tab-content">
+      <${DetailHead} title=${song.title} onBack=${onBack} />
+      ${song.composer ? html`<p class="form-hint" style="margin:-10px 0 12px;">${song.composer}</p>` : null}
+      ${myCollections.length > 0 ? html`
+        <div style="margin-bottom:16px;">
+          ${myCollections.map((c) => html`<span key=${c.id} class="event-type-badge" style="margin-right:6px;">${c.name}</span>`)}
+        </div>
+      ` : null}
+
+      <button class="card rep-song-row" style="margin-bottom:14px;" onClick=${() => onEditPart(song)}>
+        <span class="rep-song-title">Your part</span>
+        <${PartPill} song=${song} assignments=${assignments} partLabels=${partLabels} profileId=${profile.id} />
+      </button>
+
+      <button class="btn btn-primary" style="width:100%;margin-bottom:22px;" onClick=${() => setAddOpen(true)}>
+        <${IconUpload} size=${16} /> Add a recording
+      </button>
+
+      <p class="eyebrow eyebrow-tight">Recordings</p>
+      ${groups.length === 0
+        ? html`<${EmptyState} title="No recordings yet" body="Nobody's uploaded a recording for this song yet." />`
+        : groups.map(({ part, recordings: rs }) => html`
+            <div key=${part.key} class="rep-recording-group">
+              <button class="rep-group-head" onClick=${() => toggle(part.key)}>
+                <span>${part.label} (${rs.length})</span>
+                <span class=${expanded.has(part.key) ? 'rep-group-chevron rep-group-chevron-open' : 'rep-group-chevron'}>
+                  <${IconChevron} size=${14} />
+                </span>
+              </button>
+              ${expanded.has(part.key) ? html`
+                <div class="rep-song-list">
+                  ${rs.map((r) => html`<${RecordingRow} key=${r.id} recording=${r}
+                    uploaderName=${r.uploaded_by === profile.id ? 'You' : displayNameOf(directory[r.uploaded_by])} />`)}
+                </div>
+              ` : null}
+            </div>
+          `)}
+
+      ${addOpen ? html`<${AddRecordingSheet}
+        song=${song} partLabels=${partLabels} songRecordings=${songRecordings}
+        profile=${profile} directory=${directory}
+        onDone=${() => setAddOpen(false)} onClose=${() => setAddOpen(false)} />` : null}
+    </div>
+  `;
+}
+
 // --- Collection detail (a Semester folder or Sonario Classics) --------------
-function CollectionDetail({ collection, songsById, collectionItems, assignments, partLabels, profileId, onBack, onEditPart }) {
+function CollectionDetail({ collection, songsById, collectionItems, assignments, partLabels, profileId, onBack, onOpenSong }) {
   const items = collectionItems
     .filter((i) => i.collection_id === collection.id)
     .sort((a, b) => a.position - b.position)
@@ -112,14 +386,14 @@ function CollectionDetail({ collection, songsById, collectionItems, assignments,
         ? html`<${EmptyState} title="No songs yet" body="Nothing's been added to this collection yet." />`
         : html`<div class="rep-song-list">
             ${items.map((s) => html`<${SongRow} key=${s.id} song=${s}
-              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onEditPart=${onEditPart} />`)}
+              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${onOpenSong} />`)}
           </div>`}
     </div>
   `;
 }
 
 // --- Concert Playlist detail (a performance event's setlist) ---------------
-function ConcertDetail({ event, songsById, rehearsalSongs, assignments, partLabels, profileId, onBack, onEditPart }) {
+function ConcertDetail({ event, songsById, rehearsalSongs, assignments, partLabels, profileId, onBack, onOpenSong }) {
   const items = rehearsalSongs
     .filter((rs) => rs.rehearsal_id === event.id)
     .sort((a, b) => a.position - b.position)
@@ -137,7 +411,7 @@ function ConcertDetail({ event, songsById, rehearsalSongs, assignments, partLabe
         : html`<div class="rep-song-list">
             ${items.map((s, i) => html`<${SongRow} key=${s.id}
               song=${{ ...s, title: `${i + 1}. ${s.title}` }}
-              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onEditPart=${() => onEditPart(s)} />`)}
+              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${() => onOpenSong(s)} />`)}
           </div>`}
     </div>
   `;
@@ -214,7 +488,7 @@ function Browse({ collections, collectionItems, events, rehearsalSongs, onOpenCo
 }
 
 // --- All Songs: flat list grouped by collection -----------------------------
-function AllSongs({ collections, collectionItems, songsById, assignments, partLabels, profileId, onEditPart }) {
+function AllSongs({ collections, collectionItems, songsById, assignments, partLabels, profileId, onOpenSong }) {
   const groups = collections
     .map((c) => ({
       collection: c,
@@ -239,7 +513,7 @@ function AllSongs({ collections, collectionItems, songsById, assignments, partLa
           </p>
           <div class="rep-song-list">
             ${songs.map((s) => html`<${SongRow} key=${s.id} song=${s}
-              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onEditPart=${onEditPart} />`)}
+              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${onOpenSong} />`)}
           </div>
         </div>
       `)}
@@ -250,10 +524,11 @@ function AllSongs({ collections, collectionItems, songsById, assignments, partLa
 // --- The tab -----------------------------------------------------------------
 export function RepertoireTab({
   profile, songs, songsLoading, collections, collectionItems, assignments, partLabels,
-  events, rehearsalSongs,
+  events, rehearsalSongs, recordings, directory,
 }) {
   const [mode, setMode] = useState('browse'); // 'browse' | 'all'
-  const [detail, setDetail] = useState(null); // { type: 'collection' | 'concert', id }
+  const [detail, setDetail] = useState(null); // { type: 'collection' | 'concert' | 'song', id }
+  const openSong = (song) => setDetail({ type: 'song', id: song.id });
   // One picker for the whole tab, same reasoning as app.js's one event Sheet: it works no matter
   // which screen (Browse/All Songs/a collection/a concert) you tapped a song from.
   const [editingSong, setEditingSong] = useState(null);
@@ -309,7 +584,7 @@ export function RepertoireTab({
       return html`
         <${CollectionDetail} collection=${collection} songsById=${songsById}
           collectionItems=${collectionItems} assignments=${assignments} partLabels=${partLabels}
-          profileId=${profile.id} onBack=${() => setDetail(null)} onEditPart=${openPicker} />
+          profileId=${profile.id} onBack=${() => setDetail(null)} onOpenSong=${openSong} />
         ${picker}
       `;
     }
@@ -320,7 +595,19 @@ export function RepertoireTab({
       return html`
         <${ConcertDetail} event=${event} songsById=${songsById}
           rehearsalSongs=${rehearsalSongs} assignments=${assignments} partLabels=${partLabels}
-          profileId=${profile.id} onBack=${() => setDetail(null)} onEditPart=${openPicker} />
+          profileId=${profile.id} onBack=${() => setDetail(null)} onOpenSong=${openSong} />
+        ${picker}
+      `;
+    }
+  }
+  if (detail?.type === 'song') {
+    const song = songsById[detail.id];
+    if (song) {
+      return html`
+        <${SongDetail} song=${song} collections=${collections} collectionItems=${collectionItems}
+          assignments=${assignments} partLabels=${partLabels} recordings=${recordings}
+          profile=${profile} directory=${directory}
+          onBack=${() => setDetail(null)} onEditPart=${openPicker} />
         ${picker}
       `;
     }
@@ -349,7 +636,7 @@ export function RepertoireTab({
               onOpenConcert=${(e) => setDetail({ type: 'concert', id: e.id })} />`
           : html`<${AllSongs} collections=${collections} collectionItems=${collectionItems}
               songsById=${songsById} assignments=${assignments} partLabels=${partLabels}
-              profileId=${profile.id} onEditPart=${openPicker} />`}
+              profileId=${profile.id} onOpenSong=${openSong} />`}
       ${picker}
     </div>
   `;

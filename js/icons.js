@@ -185,3 +185,14 @@ export const IconMic = ({ size }) => svg(html`
   <path d="M5 11a7 7 0 0 0 14 0" />
   <path d="M12 18v3M9 21h6" />
 `, { size });
+
+// Recordings (Stage 6): a filled play triangle for each row, and a simple upload arrow for the
+// "Choose an audio file" control.
+export const IconPlay = ({ size }) => svg(html`
+  <path d="M7 4.5v15l13-7.5-13-7.5Z" />
+`, { size, fill: 'currentColor', stroke: false });
+
+export const IconUpload = ({ size }) => svg(html`
+  <path d="M12 16V4M7 9l5-5 5 5" />
+  <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+`, { size });

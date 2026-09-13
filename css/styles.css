@@ -971,6 +971,29 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
    inline-level by default — without this they sit on the same line with no gap between them. */
 .part-picker-footer { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 8px; }
 
+/* --- Repertoire: Song Detail + recordings (Stage 6) ------------------------ */
+.rep-recording-group + .rep-recording-group { margin-top: 10px; }
+.rep-group-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  border: none; background: transparent; cursor: pointer; padding: 8px 2px;
+  font-size: 13px; font-weight: 700; color: var(--fig-meta);
+}
+.rep-group-chevron { display: grid; place-items: center; color: var(--fig-mute); transition: transform 0.15s ease; }
+.rep-group-chevron-open { transform: rotate(90deg); }
+
+.rep-recording-row {
+  display: flex; align-items: flex-start; gap: 12px; background: #fff; padding: 12px 14px;
+}
+.rep-play-btn {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  border: none; cursor: pointer; background: var(--purple-light); color: var(--purple-dark);
+  margin-top: 2px;
+}
+.rep-play-btn:hover { background: var(--purple); color: #fff; }
+.rep-play-btn:disabled { opacity: 0.6; cursor: default; }
+.rep-recording-body { flex: 1; min-width: 0; }
+.rep-recording-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--fig-ink); }
+
 @media (max-width: 480px) {
   /* Must be a real rule, and --main-pad must be the ONLY place the body padding is set: the Home
      hero cancels it with negative margins, so a hardcoded .app-main padding here would leave the
