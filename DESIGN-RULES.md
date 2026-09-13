@@ -130,10 +130,11 @@ subdivisions that stay selectable but shouldn't crowd the picker.
 
 | Standard | Subdivisions |
 |---|---|
-| Sop, Alto, Tenor, **Barry** | Sop 1, Sop 2, Alto 1, Alto 2, Tenor 1, Tenor 2 |
+| Sop, Alto, Tenor, **Bari** | Sop 1, Sop 2, Alto 1, Alto 2, Tenor 1, Tenor 2 |
 
-- **"Barry" means baritone.** It is what the choir says, so it is what the app says. Don't
-  "correct" it.
+- **"Bari" means baritone.** Was "Barry" until Nina changed the wording herself, 2026-09-13
+  (migration `0010_bari_label.sql`) — the underlying `part_labels.key` is still `barry`, only the
+  displayed label changed. Don't revert this back to "Barry" thinking it's a stray typo.
 - A picker shows the four standard parts up front and the six subdivisions behind a *more*
   affordance — the `common` boolean on `part_labels` (migration 0006) is what that reads.
 - **`Full choir` is not a person's part.** It exists so a *recording* can be of the whole choir;

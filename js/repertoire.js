@@ -167,12 +167,14 @@ function RecordingRow({ recording, uploaderName }) {
   `;
 }
 
-// The upload flow: choose a part (all 11 labels, including Full choir — recordings allow it even
-// though a person can never BE Full choir on song_assignments) -> see what's already there for
-// that part, so uploading a fourth Alto recording is a deliberate choice, not an accident ->
-// choose a file -> an editable, filename-derived title -> upload.
-function AddRecordingSheet({ song, partLabels, songRecordings, profile, directory, onDone, onClose }) {
-  const [step, setStep] = useState('part'); // 'part' | 'upload' | 'success'
+// The upload flow: (if no song was already chosen — the header shortcut) choose a song first ->
+// choose a part (all 11 labels, including Full choir — recordings allow it even though a person
+// can never BE Full choir on song_assignments) -> see what's already there for that part, so
+// uploading a fourth Alto recording is a deliberate choice, not an accident -> choose a file ->
+// an editable, filename-derived title -> upload.
+function AddRecordingSheet({ song: initialSong, songs, partLabels, recordings, profile, directory, onDone, onClose }) {
+  const [step, setStep] = useState(initialSong ? 'part' : 'song'); // 'song' | 'part' | 'upload' | 'success'
+  const [song, setSong] = useState(initialSong || null);
   const [partLabel, setPartLabel] = useState(null);
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -182,10 +184,12 @@ function AddRecordingSheet({ song, partLabels, songRecordings, profile, director
   const [uploaded, setUploaded] = useState(null);
 
   const partsSorted = useMemo(() => [...partLabels].sort((a, b) => a.sort_order - b.sort_order), [partLabels]);
+  const songRecordings = song ? recordings.filter((r) => r.song_id === song.id) : [];
   const existingForPart = partLabel
     ? songRecordings.filter((r) => r.part_label === partLabel).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
     : [];
 
+  const pickSong = (s) => { setSong(s); setStep('part'); };
   const pickPart = (key) => { setPartLabel(key); setStep('upload'); };
 
   const pickFile = async (e) => {
@@ -218,13 +222,29 @@ function AddRecordingSheet({ song, partLabels, songRecordings, profile, director
   };
 
   const uploadAnother = () => {
-    setFile(null); setTitle(''); setDuration(null); setUploaded(null); setStep('part'); setPartLabel(null);
+    setFile(null); setTitle(''); setDuration(null); setUploaded(null); setPartLabel(null);
+    // Opened from a specific song's detail: stay on that song. Opened from the Repertoire header
+    // shortcut: back to picking a song, since there was never one song this flow was "about".
+    setStep(initialSong ? 'part' : 'song');
+    if (!initialSong) setSong(null);
   };
+
+  const songsSorted = useMemo(() => [...(songs || [])].sort((a, b) => a.title.localeCompare(b.title)), [songs]);
 
   return html`
     <${Sheet} label="Add a recording" onClose=${onClose}>
       <h3 class="form-heading">Add a recording</h3>
-      <p class="form-hint">${song.title}</p>
+      ${song ? html`<p class="form-hint">${song.title}</p>` : null}
+
+      ${step === 'song' ? html`
+        <div class="rep-song-list" style="margin-top:12px;">
+          ${songsSorted.map((s) => html`
+            <button key=${s.id} class="rep-song-row" onClick=${() => pickSong(s)}>
+              <span class="rep-song-title">${s.title}</span>
+            </button>
+          `)}
+        </div>
+      ` : null}
 
       ${step === 'part' ? html`
         <div class="part-picker-list" style="margin-top:12px;">
@@ -284,7 +304,7 @@ function AddRecordingSheet({ song, partLabels, songRecordings, profile, director
             Your ${partLabelText(uploaded.part_label, partLabels)} recording has been added to ${song.title}.
           </p>
           <div class="form-actions" style="margin-top:10px;">
-            <button class="btn btn-primary" onClick=${onDone}>View in song</button>
+            <button class="btn btn-primary" onClick=${() => onDone(song.id)}>View in song</button>
             <button class="btn btn-outline" onClick=${uploadAnother}>Upload another</button>
           </div>
         </div>
@@ -364,7 +384,7 @@ function SongDetail({
           `)}
 
       ${addOpen ? html`<${AddRecordingSheet}
-        song=${song} partLabels=${partLabels} songRecordings=${songRecordings}
+        song=${song} partLabels=${partLabels} recordings=${recordings}
         profile=${profile} directory=${directory}
         onDone=${() => setAddOpen(false)} onClose=${() => setAddOpen(false)} />` : null}
     </div>
@@ -527,6 +547,7 @@ export function RepertoireTab({
   events, rehearsalSongs, recordings, directory,
 }) {
   const [mode, setMode] = useState('browse'); // 'browse' | 'all'
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [detail, setDetail] = useState(null); // { type: 'collection' | 'concert' | 'song', id }
   const openSong = (song) => setDetail({ type: 'song', id: song.id });
   // One picker for the whole tab, same reasoning as app.js's one event Sheet: it works no matter
@@ -618,6 +639,7 @@ export function RepertoireTab({
       <div class="cal-top">
         <div class="cal-top-head">
           <h2 class="cal-title">Repertoire</h2>
+          <button class="btn btn-on-purple btn-sm" onClick=${() => setUploadOpen(true)}>+ Upload recording</button>
         </div>
         <div class="rep-toggle">
           <button class=${`rep-toggle-btn ${mode === 'browse' ? 'rep-toggle-on' : ''}`}
@@ -638,6 +660,11 @@ export function RepertoireTab({
               songsById=${songsById} assignments=${assignments} partLabels=${partLabels}
               profileId=${profile.id} onOpenSong=${openSong} />`}
       ${picker}
+      ${uploadOpen ? html`<${AddRecordingSheet}
+        songs=${songs} partLabels=${partLabels} recordings=${recordings}
+        profile=${profile} directory=${directory}
+        onDone=${(songId) => { setUploadOpen(false); openSong({ id: songId }); }}
+        onClose=${() => setUploadOpen(false)} />` : null}
     </div>
   `;
 }
