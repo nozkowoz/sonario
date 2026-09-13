@@ -3,12 +3,15 @@ import { supabase } from './supabaseClient.js';
 import {
   useSession, useMyMembership, displayNameOf, isSuper,
   useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useMemberDirectory, awayRangeFor,
+  useSongs, useSongCollections, useSongCollectionItems, useSongAssignments, useRehearsalSongs,
+  usePartLabels,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
-import { LoadingState, ErrorState, EmptyState, BottomNav, Sheet, useActiveTab } from './shell.js';
+import { LoadingState, ErrorState, BottomNav, Sheet, useActiveTab } from './shell.js';
 import { EventDetail, eventTitle } from './events.js';
 import { HomeTab } from './home.js';
 import { CalendarTab } from './calendar.js';
+import { RepertoireTab } from './repertoire.js';
 import { AdminTab } from './admin.js';
 import { MoreTab } from './more.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
@@ -16,7 +19,8 @@ import { CHOIR_NAME, APP_VERSION } from './config.js';
 // Home and More are deliberately role-blind: a super sees exactly what an ordinary member sees,
 // so Nina can judge the member experience without switching accounts. Organiser controls live on
 // the super-only Admin tab, plus inline on Calendar where they're tied to a specific event.
-// Repertoire/recordings/leaderboard/social remain later checkpoints and aren't wired up here.
+// Repertoire is wired up as of Stage 3 (read-only). Recordings/practice mode/leaderboard/social
+// remain later stages and aren't wired up here.
 function App() {
   const session = useSession();
 
@@ -76,6 +80,13 @@ function Main({ session, membership, profile }) {
   const { awayDates } = useAwayDates();
   // Only supers ever render another member's name, so members don't call the directory at all.
   const { directory } = useMemberDirectory(canManage);
+  // Repertoire (Stage 3) — fetched here rather than lazily on tab-open, same as everything above.
+  const { songs, loading: songsLoading } = useSongs();
+  const { collections } = useSongCollections();
+  const { collectionItems } = useSongCollectionItems();
+  const { assignments } = useSongAssignments();
+  const { rehearsalSongs } = useRehearsalSongs();
+  const { partLabels } = usePartLabels();
 
   const termsById = Object.fromEntries(terms.map((t) => [t.id, t]));
   const openEvent = openEventId ? events.find((e) => e.id === openEventId) : null;
@@ -117,11 +128,12 @@ function Main({ session, membership, profile }) {
           />
         ` : null}
         ${activeTab === 'repertoire' ? html`
-          <div class="tab-content">
-            <h2>Repertoire</h2>
-            <${EmptyState} title="Not built yet"
-              body="Songs, voice parts and practice recordings land here. The tab is in the nav because the navigation is locked — see DESIGN-RULES.md." />
-          </div>
+          <${RepertoireTab}
+            profile=${profile} songs=${songs} songsLoading=${songsLoading}
+            collections=${collections} collectionItems=${collectionItems}
+            assignments=${assignments} partLabels=${partLabels}
+            events=${events} rehearsalSongs=${rehearsalSongs}
+          />
         ` : null}
         ${activeTab === 'more' ? html`
           <${MoreTab} profile=${profile} terms=${terms}

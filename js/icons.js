@@ -172,3 +172,16 @@ export const IconExternal = ({ size }) => svg(html`
   <path d="M20 4l-8 8" />
   <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
 `, { size });
+
+// Repertoire (Stage 3): Sonario Classics' star, and the mic for Concert Playlists. No separate
+// waveform icon for semester collections — IconNote2 (already in the nav) is reused there rather
+// than adding a fourth icon for one card, a deliberate simplification from the Figma's own art.
+export const IconStar = ({ size }) => svg(html`
+  <path d="M12 3.5l2.6 5.4 5.9.6-4.4 4 1.2 5.9L12 16.6l-5.3 2.8 1.2-5.9-4.4-4 5.9-.6L12 3.5Z" />
+`, { size, fill: 'currentColor', stroke: false });
+
+export const IconMic = ({ size }) => svg(html`
+  <rect x="9" y="3" width="6" height="11" rx="3" />
+  <path d="M5 11a7 7 0 0 0 14 0" />
+  <path d="M12 18v3M9 21h6" />
+`, { size });

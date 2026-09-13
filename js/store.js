@@ -169,6 +169,49 @@ export function useSongs() {
   return { songs: rows, loading };
 }
 
+// ===========================================================================
+// Repertoire collections (Stage 3) — song_collections/song_collection_items are new (migration
+// 0008); songs, song_assignments, rehearsal_songs already existed from 0001. Read-only hooks only
+// at this stage — no mutation helpers yet, since Stage 3 doesn't edit anything.
+// ===========================================================================
+export function useSongCollections() {
+  const { rows, loading } = useLiveTable('song_collections', {
+    orderFn: (a, b) => (b.is_current - a.is_current) || a.sort_order - b.sort_order,
+  });
+  return { collections: rows, loading };
+}
+
+export function useSongCollectionItems() {
+  const { rows, loading } = useLiveTable('song_collection_items', {
+    orderFn: (a, b) => a.position - b.position,
+  });
+  return { collectionItems: rows, loading };
+}
+
+// Every member's assignment on every song — RLS already scopes this correctly (any active member
+// can read all of them; the collaborative-editing brief means seeing who's on what isn't private).
+// The UI picks out the signed-in member's own row per song from this same set.
+export function useSongAssignments() {
+  const { rows, loading } = useLiveTable('song_assignments', {
+    orderFn: (a, b) => a.updated_at.localeCompare(b.updated_at),
+  });
+  return { assignments: rows, loading };
+}
+
+export function useRehearsalSongs() {
+  const { rows, loading } = useLiveTable('rehearsal_songs', {
+    orderFn: (a, b) => a.position - b.position,
+  });
+  return { rehearsalSongs: rows, loading };
+}
+
+export function usePartLabels() {
+  const { rows, loading } = useLiveTable('part_labels', {
+    orderFn: (a, b) => a.sort_order - b.sort_order,
+  });
+  return { partLabels: rows, loading };
+}
+
 export function useNotices() {
   const { rows, loading } = useLiveTable('notices', {
     orderFn: (a, b) => (b.pinned - a.pinned) || b.created_at.localeCompare(a.created_at),

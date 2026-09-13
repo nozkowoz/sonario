@@ -918,6 +918,44 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .about-body { margin: 12px 0 0; font-size: 14px; line-height: 1.5; color: var(--fig-meta); }
 .form-saved { margin: -4px 0 0; font-size: 13px; font-weight: 600; color: var(--green); }
 
+/* --- Repertoire (Stage 3) -------------------------------------------------- */
+/* Browse/All Songs toggle, on the purple hero — same job as .btn-on-purple, but as a two-way
+   segmented control rather than a single pill. */
+.rep-toggle { display: flex; gap: 8px; margin-top: 14px; }
+.rep-toggle-btn {
+  border: 1.36px solid rgba(255, 255, 255, 0.40); background: transparent; color: #fff;
+  font-size: 13px; font-weight: 700; padding: 7px 18px; border-radius: 99px; cursor: pointer;
+}
+.rep-toggle-on { background: #fff; color: var(--purple); border-color: #fff; }
+
+.rep-collection-list { display: flex; flex-direction: column; gap: 10px; }
+.rep-collection-card {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  border: none; cursor: pointer; margin-bottom: 0;
+}
+.rep-collection-icon {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+}
+.rep-icon-semester { background: var(--purple-light); color: var(--purple-dark); }
+.rep-icon-classics { background: #FDE9C8; color: #B45309; }
+.rep-icon-concert { background: var(--purple-light); color: var(--purple-dark); }
+.rep-collection-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rep-collection-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rep-collection-name { font-size: 15px; font-weight: 700; color: var(--fig-ink); }
+
+.rep-song-list { display: flex; flex-direction: column; gap: 1px; border-radius: var(--radius-lg); overflow: hidden; }
+.rep-song-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left; border: none; background: #fff; cursor: default;
+  padding: 14px 16px; font: inherit;
+}
+.rep-song-title { font-size: 14px; font-weight: 600; color: var(--fig-ink); }
+/* The unmistakably-empty state: dashed border, muted text — never styled to look like a real
+   assignment. No part editing yet (Stage 4), so this pill is never a button at this stage. */
+.part-pill-empty {
+  background: transparent; color: var(--fig-mute); border: 1.36px dashed var(--fig-hair);
+}
+
 @media (max-width: 480px) {
   /* Must be a real rule, and --main-pad must be the ONLY place the body padding is set: the Home
      hero cancels it with negative margins, so a hardcoded .app-main padding here would leave the
