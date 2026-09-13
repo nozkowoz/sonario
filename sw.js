@@ -5,7 +5,7 @@
 // not one designed to accept offline writes.
 //
 // Bump CACHE_VERSION on any meaningful change to force a clean cache.
-const CACHE_VERSION = 'sonario-v27';
+const CACHE_VERSION = 'sonario-v28';
 const SHELL_URLS = [
   './',
   './index.html',

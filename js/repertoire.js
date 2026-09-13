@@ -73,14 +73,14 @@ function PartPickerSheet({ song, currentPartKey, partLabels, saving, error, onPi
           </button>
         `)}
       </div>
-      ${!showMore && rest.length > 0
-        ? html`<button class="btn-quiet" onClick=${() => setShowMore(true)}>More parts</button>`
-        : null}
-      ${currentPartKey
-        ? html`<button class="btn-quiet" disabled=${saving} onClick=${onClear} style="margin-top:8px;">
-            No part on this song
-          </button>`
-        : null}
+      <div class="part-picker-footer">
+        ${!showMore && rest.length > 0
+          ? html`<button class="btn-quiet" onClick=${() => setShowMore(true)}>More parts</button>`
+          : null}
+        ${currentPartKey
+          ? html`<button class="btn-quiet" disabled=${saving} onClick=${onClear}>No part on this song</button>`
+          : null}
+      </div>
       ${error ? html`<p class="absence-error">${error}</p>` : null}
     </${Sheet}>
   `;
