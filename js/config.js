@@ -2,8 +2,12 @@
 // Dashboard → Project Settings → API → "Project URL" and "anon public" key.
 // The anon key is safe to ship in client code — it's the public key, and Row Level Security
 // (see supabase/schema.sql) is what actually controls who can read or write.
-export const SUPABASE_URL = 'https://jpffnazfjxvdzqnfueue.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwZmZuYXpmanh2ZHpxbmZ1ZXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNzA3OTgsImV4cCI6MjEwMzY0Njc5OH0.rXbV13kA4Z_gHmrlcko6yV52td-sckQgL4VZRIUkXYk';
+// Phase C cutover (2026-09-13): pointed at the new dedicated Sonario project
+// (rwkaofshfatqqkupeqoe), split off from the old shared "Page Turners" project
+// (jpffnazfjxvdzqnfueue) per supabase/SPLIT-PLAN.md. The old project is left running,
+// untouched, as the rollback for at least a week — see SPLIT-PLAN.md Phase E.
+export const SUPABASE_URL = 'https://rwkaofshfatqqkupeqoe.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_W230RnUpaZ6PnTKHns4GVQ_VmFG5Aux';
 
 export const CHOIR_NAME = 'Sonario';
 
@@ -18,4 +22,4 @@ export const SUPER_PASSPHRASE = 'SUPERPURPLEHEART';
 
 // Shown in the footer so people can check they're on the latest build — useful given the PWA
 // caching quirks (see sw.js). Bump this by one on every deploy that ships a real change.
-export const APP_VERSION = 'v29-sw-more';
+export const APP_VERSION = 'v30-phase-c-local-cutover';
