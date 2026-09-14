@@ -22,7 +22,13 @@
 -- ============================================================================
 
 -- --- Clear previous run (safe to re-run) ------------------------------------
--- Deleting the auth.users row cascades to the profile, and from there to the membership.
+-- Deleting the auth.users row cascades to the profile, and from there to the membership — but
+-- memberships.decided_by has no cascade action, and the UPDATE below points several of these
+-- fake members' decided_by at each other (Marguerite approved the rest, and decided_by = self
+-- for Marguerite). Null those references out first, or the cascade delete hits
+-- memberships_decided_by_fkey and aborts. Found 2026-09-14 when this was re-run for the first
+-- time since the Phase C project split.
+update sonario.memberships set decided_by = null where decided_by::text like 'f0000000-0000-0000-0000-%';
 delete from auth.users where id::text like 'f0000000-0000-0000-0000-%';
 
 -- --- People -----------------------------------------------------------------
