@@ -555,3 +555,37 @@ export async function undoCheckIn(eventId, profileId) {
     .eq('rehearsal_id', eventId).eq('profile_id', profileId)
     .select();
 }
+
+// Editable check-in time (migration 0012, 2026-09-15) — for a live check-in someone forgot to tap
+// in the moment, a best-guess arrival time. Deliberately no separate "unverified" marker or
+// source change ("I think we don't need it 'verified'") — this is a plain UPDATE, own row or
+// super, restricted by RLS to rows still carrying source = 'live'.
+export async function updateCheckinTime(id, checkedInAt) {
+  return supabase.from('checkins').update({ checked_in_at: checkedInAt }).eq('id', id).select();
+}
+
+// --- Super-only attendance backfill (migration 0012) ------------------------
+// Per member, per past week — for a term that predates the app. checked_in_at stays null (no real
+// arrival time to record, same reasoning as friend_confirmed), and every successful insert also
+// writes an audit row to attendance_corrections, which existed since 0001 but had no writer until
+// now. `reason` is free text a super fills in (e.g. "Backfilled from Sean's paper roll, Term 2").
+export async function backfillCheckin({ rehearsalId, profileId, correctedBy, reason }) {
+  const { data: row, error } = await supabase.from('checkins')
+    .insert({ rehearsal_id: rehearsalId, profile_id: profileId, source: 'super_backfill' })
+    .select();
+  if (error) return { error };
+  if (!row || row.length === 0) return { error: { message: "That didn't save — reload and try again." } };
+  // Best-effort: the checkin itself is the thing that matters for attendance history; a failed
+  // audit-log write shouldn't undo a genuine backfill, just like uploadRecording's Storage step.
+  await supabase.from('attendance_corrections').insert({
+    checkin_id: row[0].id, rehearsal_id: rehearsalId, profile_id: profileId,
+    corrected_by: correctedBy, reason: reason || '', before: null, after: row[0],
+  });
+  return { data: row };
+}
+
+// Removing a mistaken backfill entry — same undo shape as undoCheckIn, but for any source (a
+// super fixing their own backfill mistake), not windowed to an hour like the live-checkin undo.
+export async function removeBackfillCheckin(id) {
+  return supabase.from('checkins').delete().eq('id', id).eq('source', 'super_backfill').select();
+}

@@ -175,7 +175,9 @@ function Main({ session, membership, profile, patchProfile }) {
         ` : null}
         ${activeTab === 'admin' && canManage
           ? html`<${AdminTab} key=${resetKeys.admin} session=${session} view=${adminView} setView=${setAdminView}
-              events=${events} eventsLoading=${eventsLoading} terms=${terms} onEventSaved=${patchEvent} />`
+              events=${events} eventsLoading=${eventsLoading} terms=${terms} onEventSaved=${patchEvent}
+              directory=${directory} checkins=${checkins}
+              onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow} />`
           : null}
       </main>
       <p class="app-footer">${APP_VERSION}</p>

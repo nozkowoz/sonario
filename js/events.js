@@ -31,11 +31,13 @@ export function currentTermOf(terms) {
   return terms.find((t) => t.starts_on <= today && t.ends_on >= today) || null;
 }
 
-// Next thing worth showing on Home: soonest event today or later that hasn't been cancelled.
+// Next thing worth showing on Home: soonest event today or later that's actually on —
+// 'not_scheduled' (a public holiday that fell on a rehearsal day) is just as off as 'cancelled'.
 // `events` arrives already sorted by date then start time from useEvents().
 export function nextEvent(events) {
   const today = todayStr();
-  return events.find((e) => e.rehearsal_date >= today && e.status !== 'cancelled') || null;
+  return events.find((e) => e.rehearsal_date >= today
+    && e.status !== 'cancelled' && e.status !== 'not_scheduled') || null;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +50,7 @@ export function nextEvent(events) {
 // rehearsal/not-rehearsal rather than what kind of thing it is; she chose semantic when asked,
 // so the palette's own colours are used here and rehearsals keep the Figma's white.
 // ---------------------------------------------------------------------------
-export const rowTintClass = (ev) => (ev.status === 'cancelled'
+export const rowTintClass = (ev) => (ev.status === 'cancelled' || ev.status === 'not_scheduled'
   ? 'rail-row-cancelled'
   : ev.event_type === 'rehearsal' ? '' : `rail-row-${ev.event_type}`);
 
@@ -94,7 +96,7 @@ export function AbsenceToggle({ event, myAbsence, profileId, onAbsenceSaved, onA
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  if (event.status === 'cancelled' || isPast(event)) return null;
+  if (event.status === 'cancelled' || event.status === 'not_scheduled' || isPast(event)) return null;
 
   // patchAbsence/removeAbsence update the parent's local list the moment this insert/delete has a
   // result, rather than waiting for Realtime's round trip — same fix as CheckInPanel's, 2026-09-15
@@ -140,7 +142,7 @@ function AbsenceSummary({ event, absencesForEvent, directory }) {
   if (!absencesForEvent.length) {
     // "Nobody has said they can't make it" is useful information about something still to come;
     // on a past or cancelled event it's just noise, so it's only the populated list that shows.
-    if (isPast(event) || event.status === 'cancelled') return null;
+    if (isPast(event) || event.status === 'cancelled' || event.status === 'not_scheduled') return null;
     return html`<p class="absence-summary">Nobody has said they can't make it.</p>`;
   }
   const names = absencesForEvent
@@ -271,13 +273,18 @@ function useStatusFlip(event, onEventSaved) {
 }
 
 function adminMenuItems(event, { onEdit, onReschedule, flip, busy }) {
-  const cancelled = event.status === 'cancelled';
+  const off = event.status === 'cancelled' || event.status === 'not_scheduled';
   return [
     { label: 'Edit', Icon: IconEdit, onClick: () => onEdit(event) },
     { label: 'Reschedule', Icon: IconReschedule, onClick: () => onReschedule(event) },
-    cancelled
-      ? { label: 'Reinstate', Icon: IconCheck, onClick: () => flip('scheduled'), disabled: busy }
-      : { label: 'Cancel', Icon: IconCancel, onClick: () => flip('cancelled'), disabled: busy, danger: true },
+    ...(off
+      ? [{ label: 'Reinstate', Icon: IconCheck, onClick: () => flip('scheduled'), disabled: busy }]
+      : [
+          { label: 'Cancel', Icon: IconCancel, onClick: () => flip('cancelled'), disabled: busy, danger: true },
+          // For a public holiday that fell on what would've been a rehearsal day — reusable for
+          // every future one your term schedule generates, not a one-off fix for this date.
+          { label: 'No rehearsal (public holiday)', Icon: IconCalendar, onClick: () => flip('not_scheduled'), disabled: busy },
+        ]),
   ];
 }
 
@@ -291,11 +298,12 @@ export function EventRow({
 }) {
   const { busy, error, flip } = useStatusFlip(event, onEventSaved);
   const cancelled = event.status === 'cancelled';
+  const notScheduled = event.status === 'not_scheduled';
   const rail = formatDateRail(event.rehearsal_date);
   const rel = showRelative ? relativeDayLabel(event.rehearsal_date) : '';
 
   return html`
-    <div class="event-row ${cancelled ? 'event-row-cancelled' : ''}" role="button" tabindex="0"
+    <div class="event-row ${cancelled || notScheduled ? 'event-row-cancelled' : ''}" role="button" tabindex="0"
       onClick=${() => onOpen(event)}
       onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(event); } }}>
       <div class="date-rail" aria-hidden="true">
@@ -312,6 +320,7 @@ export function EventRow({
         <div class="event-row-tags">
           <span class="event-type-badge event-type-${event.event_type}">${EVENT_TYPE_LABEL[event.event_type]}</span>
           ${cancelled ? html`<span class="event-type-badge event-cancelled-badge">Cancelled</span>` : null}
+          ${notScheduled ? html`<span class="event-type-badge event-cancelled-badge">No rehearsal (public holiday)</span>` : null}
           ${myCheckin ? html`<span class="event-type-badge badge-in">Checked in</span>` : null}
           ${!myCheckin && myAway ? html`<span class="event-type-badge event-type-neutral">You're away</span>` : null}
           ${!myCheckin && !myAway && myAbsence ? html`<span class="event-type-badge event-type-neutral">Can't make it</span>` : null}
@@ -344,8 +353,10 @@ export function EventDetail({
   onAbsenceSaved, onAbsenceRemoved,
 }) {
   const cancelled = event.status === 'cancelled';
+  const notScheduled = event.status === 'not_scheduled';
+  const off = cancelled || notScheduled;
   const past = isPast(event);
-  const showAdmin = canManage && !cancelled && (past || isCheckInDay(event) || absencesForEvent.length > 0);
+  const showAdmin = canManage && !off && (past || isCheckInDay(event) || absencesForEvent.length > 0);
 
   return html`
     <div class="sheet-detail">
@@ -354,9 +365,9 @@ export function EventDetail({
       <div class="sheet-title-row">
         <h2 class="sheet-title">${eventTitle(event)}</h2>
         <div class="sheet-title-actions">
-          <span class=${`sheet-type sheet-type-${cancelled ? 'cancelled' : event.event_type}`}>
+          <span class=${`sheet-type sheet-type-${off ? 'cancelled' : event.event_type}`}>
             <span class="sheet-type-dot" aria-hidden="true"></span>
-            ${cancelled ? 'Cancelled' : EVENT_TYPE_LABEL[event.event_type]}
+            ${cancelled ? 'Cancelled' : notScheduled ? 'No rehearsal (public holiday)' : EVENT_TYPE_LABEL[event.event_type]}
           </span>
           ${canManage && onManage ? html`
             <button class="icon-btn" aria-label="Edit this event" onClick=${() => onManage(event)}>
@@ -386,12 +397,12 @@ export function EventDetail({
       <${AttendanceStatus} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
         myAway=${myAway} detailed=${true} />
 
-      ${cancelled ? null : html`
+      ${off ? null : html`
         <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
           profileId=${profileId} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved} />
       `}
 
-      ${!cancelled ? html`
+      ${!off ? html`
         <div class="sheet-rule"></div>
         <div class="sheet-section">
           <p class="sheet-section-head"><${IconCalendar} size=${20} />Add to calendar</p>
@@ -424,7 +435,7 @@ export function EventDetail({
             DESIGN-RULES.md), and leave already covers this rehearsal, so offering it here would
             invite a second, redundant row saying the same thing. Cancel the leave if it's
             wrong. */
-        cancelled || myCheckin || myAway ? null : html`
+        off || myCheckin || myAway ? null : html`
         <div class="sheet-rule"></div>
         <div class="sheet-action">
           <${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId}

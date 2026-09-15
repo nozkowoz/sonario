@@ -1,11 +1,11 @@
 import { html, useState, useMemo } from './lib.js';
-import { todayStr } from './lib.js';
+import { todayStr, formatEventDateLong } from './lib.js';
 import { ApprovalQueue } from './approvals.js';
-import { useAllMemberships } from './store.js';
+import { useAllMemberships, backfillCheckin, removeBackfillCheckin } from './store.js';
 import { EventRow, EventForm } from './events.js';
 import { EmptyState, LoadingState } from './shell.js';
 import { IconCalendar, IconUsers, IconCheckSquare, IconBell, IconAdmin, IconCrown,
-  IconChevron, IconBack } from './icons.js';
+  IconChevron, IconBack, IconCheck } from './icons.js';
 
 // The organiser console. Everything an organiser does lives here, so the member-facing screens
 // (Home, Calendar, More) read identically whether you're a super or not — which is the whole
@@ -23,20 +23,28 @@ const SECTIONS = [
   // Listed but not built, deliberately: showing the shape of the console is useful, and each of
   // these is real work rather than a screen waiting to be drawn.
   { key: 'attendance', label: 'Attendance', Icon: IconCheckSquare,
-    body: 'View attendance, check-ins and absence reports.', soon: true },
+    body: 'Backfill past attendance for a member, week by week.' },
   { key: 'notifications', label: 'Notifications', Icon: IconBell,
     body: 'Send and schedule messages to your choir.', soon: true },
   { key: 'settings', label: 'Settings', Icon: IconAdmin,
     body: 'Update choir details, term dates and preferences.', soon: true },
 ];
 
-export function AdminTab({ session, view, setView, events, eventsLoading, terms, onEventSaved }) {
+export function AdminTab({
+  session, view, setView, events, eventsLoading, terms, onEventSaved,
+  directory, checkins, onCheckinSaved, onCheckinRemoved,
+}) {
   if (view?.section === 'events') {
     return html`<${AdminEvents} events=${events} loading=${eventsLoading} terms=${terms}
       initialEditId=${view.editId || null} onBack=${() => setView(null)} onEventSaved=${onEventSaved} />`;
   }
   if (view?.section === 'members') {
     return html`<${AdminMembers} session=${session} onBack=${() => setView(null)} />`;
+  }
+  if (view?.section === 'attendance') {
+    return html`<${AdminAttendance} session=${session} events=${events} directory=${directory}
+      checkins=${checkins} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved}
+      onBack=${() => setView(null)} />`;
   }
   if (view?.section) {
     const section = SECTIONS.find((s) => s.key === view.section);
@@ -152,6 +160,115 @@ function AdminEvents({ events, loading, terms, initialEditId, onBack, onEventSav
           ${past.map((e) => html`<${EventRow} key=${e.id} ...${rowProps(e)} />`)}
         </div>
       ` : null}
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Admin > Attendance. Super-only backfill of past attendance, per member per week — for a term
+// that predates the app (migration 0012, agreed 2026-09-15). Deliberately narrow: rehearsals
+// only ("per week" means the weekly recurring thing, not workshops/performances/socials), and
+// only weeks that have already happened — the RLS policy enforces that server-side too, this
+// just keeps the UI from offering something it knows will be rejected.
+//
+// A week already carrying a REAL check-in (live or friend_confirmed) shows ticked but disabled —
+// this screen backfills gaps, it doesn't let a super silently overwrite someone's genuine record.
+// ---------------------------------------------------------------------------
+function AdminAttendance({ session, events, directory, checkins, onCheckinSaved, onCheckinRemoved, onBack }) {
+  const [memberId, setMemberId] = useState(null);
+  const [reason, setReason] = useState('');
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+
+  const today = todayStr();
+  const pastRehearsals = useMemo(() => events
+    .filter((e) => e.event_type === 'rehearsal' && e.status === 'scheduled' && e.rehearsal_date < today)
+    .sort((a, b) => b.rehearsal_date.localeCompare(a.rehearsal_date)),
+    [events, today]);
+
+  const members = useMemo(
+    () => Object.values(directory).sort((a, b) => a.display_name.localeCompare(b.display_name)),
+    [directory],
+  );
+
+  if (!memberId) {
+    return html`
+      <div class="tab-content">
+        <${AdminHead} title="Attendance" onBack=${onBack} />
+        <p class="form-hint" style="margin:0 0 14px;">
+          Backfill past attendance for a member — for weeks before the choir used Sonario.
+        </p>
+        ${members.length === 0
+          ? html`<${EmptyState} title="No members yet" body="Nobody to backfill attendance for." />`
+          : html`<div class="rep-song-list">
+              ${members.map((m) => html`
+                <button key=${m.id} class="rep-song-row" onClick=${() => setMemberId(m.id)}>
+                  <span class="rep-song-title">${m.display_name}</span>
+                  <${IconChevron} size=${16} />
+                </button>
+              `)}
+            </div>`}
+      </div>
+    `;
+  }
+
+  const member = directory[memberId];
+  const theirCheckins = checkins.filter((c) => c.profile_id === memberId);
+  const checkinFor = (rehearsalId) => theirCheckins.find((c) => c.rehearsal_id === rehearsalId);
+
+  const toggle = async (rehearsal) => {
+    const existing = checkinFor(rehearsal.id);
+    if (existing && existing.source !== 'super_backfill') return; // a real check-in, not ours to touch
+    setBusyId(rehearsal.id);
+    setError(null);
+    if (existing) {
+      const { data, error: err } = await removeBackfillCheckin(existing.id);
+      setBusyId(null);
+      if (err) { setError(err.message); return; }
+      if (!data || data.length === 0) { setError("That didn't save — reload and try again."); return; }
+      onCheckinRemoved?.(existing.id);
+    } else {
+      const { data, error: err } = await backfillCheckin({
+        rehearsalId: rehearsal.id, profileId: memberId, correctedBy: session.user.id, reason,
+      });
+      setBusyId(null);
+      if (err) { setError(err.message); return; }
+      if (!data || data.length === 0) { setError("That didn't save — reload and try again."); return; }
+      onCheckinSaved?.(data[0]);
+    }
+  };
+
+  return html`
+    <div class="tab-content">
+      <${AdminHead} title="Attendance" onBack=${() => setMemberId(null)} />
+      <p class="form-hint" style="margin:0 0 4px;">${member?.display_name || 'Member'}</p>
+      <label style="margin-bottom:14px;">
+        Reason (optional, applies to weeks you tick below)
+        <input type="text" value=${reason} onInput=${(e) => setReason(e.target.value)}
+          placeholder="e.g. Backfilled from Sean's paper roll, Term 2" />
+      </label>
+      ${error ? html`<p class="absence-error">${error}</p>` : null}
+      ${pastRehearsals.length === 0
+        ? html`<${EmptyState} title="No past rehearsals yet" body="Nothing to backfill until at least one rehearsal has happened." />`
+        : html`<div class="practice-select-list">
+            ${pastRehearsals.map((r) => {
+              const existing = checkinFor(r.id);
+              const isReal = !!existing && existing.source !== 'super_backfill';
+              return html`
+                <button key=${r.id}
+                  class=${`practice-select-row ${existing ? 'practice-select-row-on' : ''} ${isReal ? 'practice-select-row-disabled' : ''}`}
+                  disabled=${busyId === r.id || isReal} onClick=${() => toggle(r)}>
+                  <span class=${`practice-checkbox ${existing ? 'practice-checkbox-on' : ''}`}>
+                    ${existing ? html`<${IconCheck} size=${13} />` : null}
+                  </span>
+                  <span class="practice-select-text">
+                    <span class="rep-song-title">${formatEventDateLong(r.rehearsal_date)}</span>
+                    ${isReal ? html`<span class="form-hint" style="margin:0;">Already checked in</span>` : null}
+                  </span>
+                </button>
+              `;
+            })}
+          </div>`}
     </div>
   `;
 }

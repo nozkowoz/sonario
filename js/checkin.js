@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useMemo } from './lib.js';
 import { todayStr } from './lib.js';
-import { checkIn, undoCheckIn, clearAbsence } from './store.js';
+import { checkIn, undoCheckIn, clearAbsence, updateCheckinTime } from './store.js';
 import { IconCheckCircle } from './icons.js';
 
 // The undo window is a database policy (migration 0003), not a UI rule — this constant only
@@ -8,10 +8,12 @@ import { IconCheckCircle } from './icons.js';
 // interval ever changes, change this with it.
 const UNDO_WINDOW_MS = 60 * 60 * 1000;
 
-// Check-in only exists on the day, matching the insert policy in migration 0003: a member can't
-// check in to next month's concert, and a cancelled event has nothing to arrive at.
+// Check-in only exists on the day, matching the insert policy in migration 0012 (which widened
+// this from 0003's 'cancelled'-only exclusion to a positive `status = 'scheduled'` match): a
+// member can't check in to next month's concert, and neither a cancelled event nor a public
+// holiday that was never scheduled has anything to arrive at.
 export function isCheckInDay(event) {
-  return event.rehearsal_date === todayStr() && event.status !== 'cancelled';
+  return event.rehearsal_date === todayStr() && event.status === 'scheduled';
 }
 
 // Re-renders on a timer so the Undo button disappears on its own when the hour runs out, rather
@@ -29,6 +31,20 @@ function useNow(intervalMs = 30000) {
 // duplicating the formatting (or the 12-hour/am-pm handling) there.
 export const timeOfDay = (iso) =>
   new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
+
+// For the "Edit time" input — a plain HH:MM in local time, and back. Always anchored to the
+// event's own rehearsal_date: editing the arrival TIME only ever makes sense against the day the
+// check-in already belongs to, never a different date.
+const toTimeInputValue = (iso) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+const timeInputToIso = (rehearsalDateStr, hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date(`${rehearsalDateStr}T00:00:00`);
+  d.setHours(h, m, 0, 0);
+  return d.toISOString();
+};
 
 // ---------------------------------------------------------------------------
 // Where you stand on this event — the single source of that answer, so Home and the detail
@@ -50,6 +66,8 @@ export function AttendanceStatus({ event, myCheckin, myAbsence, myAway, detailed
   // statement and the member didn't mark this event individually.
   const state = event.status === 'cancelled'
     ? { text: 'This event has been cancelled.', tone: 'muted' }
+    : event.status === 'not_scheduled'
+    ? { text: 'No rehearsal — public holiday.', tone: 'muted' }
     : myCheckin
       ? { text: `You're here${myCheckin.checked_in_at ? ` — checked in at ${timeOfDay(myCheckin.checked_in_at)}` : ''}`, tone: 'good' }
       : myAway
@@ -83,6 +101,8 @@ export function AttendanceStatus({ event, myCheckin, myAbsence, myAway, detailed
 export function CheckInPanel({ event, myCheckin, myAbsence, profileId, onCheckinSaved, onCheckinRemoved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [editingTime, setEditingTime] = useState(false);
+  const [timeValue, setTimeValue] = useState('');
   const now = useNow();
 
   if (!isCheckInDay(event)) return null;
@@ -108,6 +128,7 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId, onCheckin
     }
     if (patch) onCheckinSaved?.(Array.isArray(data) ? data[0] : data);
     if (removedId) onCheckinRemoved?.(removedId);
+    return true;
   };
 
   const doCheckIn = () => run(async () => {
@@ -122,6 +143,20 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId, onCheckin
   const undoLabel = busy ? 'Saving…' : `Undo (${Math.max(1, Math.round(msLeft / 60000))} min left)`;
   const errorLine = error ? html`<p class="absence-error">${error}</p>` : null;
 
+  const openTimeEdit = () => {
+    setTimeValue(myCheckin?.checked_in_at ? toTimeInputValue(myCheckin.checked_in_at) : '');
+    setError(null);
+    setEditingTime(true);
+  };
+  const saveTime = async () => {
+    if (!timeValue) { setError('Pick a time first.'); return; }
+    const ok = await run(
+      () => updateCheckinTime(myCheckin.id, timeInputToIso(event.rehearsal_date, timeValue)),
+      { patch: true },
+    );
+    if (ok) setEditingTime(false);
+  };
+
   if (!myCheckin) {
     return html`
       <div class="checkin-row">
@@ -133,13 +168,24 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId, onCheckin
     `;
   }
 
-  // Checked in: the status line above already says so, so all that's left is the way out.
+  // Checked in: the status line above already says so. What's left is the way out (Undo, still
+  // time-windowed — it removes the record) or fixing a forgotten live tap's time (Edit time, no
+  // window — Nina, 2026-09-15: "I think we don't need it 'verified'").
   return html`
     <div class="checkin-row">
-      ${canUndo ? html`
-        <button class="btn-quiet" disabled=${busy}
-          onClick=${() => run(() => undoCheckIn(event.id, profileId), { removedId: myCheckin.id })}>${undoLabel}</button>
-      ` : null}
+      ${editingTime ? html`
+        <span class="checkin-time-edit">
+          <input type="time" value=${timeValue} onInput=${(e) => setTimeValue(e.target.value)} />
+          <button class="btn-quiet" disabled=${busy} onClick=${saveTime}>${busy ? 'Saving…' : 'Save'}</button>
+          <button class="btn-quiet" disabled=${busy} onClick=${() => setEditingTime(false)}>Cancel</button>
+        </span>
+      ` : html`
+        <button class="btn-quiet" disabled=${busy} onClick=${openTimeEdit}>Edit time</button>
+        ${canUndo ? html`
+          <button class="btn-quiet" disabled=${busy}
+            onClick=${() => run(() => undoCheckIn(event.id, profileId), { removedId: myCheckin.id })}>${undoLabel}</button>
+        ` : null}
+      `}
       ${errorLine}
     </div>
   `;
