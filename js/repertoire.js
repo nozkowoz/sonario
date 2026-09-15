@@ -42,13 +42,35 @@ function PartPill({ song, assignments, partLabels, profileId }) {
     : html`<span class="event-type-badge part-pill-empty">Set part</span>`;
 }
 
+// Per-part recording coverage: purely derived from `recordings`, no new schema (agreed
+// 2026-09-15) — just the four common parts (Sop/Alto/Tenor/Bari), purple once at least one
+// recording exists for that part OR one of its numbered subdivisions (an "Alto 1" recording
+// counts toward "Alto"), grey otherwise. Renders nothing once part_labels itself hasn't loaded.
+function PartTagRow({ song, recordings, partLabels }) {
+  const common = partLabels.filter((p) => p.common).sort((a, b) => a.sort_order - b.sort_order);
+  if (common.length === 0) return null;
+  const recordedKeys = new Set(recordings.filter((r) => r.song_id === song.id).map((r) => r.part_label));
+  const hasRecording = (p) => recordedKeys.has(p.key)
+    || [...recordedKeys].some((k) => k.startsWith(`${p.key}_`));
+  return html`
+    <div class="rep-part-tags">
+      ${common.map((p) => html`
+        <span key=${p.key} class=${`rep-part-tag ${hasRecording(p) ? 'rep-part-tag-on' : ''}`}>${p.label}</span>
+      `)}
+    </div>
+  `;
+}
+
 // The whole row opens Song Detail — the canonical screen for a song regardless of where it was
 // tapped from (All Songs, a Semester, Classics, a Concert Playlist). Part editing lives inside
 // that screen now (Stage 6), not on tap-from-a-list directly.
-function SongRow({ song, assignments, partLabels, profileId, onOpen }) {
+function SongRow({ song, assignments, partLabels, profileId, recordings, onOpen }) {
   return html`
     <button class="rep-song-row" onClick=${() => onOpen(song)}>
-      <span class="rep-song-title">${song.title}</span>
+      <span class="rep-song-main">
+        <span class="rep-song-title">${song.title}</span>
+        <${PartTagRow} song=${song} recordings=${recordings} partLabels=${partLabels} />
+      </span>
       <${PartPill} song=${song} assignments=${assignments} partLabels=${partLabels} profileId=${profileId} />
     </button>
   `;
@@ -446,7 +468,7 @@ function SongDetail({
 }
 
 // --- Collection detail (a Semester folder or Sonario Classics) --------------
-function CollectionDetail({ collection, songsById, collectionItems, assignments, partLabels, profileId, onBack, onOpenSong }) {
+function CollectionDetail({ collection, songsById, collectionItems, assignments, partLabels, profileId, recordings, onBack, onOpenSong }) {
   const items = collectionItems
     .filter((i) => i.collection_id === collection.id)
     .sort((a, b) => a.position - b.position)
@@ -460,14 +482,15 @@ function CollectionDetail({ collection, songsById, collectionItems, assignments,
         ? html`<${EmptyState} title="No songs yet" body="Nothing's been added to this collection yet." />`
         : html`<div class="rep-song-list">
             ${items.map((s) => html`<${SongRow} key=${s.id} song=${s}
-              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${onOpenSong} />`)}
+              assignments=${assignments} partLabels=${partLabels} profileId=${profileId}
+              recordings=${recordings} onOpen=${onOpenSong} />`)}
           </div>`}
     </div>
   `;
 }
 
 // --- Concert Playlist detail (a performance event's setlist) ---------------
-function ConcertDetail({ event, songsById, rehearsalSongs, assignments, partLabels, profileId, onBack, onOpenSong }) {
+function ConcertDetail({ event, songsById, rehearsalSongs, assignments, partLabels, profileId, recordings, onBack, onOpenSong }) {
   const items = rehearsalSongs
     .filter((rs) => rs.rehearsal_id === event.id)
     .sort((a, b) => a.position - b.position)
@@ -485,7 +508,8 @@ function ConcertDetail({ event, songsById, rehearsalSongs, assignments, partLabe
         : html`<div class="rep-song-list">
             ${items.map((s, i) => html`<${SongRow} key=${s.id}
               song=${{ ...s, title: `${i + 1}. ${s.title}` }}
-              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${() => onOpenSong(s)} />`)}
+              assignments=${assignments} partLabels=${partLabels} profileId=${profileId}
+              recordings=${recordings} onOpen=${() => onOpenSong(s)} />`)}
           </div>`}
     </div>
   `;
@@ -562,7 +586,7 @@ function Browse({ collections, collectionItems, events, rehearsalSongs, onOpenCo
 }
 
 // --- All Songs: flat list grouped by collection -----------------------------
-function AllSongs({ collections, collectionItems, songsById, assignments, partLabels, profileId, onOpenSong }) {
+function AllSongs({ collections, collectionItems, songsById, assignments, partLabels, profileId, recordings, onOpenSong }) {
   const groups = collections
     .map((c) => ({
       collection: c,
@@ -587,7 +611,8 @@ function AllSongs({ collections, collectionItems, songsById, assignments, partLa
           </p>
           <div class="rep-song-list">
             ${songs.map((s) => html`<${SongRow} key=${s.id} song=${s}
-              assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${onOpenSong} />`)}
+              assignments=${assignments} partLabels=${partLabels} profileId=${profileId}
+              recordings=${recordings} onOpen=${onOpenSong} />`)}
           </div>
         </div>
       `)}
@@ -599,7 +624,7 @@ function AllSongs({ collections, collectionItems, songsById, assignments, partLa
 // v1 scope, agreed 2026-09-14: title + composer/artist only, not lyric text — song_lyrics isn't
 // even readable for most of the choir most of the time, so indexing it for search would mean
 // search results themselves leak which songs have released lyrics.
-function SearchResults({ songs, query, assignments, partLabels, profileId, onOpenSong }) {
+function SearchResults({ songs, query, assignments, partLabels, profileId, recordings, onOpenSong }) {
   const q = query.trim().toLowerCase();
   const results = q
     ? songs.filter((s) => s.title.toLowerCase().includes(q) || (s.composer || '').toLowerCase().includes(q))
@@ -611,7 +636,8 @@ function SearchResults({ songs, query, assignments, partLabels, profileId, onOpe
   return html`
     <div class="rep-song-list">
       ${results.map((s) => html`<${SongRow} key=${s.id} song=${s}
-        assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${onOpenSong} />`)}
+        assignments=${assignments} partLabels=${partLabels} profileId=${profileId}
+        recordings=${recordings} onOpen=${onOpenSong} />`)}
     </div>
   `;
 }
@@ -682,7 +708,8 @@ export function RepertoireTab({
       return html`
         <${CollectionDetail} collection=${collection} songsById=${songsById}
           collectionItems=${collectionItems} assignments=${assignments} partLabels=${partLabels}
-          profileId=${profile.id} onBack=${() => setDetail(null)} onOpenSong=${openSong} />
+          profileId=${profile.id} recordings=${recordings}
+          onBack=${() => setDetail(null)} onOpenSong=${openSong} />
         ${picker}
       `;
     }
@@ -693,7 +720,8 @@ export function RepertoireTab({
       return html`
         <${ConcertDetail} event=${event} songsById=${songsById}
           rehearsalSongs=${rehearsalSongs} assignments=${assignments} partLabels=${partLabels}
-          profileId=${profile.id} onBack=${() => setDetail(null)} onOpenSong=${openSong} />
+          profileId=${profile.id} recordings=${recordings}
+          onBack=${() => setDetail(null)} onOpenSong=${openSong} />
         ${picker}
       `;
     }
@@ -747,7 +775,8 @@ export function RepertoireTab({
 
       ${searchOpen
         ? html`<${SearchResults} songs=${songs} query=${query}
-            assignments=${assignments} partLabels=${partLabels} profileId=${profile.id} onOpenSong=${openSong} />`
+            assignments=${assignments} partLabels=${partLabels} profileId=${profile.id}
+            recordings=${recordings} onOpenSong=${openSong} />`
         : songs.length === 0
         ? html`<${EmptyState} title="No songs yet" body="Nothing's in the repertoire yet." />`
         : mode === 'browse'
@@ -757,7 +786,7 @@ export function RepertoireTab({
               onOpenConcert=${(e) => setDetail({ type: 'concert', id: e.id })} />`
           : html`<${AllSongs} collections=${collections} collectionItems=${collectionItems}
               songsById=${songsById} assignments=${assignments} partLabels=${partLabels}
-              profileId=${profile.id} onOpenSong=${openSong} />`}
+              profileId=${profile.id} recordings=${recordings} onOpenSong=${openSong} />`}
       ${picker}
     </div>
   `;

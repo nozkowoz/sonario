@@ -973,6 +973,19 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   padding: 14px 16px; font: inherit;
 }
 .rep-song-title { font-size: 14px; font-weight: 600; color: var(--fig-ink); }
+.rep-song-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* Per-part recording coverage tags (2026-09-15): grey until at least one recording exists for
+   that part (or one of its numbered subdivisions, e.g. an "Alto 1" recording lights up "Alto") —
+   purely derived from `recordings`, no new schema. Only the four common parts (Sop/Alto/Tenor/
+   Bari) get a tag; the six numbered subdivisions and Full choir don't get their own, matching how
+   Nina described this ("alto, sop etc.") rather than a 10-wide row on every song. */
+.rep-part-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.rep-part-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.2px;
+  padding: 2px 7px; border-radius: 8px; white-space: nowrap;
+  background: var(--fig-hair); color: var(--fig-mute);
+}
+.rep-part-tag-on { background: var(--purple); color: #fff; }
 /* The unmistakably-empty state: dashed border, muted text — never styled to look like a real
    assignment. */
 .part-pill-empty {
