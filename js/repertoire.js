@@ -314,7 +314,7 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
 
           <label>
             Audio file
-            <input type="file" accept="audio/*"
+            <input type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a,.wav"
               onChange=${pickFile} />
           </label>
           <p class="form-hint" style="margin:4px 0 14px;">MP3, M4A or WAV, up to 50MB.</p>
