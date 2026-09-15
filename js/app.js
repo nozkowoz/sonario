@@ -4,7 +4,7 @@ import {
   useSession, useMyMembership, displayNameOf, isSuper,
   useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useMemberDirectory, awayRangeFor,
   useSongs, useSongCollections, useSongCollectionItems, useSongAssignments, useRehearsalSongs,
-  usePartLabels, useRecordings,
+  usePartLabels, useRecordings, useSongLyrics,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
 import { LoadingState, ErrorState, BottomNav, Sheet, useActiveTab } from './shell.js';
@@ -90,6 +90,7 @@ function Main({ session, membership, profile }) {
   const { rehearsalSongs } = useRehearsalSongs();
   const { partLabels } = usePartLabels();
   const { recordings } = useRecordings();
+  const { songLyrics } = useSongLyrics();
 
   const termsById = Object.fromEntries(terms.map((t) => [t.id, t]));
   const openEvent = openEventId ? events.find((e) => e.id === openEventId) : null;
@@ -132,11 +133,11 @@ function Main({ session, membership, profile }) {
         ` : null}
         ${activeTab === 'repertoire' ? html`
           <${RepertoireTab}
-            profile=${profile} songs=${songs} songsLoading=${songsLoading}
+            profile=${profile} canManage=${canManage} songs=${songs} songsLoading=${songsLoading}
             collections=${collections} collectionItems=${collectionItems}
             assignments=${assignments} partLabels=${partLabels}
             events=${events} rehearsalSongs=${rehearsalSongs}
-            recordings=${recordings} directory=${directory}
+            recordings=${recordings} directory=${directory} songLyrics=${songLyrics}
           />
         ` : null}
         ${activeTab === 'more' ? html`

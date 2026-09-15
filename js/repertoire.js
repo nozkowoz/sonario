@@ -1,10 +1,11 @@
 import { html, useState, useMemo, formatEventDateLong } from './lib.js';
 import {
   displayNameOf, setSongPart, clearSongPart, uploadRecording, getRecordingUrl,
+  saveLyrics, hideLyrics,
 } from './store.js';
 import { LoadingState, EmptyState, Sheet } from './shell.js';
 import {
-  IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconUpload,
+  IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconUpload, IconSearch,
 } from './icons.js';
 
 // Repertoire. Stage 3 (2026-09-13) built the read-only screens against the final Figma design
@@ -167,14 +168,17 @@ function RecordingRow({ recording, uploaderName }) {
   `;
 }
 
-// The upload flow: (if no song was already chosen — the header shortcut) choose a song first ->
-// choose a part (all 11 labels, including Full choir — recordings allow it even though a person
-// can never BE Full choir on song_assignments) -> see what's already there for that part, so
-// uploading a fourth Alto recording is a deliberate choice, not an accident -> choose a file ->
-// an editable, filename-derived title -> upload.
-function AddRecordingSheet({ song: initialSong, songs, partLabels, recordings, profile, directory, onDone, onClose }) {
-  const [step, setStep] = useState(initialSong ? 'part' : 'song'); // 'song' | 'part' | 'upload' | 'success'
-  const [song, setSong] = useState(initialSong || null);
+// The upload flow: choose a part (all 11 labels, including Full choir — recordings allow it even
+// though a person can never BE Full choir on song_assignments) -> see what's already there for
+// that part, so uploading a fourth Alto recording is a deliberate choice, not an accident ->
+// choose a file -> an editable, filename-derived title -> upload.
+//
+// Always opened for a fixed song (Song Detail -> Recordings -> + Add a recording) — Stage 2 of
+// the Song Detail redesign moved the header's own upload shortcut to Search instead, so the
+// "which song?" first step this used to have when opened songless no longer has a caller. Removed
+// rather than kept dead, per the same reasoning as everywhere else unused code gets cut here.
+function AddRecordingSheet({ song, partLabels, recordings, profile, directory, onDone, onClose }) {
+  const [step, setStep] = useState('part'); // 'part' | 'upload' | 'success'
   const [partLabel, setPartLabel] = useState(null);
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -184,12 +188,11 @@ function AddRecordingSheet({ song: initialSong, songs, partLabels, recordings, p
   const [uploaded, setUploaded] = useState(null);
 
   const partsSorted = useMemo(() => [...partLabels].sort((a, b) => a.sort_order - b.sort_order), [partLabels]);
-  const songRecordings = song ? recordings.filter((r) => r.song_id === song.id) : [];
+  const songRecordings = recordings.filter((r) => r.song_id === song.id);
   const existingForPart = partLabel
     ? songRecordings.filter((r) => r.part_label === partLabel).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
     : [];
 
-  const pickSong = (s) => { setSong(s); setStep('part'); };
   const pickPart = (key) => { setPartLabel(key); setStep('upload'); };
 
   const pickFile = async (e) => {
@@ -223,28 +226,13 @@ function AddRecordingSheet({ song: initialSong, songs, partLabels, recordings, p
 
   const uploadAnother = () => {
     setFile(null); setTitle(''); setDuration(null); setUploaded(null); setPartLabel(null);
-    // Opened from a specific song's detail: stay on that song. Opened from the Repertoire header
-    // shortcut: back to picking a song, since there was never one song this flow was "about".
-    setStep(initialSong ? 'part' : 'song');
-    if (!initialSong) setSong(null);
+    setStep('part');
   };
-
-  const songsSorted = useMemo(() => [...(songs || [])].sort((a, b) => a.title.localeCompare(b.title)), [songs]);
 
   return html`
     <${Sheet} label="Add a recording" onClose=${onClose}>
       <h3 class="form-heading">Add a recording</h3>
-      ${song ? html`<p class="form-hint">${song.title}</p>` : null}
-
-      ${step === 'song' ? html`
-        <div class="rep-song-list" style="margin-top:12px;">
-          ${songsSorted.map((s) => html`
-            <button key=${s.id} class="rep-song-row" onClick=${() => pickSong(s)}>
-              <span class="rep-song-title">${s.title}</span>
-            </button>
-          `)}
-        </div>
-      ` : null}
+      <p class="form-hint">${song.title}</p>
 
       ${step === 'part' ? html`
         <div class="part-picker-list" style="margin-top:12px;">
@@ -304,7 +292,7 @@ function AddRecordingSheet({ song: initialSong, songs, partLabels, recordings, p
             Your ${partLabelText(uploaded.part_label, partLabels)} recording has been added to ${song.title}.
           </p>
           <div class="form-actions" style="margin-top:10px;">
-            <button class="btn btn-primary" onClick=${() => onDone(song.id)}>View in song</button>
+            <button class="btn btn-primary" onClick=${onDone}>Done</button>
             <button class="btn btn-outline" onClick=${uploadAnother}>Upload another</button>
           </div>
         </div>
@@ -313,11 +301,60 @@ function AddRecordingSheet({ song: initialSong, songs, partLabels, recordings, p
   `;
 }
 
+// --- Lyrics tab (Stage 2 of the Song Detail redesign, migration 0011) -------
+// Member view: nothing until released_at is set, then the plain text. Super view: always the
+// editable draft (released or not — a super can still fix a typo in already-released lyrics),
+// plus Release/Hide. updated_by/released_by are never sent from here — the server trigger derives
+// both, so there's nothing for this component to get right or wrong about who gets credited.
+function LyricsTab({ song, lyricsRow, canManage, onSave, onRelease, onHide }) {
+  const [text, setText] = useState(lyricsRow?.lyrics || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const released = !!lyricsRow?.released_at;
+
+  const run = async (action) => {
+    setBusy(true); setError(null); setSaved(false);
+    const { error: err } = await action();
+    setBusy(false);
+    if (err) { setError(err.message); return; }
+    setSaved(true);
+  };
+
+  if (!canManage) {
+    if (!released) {
+      return html`<${EmptyState} title="Lyrics not released yet" body=${`${song.title}'s lyrics haven't been released — check back closer to when it's being sung.`} />`;
+    }
+    return html`<p class="lyrics-body">${lyricsRow.lyrics}</p>`;
+  }
+
+  return html`
+    <div>
+      <p class="form-hint" style="margin:0 0 10px;">
+        ${released ? `Released ${formatShortDate(lyricsRow.released_at)} — visible to every member.` : 'Not released — only supers can see this.'}
+      </p>
+      <textarea rows="14" value=${text} placeholder="Paste or type the lyrics…"
+        onInput=${(e) => { setText(e.target.value); setSaved(false); }} />
+      ${error ? html`<p class="absence-error">${error}</p>` : null}
+      ${saved ? html`<p class="form-saved">Saved.</p>` : null}
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="btn btn-outline" disabled=${busy} onClick=${() => run(() => onSave(text))}>Save</button>
+        ${released
+          ? html`<button class="btn btn-outline" disabled=${busy} onClick=${() => run(onHide)}>Hide lyrics</button>`
+          : html`<button class="btn btn-primary" disabled=${busy} onClick=${() => run(() => onRelease(text))}>Release lyrics</button>`}
+      </div>
+    </div>
+  `;
+}
+
 // --- Song Detail — the canonical screen for a song, reached from anywhere ---
+// Overview / Lyrics / Recordings tabs, per the approved Song Detail redesign (2026-09-14).
 function SongDetail({
   song, collections, collectionItems, assignments, partLabels, recordings, profile, directory,
+  canManage, lyricsRow, onSaveLyrics, onReleaseLyrics, onHideLyrics,
   onBack, onEditPart,
 }) {
+  const [panel, setPanel] = useState('overview'); // 'overview' | 'lyrics' | 'recordings'
   const [addOpen, setAddOpen] = useState(false);
 
   const myCollections = collections.filter((c) =>
@@ -347,41 +384,58 @@ function SongDetail({
   return html`
     <div class="tab-content">
       <${DetailHead} title=${song.title} onBack=${onBack} />
-      ${song.composer ? html`<p class="form-hint" style="margin:-10px 0 12px;">${song.composer}</p>` : null}
-      ${myCollections.length > 0 ? html`
-        <div style="margin-bottom:16px;">
-          ${myCollections.map((c) => html`<span key=${c.id} class="event-type-badge" style="margin-right:6px;">${c.name}</span>`)}
+
+      <div class="song-detail-tabs">
+        <button class=${`tab-btn ${panel === 'overview' ? 'active' : ''}`} onClick=${() => setPanel('overview')}>Overview</button>
+        <button class=${`tab-btn ${panel === 'lyrics' ? 'active' : ''}`} onClick=${() => setPanel('lyrics')}>Lyrics</button>
+        <button class=${`tab-btn ${panel === 'recordings' ? 'active' : ''}`} onClick=${() => setPanel('recordings')}>Recordings</button>
+      </div>
+
+      ${panel === 'overview' ? html`
+        <div>
+          ${song.composer ? html`<p class="form-hint" style="margin:0 0 12px;">${song.composer}</p>` : null}
+          ${myCollections.length > 0 ? html`
+            <div style="margin-bottom:16px;">
+              ${myCollections.map((c) => html`<span key=${c.id} class="event-type-badge" style="margin-right:6px;">${c.name}</span>`)}
+            </div>
+          ` : null}
+          <button class="card rep-song-row" onClick=${() => onEditPart(song)}>
+            <span class="rep-song-title">Your part</span>
+            <${PartPill} song=${song} assignments=${assignments} partLabels=${partLabels} profileId=${profile.id} />
+          </button>
         </div>
       ` : null}
 
-      <button class="card rep-song-row" style="margin-bottom:14px;" onClick=${() => onEditPart(song)}>
-        <span class="rep-song-title">Your part</span>
-        <${PartPill} song=${song} assignments=${assignments} partLabels=${partLabels} profileId=${profile.id} />
-      </button>
+      ${panel === 'lyrics' ? html`<${LyricsTab}
+        song=${song} lyricsRow=${lyricsRow} canManage=${canManage}
+        onSave=${onSaveLyrics} onRelease=${onReleaseLyrics} onHide=${onHideLyrics} />` : null}
 
-      <button class="btn btn-primary" style="width:100%;margin-bottom:22px;" onClick=${() => setAddOpen(true)}>
-        <${IconUpload} size=${16} /> Add a recording
-      </button>
+      ${panel === 'recordings' ? html`
+        <div>
+          <button class="btn btn-primary" style="width:100%;margin-bottom:22px;" onClick=${() => setAddOpen(true)}>
+            <${IconUpload} size=${16} /> Add a recording
+          </button>
 
-      <p class="eyebrow eyebrow-tight">Recordings</p>
-      ${groups.length === 0
-        ? html`<${EmptyState} title="No recordings yet" body="Nobody's uploaded a recording for this song yet." />`
-        : groups.map(({ part, recordings: rs }) => html`
-            <div key=${part.key} class="rep-recording-group">
-              <button class="rep-group-head" onClick=${() => toggle(part.key)}>
-                <span>${part.label} (${rs.length})</span>
-                <span class=${expanded.has(part.key) ? 'rep-group-chevron rep-group-chevron-open' : 'rep-group-chevron'}>
-                  <${IconChevron} size=${14} />
-                </span>
-              </button>
-              ${expanded.has(part.key) ? html`
-                <div class="rep-song-list">
-                  ${rs.map((r) => html`<${RecordingRow} key=${r.id} recording=${r}
-                    uploaderName=${r.uploaded_by === profile.id ? 'You' : displayNameOf(directory[r.uploaded_by])} />`)}
+          ${groups.length === 0
+            ? html`<${EmptyState} title="No recordings yet" body="Nobody's uploaded a recording for this song yet." />`
+            : groups.map(({ part, recordings: rs }) => html`
+                <div key=${part.key} class="rep-recording-group">
+                  <button class="rep-group-head" onClick=${() => toggle(part.key)}>
+                    <span>${part.label} (${rs.length})</span>
+                    <span class=${expanded.has(part.key) ? 'rep-group-chevron rep-group-chevron-open' : 'rep-group-chevron'}>
+                      <${IconChevron} size=${14} />
+                    </span>
+                  </button>
+                  ${expanded.has(part.key) ? html`
+                    <div class="rep-song-list">
+                      ${rs.map((r) => html`<${RecordingRow} key=${r.id} recording=${r}
+                        uploaderName=${r.uploaded_by === profile.id ? 'You' : displayNameOf(directory[r.uploaded_by])} />`)}
+                    </div>
+                  ` : null}
                 </div>
-              ` : null}
-            </div>
-          `)}
+              `)}
+        </div>
+      ` : null}
 
       ${addOpen ? html`<${AddRecordingSheet}
         song=${song} partLabels=${partLabels} recordings=${recordings}
@@ -541,13 +595,36 @@ function AllSongs({ collections, collectionItems, songsById, assignments, partLa
   `;
 }
 
+// --- Search (Stage 2 of the Song Detail redesign) ---------------------------
+// v1 scope, agreed 2026-09-14: title + composer/artist only, not lyric text — song_lyrics isn't
+// even readable for most of the choir most of the time, so indexing it for search would mean
+// search results themselves leak which songs have released lyrics.
+function SearchResults({ songs, query, assignments, partLabels, profileId, onOpenSong }) {
+  const q = query.trim().toLowerCase();
+  const results = q
+    ? songs.filter((s) => s.title.toLowerCase().includes(q) || (s.composer || '').toLowerCase().includes(q))
+    : songs;
+
+  if (results.length === 0) {
+    return html`<${EmptyState} title="No songs found" body=${`Nothing matches "${query}".`} />`;
+  }
+  return html`
+    <div class="rep-song-list">
+      ${results.map((s) => html`<${SongRow} key=${s.id} song=${s}
+        assignments=${assignments} partLabels=${partLabels} profileId=${profileId} onOpen=${onOpenSong} />`)}
+    </div>
+  `;
+}
+
 // --- The tab -----------------------------------------------------------------
 export function RepertoireTab({
-  profile, songs, songsLoading, collections, collectionItems, assignments, partLabels,
-  events, rehearsalSongs, recordings, directory,
+  profile, canManage, songs, songsLoading, collections, collectionItems, assignments, partLabels,
+  events, rehearsalSongs, recordings, directory, songLyrics,
 }) {
   const [mode, setMode] = useState('browse'); // 'browse' | 'all'
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const closeSearch = () => { setSearchOpen(false); setQuery(''); };
   const [detail, setDetail] = useState(null); // { type: 'collection' | 'concert' | 'song', id }
   const openSong = (song) => setDetail({ type: 'song', id: song.id });
   // One picker for the whole tab, same reasoning as app.js's one event Sheet: it works no matter
@@ -624,10 +701,15 @@ export function RepertoireTab({
   if (detail?.type === 'song') {
     const song = songsById[detail.id];
     if (song) {
+      const lyricsRow = songLyrics.find((l) => l.song_id === song.id) || null;
       return html`
         <${SongDetail} song=${song} collections=${collections} collectionItems=${collectionItems}
           assignments=${assignments} partLabels=${partLabels} recordings=${recordings}
           profile=${profile} directory=${directory}
+          canManage=${canManage} lyricsRow=${lyricsRow}
+          onSaveLyrics=${(text) => saveLyrics({ songId: song.id, lyrics: text })}
+          onReleaseLyrics=${(text) => saveLyrics({ songId: song.id, lyrics: text, release: true })}
+          onHideLyrics=${() => hideLyrics(lyricsRow.id)}
           onBack=${() => setDetail(null)} onEditPart=${openPicker} />
         ${picker}
       `;
@@ -638,18 +720,35 @@ export function RepertoireTab({
     <div class="tab-content">
       <div class="cal-top">
         <div class="cal-top-head">
-          <h2 class="cal-title">Repertoire</h2>
-          <button class="btn btn-on-purple btn-sm" onClick=${() => setUploadOpen(true)}>+ Upload recording</button>
+          ${searchOpen ? html`
+            <div class="rep-search-row">
+              <input class="rep-search-input" type="search" autofocus value=${query}
+                placeholder="Search by title or composer" onInput=${(e) => setQuery(e.target.value)} />
+              <button class="icon-btn-on-purple" aria-label="Close search" onClick=${closeSearch}>
+                <span style="font-size:20px;line-height:1;">×</span>
+              </button>
+            </div>
+          ` : html`
+            <h2 class="cal-title">Repertoire</h2>
+            <button class="icon-btn-on-purple" aria-label="Search repertoire" onClick=${() => setSearchOpen(true)}>
+              <${IconSearch} size=${20} />
+            </button>
+          `}
         </div>
-        <div class="rep-toggle">
-          <button class=${`rep-toggle-btn ${mode === 'browse' ? 'rep-toggle-on' : ''}`}
-            onClick=${() => setMode('browse')}>Browse</button>
-          <button class=${`rep-toggle-btn ${mode === 'all' ? 'rep-toggle-on' : ''}`}
-            onClick=${() => setMode('all')}>All Songs</button>
-        </div>
+        ${!searchOpen ? html`
+          <div class="rep-toggle">
+            <button class=${`rep-toggle-btn ${mode === 'browse' ? 'rep-toggle-on' : ''}`}
+              onClick=${() => setMode('browse')}>Browse</button>
+            <button class=${`rep-toggle-btn ${mode === 'all' ? 'rep-toggle-on' : ''}`}
+              onClick=${() => setMode('all')}>All Songs</button>
+          </div>
+        ` : null}
       </div>
 
-      ${songs.length === 0
+      ${searchOpen
+        ? html`<${SearchResults} songs=${songs} query=${query}
+            assignments=${assignments} partLabels=${partLabels} profileId=${profile.id} onOpenSong=${openSong} />`
+        : songs.length === 0
         ? html`<${EmptyState} title="No songs yet" body="Nothing's in the repertoire yet." />`
         : mode === 'browse'
           ? html`<${Browse} collections=${collections} collectionItems=${collectionItems}
@@ -660,11 +759,6 @@ export function RepertoireTab({
               songsById=${songsById} assignments=${assignments} partLabels=${partLabels}
               profileId=${profile.id} onOpenSong=${openSong} />`}
       ${picker}
-      ${uploadOpen ? html`<${AddRecordingSheet}
-        songs=${songs} partLabels=${partLabels} recordings=${recordings}
-        profile=${profile} directory=${directory}
-        onDone=${(songId) => { setUploadOpen(false); openSong({ id: songId }); }}
-        onClose=${() => setUploadOpen(false)} />` : null}
     </div>
   `;
 }

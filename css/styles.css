@@ -928,6 +928,29 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 }
 .rep-toggle-on { background: #fff; color: var(--purple); border-color: #fff; }
 
+/* Repertoire search (Stage 2 of the Song Detail redesign): the header's search toggle/close, and
+   the inline search field that replaces the title row while it's open. Icon button styling
+   matches .week-nav's treatment of an icon on this same purple hero, just under a shared name
+   since it's no longer specific to week navigation. */
+.icon-btn-on-purple {
+  border: none; background: none; cursor: pointer; padding: 6px; border-radius: 99px;
+  color: rgba(255, 255, 255, 0.9); display: grid; place-items: center; flex-shrink: 0;
+}
+.icon-btn-on-purple:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.rep-search-row { display: flex; align-items: center; gap: 8px; }
+.rep-search-input {
+  flex: 1; border: none; border-radius: 99px; padding: 8px 16px; font-size: 14px;
+  background: #fff; color: var(--ink);
+}
+.rep-search-input:focus { outline: 2px solid rgba(255, 255, 255, 0.6); }
+
+/* Song Detail's own Overview/Lyrics/Recordings sub-tabs — reuses the existing (previously
+   unused) .tab-btn underline style rather than the purple-hero .rep-toggle, since this screen has
+   a plain white background. */
+.song-detail-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+
+.lyrics-body { white-space: pre-wrap; font-size: 15px; line-height: 1.6; margin: 0; }
+
 .rep-collection-list { display: flex; flex-direction: column; gap: 10px; }
 .rep-collection-card {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;

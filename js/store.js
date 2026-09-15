@@ -261,6 +261,39 @@ export async function deleteRecording({ id, storagePath }) {
   return supabase.from('recordings').delete().eq('id', id).select();
 }
 
+// Song lyrics (Stage 2 of the Song Detail redesign, migration 0011). Deliberately not in
+// Realtime (agreed 2026-09-14) — this still uses the shared useLiveTable hook for consistency
+// with every other table here, but the subscription simply never receives anything for this one
+// since the table isn't in the supabase_realtime publication.
+//
+// One row per song: song_id has a plain (non-partial) unique index, so upsert can target it
+// directly — unlike setSongPart below, there's no partial-index workaround needed here.
+export function useSongLyrics() {
+  const { rows, loading } = useLiveTable('song_lyrics');
+  return { songLyrics: rows, loading };
+}
+
+// updated_by/released_by are never sent — migration 0011's enforce_lyrics_audit() trigger
+// derives both from auth.uid() server-side and ignores whatever the client sends, so there's no
+// point pretending this code chooses them.
+//
+// `release: true` sets released_at in the same call as saving the text, so a super can release
+// straight from an unsaved edit without a second round trip. Omitting `release` leaves whatever
+// released_at the row already has untouched (upsert only overwrites columns present in the
+// payload) — that's what a plain "Save" while already released, or while still unreleased, does.
+export async function saveLyrics({ songId, lyrics, release }) {
+  const payload = { song_id: songId, lyrics };
+  if (release) payload.released_at = new Date().toISOString();
+  return supabase.from('song_lyrics').upsert(payload, { onConflict: 'song_id' }).select();
+}
+
+// Hide lyrics: clears released_at only, never touches the text. A separate function rather than
+// saveLyrics({..., release: false}) so hiding never risks overwriting lyrics text with whatever
+// happens to be sitting in a stale textarea.
+export async function hideLyrics(id) {
+  return supabase.from('song_lyrics').update({ released_at: null }).eq('id', id).select();
+}
+
 export function usePartLabels() {
   const { rows, loading } = useLiveTable('part_labels', {
     orderFn: (a, b) => a.sort_order - b.sort_order,

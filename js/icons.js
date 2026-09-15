@@ -196,3 +196,9 @@ export const IconUpload = ({ size }) => svg(html`
   <path d="M12 16V4M7 9l5-5 5 5" />
   <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
 `, { size });
+
+// Repertoire search (Stage 2 of the Song Detail redesign): replaces the header's upload shortcut.
+export const IconSearch = ({ size }) => svg(html`
+  <circle cx="10.5" cy="10.5" r="6.5" />
+  <path d="M20 20l-5-5" />
+`, { size });
