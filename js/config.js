@@ -22,4 +22,4 @@ export const SUPER_PASSPHRASE = 'SUPERPURPLEHEART';
 
 // Shown in the footer so people can check they're on the latest build — useful given the PWA
 // caching quirks (see sw.js). Bump this by one on every deploy that ships a real change.
-export const APP_VERSION = 'v42-public-holidays-checkin-backfill-edit';
+export const APP_VERSION = 'v43-voice-memos-upload-fix';

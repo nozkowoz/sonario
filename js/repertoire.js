@@ -159,7 +159,8 @@ function titleFromFilename(filename) {
   return filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ').trim();
 }
 
-const ALLOWED_MIME = ['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/wav'];
+const ALLOWED_MIME = ['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/wav', 'audio/x-wav'];
+const ALLOWED_EXT = ['.mp3', '.m4a', '.wav'];
 const MAX_BYTES = 50 * 1024 * 1024;
 
 // Reads a file's duration via a throwaway <audio> element rather than a library — best effort
@@ -243,7 +244,11 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
     const f = e.target.files?.[0];
     if (!f) return;
     setError(null);
-    if (!ALLOWED_MIME.includes(f.type)) {
+    // iOS (Voice Memos exports in particular) sometimes hands back an empty or unrecognised MIME
+    // type for an otherwise perfectly valid file — fall back to the extension rather than reject
+    // a real recording just because the browser didn't label it the way we expected.
+    const hasAllowedExt = ALLOWED_EXT.some((ext) => f.name.toLowerCase().endsWith(ext));
+    if (!ALLOWED_MIME.includes(f.type) && !hasAllowedExt) {
       setError('That file type isn\'t supported — use MP3, M4A or WAV.');
       return;
     }
@@ -309,7 +314,7 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
 
           <label>
             Audio file
-            <input type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a,.wav"
+            <input type="file" accept="audio/*"
               onChange=${pickFile} />
           </label>
           <p class="form-hint" style="margin:4px 0 14px;">MP3, M4A or WAV, up to 50MB.</p>
