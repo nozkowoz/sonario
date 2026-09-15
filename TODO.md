@@ -26,6 +26,10 @@ checkpoint-complete — most of it is superseded by the rebuild brief.
 
 ## Genuinely still separate, not part of the rebuild brief
 
+- **Recording play button doesn't toggle play/pause.** Nina, 2026-09-16: in a song's Recordings tab, tapping the purple play button loads and starts the recording once (`RecordingRow` in `js/repertoire.js` fetches a signed URL then renders a native `<audio controls autoplay>`), but the button itself isn't wired to that audio element afterwards — pause/resume only works from the native controls underneath. Needs the button to reflect and control real play/pause state, not just "start once".
+- **What do Android users see when uploading a recording?** Nina, 2026-09-16: the Voice Memos fix (`accept="audio/*"`) was iOS-specific reasoning. Android has no single equivalent app the way iOS has Voice Memos — its recordings normally surface through the standard Files/media picker instead, so Android users likely CAN still upload fine, but this hasn't been verified on a real Android device. Worth a quick real-device check before assuming parity.
+- **Let people submit app feedback.** Nina, 2026-09-16 — no shape decided yet (in-app form vs. a link out somewhere).
+
 - Swap the placeholder "S" icon for something more Sonario (icons/*) — do this whenever, unrelated to the rebuild
 - A "next rehearsal" summary if Home's design in Checkpoint 5 doesn't already cover it
 - **Barry → Bari still shows live (e.g. Practice Mode badge).** Nina, 2026-09-16 flagged this — NOT a code bug. Migration `0010_bari_label.sql` (the one-line `update part_labels set label = 'Bari' where key = 'barry'`) was written and committed but never pasted into the live Supabase SQL editor. Nina just needs to run it — see the migration file, or ask Claude to paste it again.
