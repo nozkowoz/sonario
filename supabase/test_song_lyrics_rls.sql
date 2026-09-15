@@ -26,9 +26,9 @@ declare
   v_released_by  uuid;
   v_released_at  timestamptz;
 begin
-  select id into v_song_id from sonario.songs where title = 'Can We Talk' limit 1;
+  select id into v_song_id from sonario.songs order by created_at limit 1;
   if v_song_id is null then
-    raise exception 'FIXTURE MISSING: song "Can We Talk" not found — point SONG_TITLE at a real song before running this';
+    raise exception 'FIXTURE MISSING: sonario.songs has no rows at all — seed real_repertoire_2026.sql first';
   end if;
 
   -- --- fixture cleanup, as super (in case of a previous partial run) --------
