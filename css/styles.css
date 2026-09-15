@@ -951,6 +951,65 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 
 .lyrics-body { white-space: pre-wrap; font-size: 15px; line-height: 1.6; margin: 0; }
 
+/* --- Practice Mode, Stage 1 (2026-09-15) ------------------------------------ */
+.practice-entry-card {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  border: none; cursor: pointer; margin-bottom: 20px; padding: 16px;
+  background: linear-gradient(180deg, #3b2a72 0%, #2b1f57 100%); border-radius: var(--radius-lg);
+  color: #fff;
+}
+.practice-entry-icon {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16); display: grid; place-items: center;
+}
+.practice-entry-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.practice-entry-title { font-size: 15px; font-weight: 800; }
+.practice-entry-sub { font-size: 12.5px; font-weight: 500; color: rgba(255, 255, 255, 0.75); line-height: 1.4; }
+
+/* Setup screens (song select, mode/parts) share the purple-hero header + sticky footer shape. */
+.practice-top { padding-bottom: 18px; }
+.practice-back-link {
+  display: flex; align-items: center; gap: 4px; border: none; background: none; cursor: pointer;
+  color: rgba(255, 255, 255, 0.75); font-size: 13px; font-weight: 600; padding: 0 0 8px; margin: 0;
+}
+.practice-back-link:hover { color: #fff; }
+.practice-body { padding-bottom: 96px; }
+.practice-group { margin-bottom: 20px; }
+.practice-select-list { display: flex; flex-direction: column; gap: 8px; }
+.practice-select-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  border: 1.5px solid var(--border); background: #fff; border-radius: var(--radius-lg);
+  padding: 13px 14px; cursor: pointer; font: inherit;
+}
+.practice-select-row-on { border-color: var(--purple); background: var(--purple-light); }
+.practice-checkbox {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--border);
+  background: #fff; display: grid; place-items: center; color: #fff;
+}
+.practice-checkbox-on { background: var(--purple); border-color: var(--purple); }
+.practice-sticky-footer {
+  position: fixed; left: 0; right: 0; bottom: var(--bottom-nav-h, 0px); z-index: 6;
+  max-width: 780px; margin: 0 auto; padding: 12px var(--main-pad) calc(12px + env(safe-area-inset-bottom, 0px));
+  background: #fff; border-top: 1px solid var(--border);
+}
+.practice-mode-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.practice-mode-radio {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+  border: 1.5px solid var(--border); background: #fff; border-radius: var(--radius-lg);
+  padding: 13px 14px; cursor: pointer; font: inherit;
+}
+.practice-mode-radio-on { border-color: var(--purple); background: var(--purple-light); }
+.practice-radio-dot {
+  flex-shrink: 0; margin-top: 2px; width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid var(--border); background: #fff;
+}
+.practice-radio-dot-on {
+  border-color: var(--purple); border-width: 5px;
+}
+.practice-mode-text { display: flex; flex-direction: column; gap: 2px; }
+.practice-mode-title { font-size: 14px; font-weight: 700; color: var(--fig-ink); }
+.practice-remaining { font-size: 12px; font-weight: 700; color: var(--error); }
+
 .rep-collection-list { display: flex; flex-direction: column; gap: 10px; }
 .rep-collection-card {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;

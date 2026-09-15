@@ -7,6 +7,7 @@ import { LoadingState, EmptyState, Sheet } from './shell.js';
 import {
   IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconUpload, IconSearch,
 } from './icons.js';
+import { PracticeEntryCard, PracticeFlow } from './practice.js';
 
 // Repertoire. Stage 3 (2026-09-13) built the read-only screens against the final Figma design
 // (Browse/All Songs toggle, Concert Playlists, Your Library) and the real
@@ -23,14 +24,32 @@ import {
 // One icon simplification from the Figma: semester collections reuse IconNote2 (already in the
 // bottom nav) rather than a separate waveform icon added just for this one card.
 
-function partLabelText(key, partLabels) {
+// Exported: practice.js's "Your parts" list shows the resolved part's label the same way.
+export function partLabelText(key, partLabels) {
   return partLabels.find((p) => p.key === key)?.label || key;
 }
 
-function myAssignment(assignments, songId, profileId) {
+// Exported: reused by practice.js's per-song part chooser, which writes through this exact same
+// function rather than inventing a second "practice session part" concept.
+export function myAssignment(assignments, songId, profileId) {
   return assignments.find(
     (a) => a.song_id === songId && a.profile_id === profileId && !a.archived_at,
   );
+}
+
+// Exported: the same collection grouping AllSongs uses, reused by practice.js's song-selection
+// screen so both screens group/order songs identically rather than keeping two copies in sync.
+export function groupSongsByCollection(collections, collectionItems, songsById) {
+  return collections
+    .map((c) => ({
+      collection: c,
+      songs: collectionItems
+        .filter((i) => i.collection_id === c.id)
+        .sort((a, b) => a.position - b.position)
+        .map((i) => songsById[i.song_id])
+        .filter(Boolean),
+    }))
+    .filter((g) => g.songs.length > 0);
 }
 
 // A song row's trailing pill: the member's own saved part, or an unmistakably-empty "Set part" —
@@ -78,7 +97,9 @@ function SongRow({ song, assignments, partLabels, profileId, recordings, onOpen 
 
 // --- The part picker sheet --------------------------------------------------
 // Tap-to-select-and-close, no separate Save button — matches the Figma's own picker flow exactly.
-function PartPickerSheet({ song, currentPartKey, partLabels, saving, error, onPick, onClear, onClose }) {
+// Exported: practice.js's "Choose" step reuses this exact sheet, so a part picked during practice
+// setup writes through the same setSongPart/clearSongPart path as everywhere else.
+export function PartPickerSheet({ song, currentPartKey, partLabels, saving, error, onPick, onClear, onClose }) {
   const [showMore, setShowMore] = useState(false);
   const assignable = partLabels.filter((p) => p.assignable);
   const common = assignable.filter((p) => p.common);
@@ -587,16 +608,7 @@ function Browse({ collections, collectionItems, events, rehearsalSongs, onOpenCo
 
 // --- All Songs: flat list grouped by collection -----------------------------
 function AllSongs({ collections, collectionItems, songsById, assignments, partLabels, profileId, recordings, onOpenSong }) {
-  const groups = collections
-    .map((c) => ({
-      collection: c,
-      songs: collectionItems
-        .filter((i) => i.collection_id === c.id)
-        .sort((a, b) => a.position - b.position)
-        .map((i) => songsById[i.song_id])
-        .filter(Boolean),
-    }))
-    .filter((g) => g.songs.length > 0);
+  const groups = groupSongsByCollection(collections, collectionItems, songsById);
 
   if (groups.length === 0) {
     return html`<${EmptyState} title="No songs yet" body="Nothing's in the repertoire yet." />`;
@@ -648,6 +660,7 @@ export function RepertoireTab({
   events, rehearsalSongs, recordings, directory, songLyrics,
 }) {
   const [mode, setMode] = useState('browse'); // 'browse' | 'all'
+  const [practiceOpen, setPracticeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const closeSearch = () => { setSearchOpen(false); setQuery(''); };
@@ -694,6 +707,13 @@ export function RepertoireTab({
 
   if (songsLoading) {
     return html`<div class="tab-content"><${LoadingState} label="Loading repertoire…" /></div>`;
+  }
+
+  if (practiceOpen) {
+    return html`<${PracticeFlow}
+      songs=${songs} collections=${collections} collectionItems=${collectionItems}
+      assignments=${assignments} partLabels=${partLabels} recordings=${recordings}
+      profile=${profile} onClose=${() => setPracticeOpen(false)} />`;
   }
 
   const picker = editingSong ? html`<${PartPickerSheet}
@@ -772,6 +792,8 @@ export function RepertoireTab({
           </div>
         ` : null}
       </div>
+
+      ${!searchOpen ? html`<${PracticeEntryCard} onOpen=${() => setPracticeOpen(true)} />` : null}
 
       ${searchOpen
         ? html`<${SearchResults} songs=${songs} query=${query}
