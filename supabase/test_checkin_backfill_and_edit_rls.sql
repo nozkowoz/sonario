@@ -144,11 +144,15 @@ begin
 
   -- =========================================================================
   -- Fixture for checks 8-10: a fresh backfill row to test the delete policy
-  -- against, independent of the live-row fixture above.
+  -- against, independent of the live-row fixture above. Cleanup runs as
+  -- postgres (bypassing RLS), not impersonated as super — there is
+  -- deliberately no policy letting a super delete another member's real
+  -- live check-in (that's what attendance_corrections is for), so an
+  -- impersonated delete here would silently affect 0 rows and collide with
+  -- the insert below on the unique (rehearsal_id, profile_id) constraint.
   -- =========================================================================
   execute 'reset role';
-  perform set_config('request.jwt.claims', json_build_object('sub', v_super::text, 'role', 'authenticated')::text, true);
-  execute 'set local role authenticated';
+  perform set_config('request.jwt.claims', 'null', true);
   delete from sonario.checkins where id = v_checkin_id; -- the live-row fixture, done with it
   insert into sonario.checkins (rehearsal_id, profile_id, source)
     values (v_past_rehearsal, v_member1, 'super_backfill')
