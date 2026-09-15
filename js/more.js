@@ -34,11 +34,11 @@ const SECTIONS = [
   { key: 'about', label: 'About Sonario', body: 'Version and how this app works' },
 ];
 
-export function MoreTab({ profile, terms, view, setView, onNavigate, onSignOut }) {
+export function MoreTab({ profile, terms, view, setView, onNavigate, onSignOut, onProfileSaved }) {
   const term = currentTermOf(terms);
 
   if (view === 'profile') {
-    return html`<${MyProfile} profile=${profile} onBack=${() => setView(null)} />`;
+    return html`<${MyProfile} profile=${profile} onBack=${() => setView(null)} onProfileSaved=${onProfileSaved} />`;
   }
   if (view === 'about') {
     return html`<${About} term=${term} onBack=${() => setView(null)} />`;
@@ -108,7 +108,7 @@ function MoreHead({ title, onBack }) {
 // Google returned. The mockup's "contact info" has no column behind it and one was NOT added —
 // adding schema to make a mockup render is exactly what Nina asked not to happen.
 // ---------------------------------------------------------------------------
-function MyProfile({ profile, onBack }) {
+function MyProfile({ profile, onBack, onProfileSaved }) {
   const [name, setName] = useState(displayNameOf(profile));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -130,6 +130,9 @@ function MyProfile({ profile, onBack }) {
       setError("That didn't save — reload and try again.");
       return;
     }
+    // profiles has no realtime subscription at all (see useMyMembership in store.js) — without
+    // this the new name wouldn't show anywhere else in the app until a full reload. 2026-09-15.
+    onProfileSaved?.(data[0]);
     setSaved(true);
   };
 

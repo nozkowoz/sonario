@@ -103,7 +103,7 @@ function termStats({ term, events, checkins, profileId }) {
 }
 
 export function HomeTab({ profile, events, loading, terms, absences, checkins, onNavigate,
-  onOpenEvent }) {
+  onOpenEvent, onCheckinSaved, onCheckinRemoved, onAbsenceSaved, onAbsenceRemoved }) {
   const next = useMemo(() => nextEvent(events), [events]);
   const term = useMemo(() => currentTermOf(terms), [terms]);
   const myAbsence = useMemo(
@@ -172,12 +172,13 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
                 ` : null}
                 <${AttendanceStatus} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence} />
                 <${CheckInPanel} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence}
-                  profileId=${profile.id} />
+                  profileId=${profile.id} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved} />
               </div>
             </div>
             ${myCheckin ? null : html`
               <div class="next-card-foot">
-                <${AbsenceToggle} event=${next} myAbsence=${myAbsence} profileId=${profile.id} />
+                <${AbsenceToggle} event=${next} myAbsence=${myAbsence} profileId=${profile.id}
+                  onAbsenceSaved=${onAbsenceSaved} onAbsenceRemoved=${onAbsenceRemoved} />
               </div>
             `}
           </div>

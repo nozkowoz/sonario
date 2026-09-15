@@ -91,7 +91,7 @@ function WeekStrip({ monday, eventsByDate, selected, onSelect, onStep }) {
 }
 
 // --- Log leave --------------------------------------------------------------
-function LeaveForm({ profileId, onDone }) {
+function LeaveForm({ profileId, onDone, onAwayDateSaved }) {
   const [startsOn, setStartsOn] = useState(todayStr());
   const [endsOn, setEndsOn] = useState(todayStr());
   const [note, setNote] = useState('');
@@ -114,6 +114,9 @@ function LeaveForm({ profileId, onDone }) {
       setError("That didn't save — reload and try again.");
       return;
     }
+    // Realtime round trip isn't instant — patch the local awayDates list directly, same pass as
+    // check-ins/absences/everything else, 2026-09-15.
+    onAwayDateSaved?.(data[0]);
     onDone();
   };
 
@@ -159,7 +162,7 @@ function LeaveForm({ profileId, onDone }) {
 // `pending` is shown as pending rather than being collapsed into `confirmed`: the two are
 // different states in the data and shouldn't be flattened just because the app currently treats
 // both as effective for the "You're away" calculation.
-function LeaveList({ leave }) {
+function LeaveList({ leave, onAwayDateSaved }) {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
 
@@ -173,7 +176,9 @@ function LeaveList({ leave }) {
     // already confirmed matches zero rows. That has to be said out loud, not swallowed.
     if (!data || data.length === 0) {
       setError("That leave couldn't be cancelled — an organiser may have already confirmed it.");
+      return;
     }
+    onAwayDateSaved?.(data[0]);
   };
 
   if (!leave.length) return null;
@@ -211,7 +216,7 @@ function LeaveList({ leave }) {
 
 // --- The tab ----------------------------------------------------------------
 export function CalendarTab({
-  profileId, events, loading, terms, absences, checkins, awayDates, onOpenEvent,
+  profileId, events, loading, terms, absences, checkins, awayDates, onOpenEvent, onAwayDateSaved,
 }) {
   const [leaveOpen, setLeaveOpen] = useState(false);
   // Which day the strip highlights. Defaults to today, which is what the design shows.
@@ -333,7 +338,7 @@ export function CalendarTab({
       </div>
 
       ${leaveOpen
-        ? html`<${LeaveForm} profileId=${profileId} onDone=${() => setLeaveOpen(false)} />`
+        ? html`<${LeaveForm} profileId=${profileId} onDone=${() => setLeaveOpen(false)} onAwayDateSaved=${onAwayDateSaved} />`
         : null}
 
       <div class="chips">
@@ -367,7 +372,7 @@ export function CalendarTab({
                 : 'Nothing upcoming of this kind. Try another filter.'} />`}
       ` : null}
 
-      <${LeaveList} leave=${myLeave} />
+      <${LeaveList} leave=${myLeave} onAwayDateSaved=${onAwayDateSaved} />
     </div>
   `;
 }

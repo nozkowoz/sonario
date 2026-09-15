@@ -55,7 +55,12 @@ export function useMyMembership(session) {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [session?.user?.id, reloadKey]);
 
-  return { membership, profile, error, retry: () => setReloadKey((k) => k + 1) };
+  // `profiles` has no realtime subscription at all here (only `memberships` does, above) — so
+  // without this, a successful updateDisplayName() would never show up locally until a full
+  // reload, not even eventually. Same "go through everything" pass as checkins/lyrics, 2026-09-15.
+  const patchProfile = (fields) => setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
+
+  return { membership, profile, error, retry: () => setReloadKey((k) => k + 1), patchProfile };
 }
 
 export function displayNameOf(profile) {
@@ -68,8 +73,8 @@ export function isSuper(membership) {
 
 // Super-only: the pending-approval queue + every membership for management (deactivate/reactivate).
 export function useAllMemberships() {
-  const { rows, loading } = useLiveTable('memberships');
-  return { memberships: rows, loading };
+  const { rows, loading, patchRow } = useLiveTable('memberships');
+  return { memberships: rows, loading, patchMembership: patchRow };
 }
 
 // Role changes only. Kept separate from decideMembership so a promotion can never accidentally
@@ -135,7 +140,23 @@ function useLiveTable(table, { select = '*', orderFn } = {}) {
     };
   }, [table]);
 
-  return { rows, loading };
+  // For a table deliberately left out of the supabase_realtime publication (song_lyrics, see
+  // migration 0011), the postgres_changes handler above never fires for this client's own
+  // writes — nothing else here patches `rows`, so a save that genuinely reached the database
+  // would sit invisible in the UI until a full reload. Callers whose writes aren't covered by
+  // Realtime call this after a successful mutation to patch the local cache exactly the way the
+  // realtime handler above would have.
+  const patchRow = (row) => {
+    setRows((prev) => {
+      const next = prev.some((r) => r.id === row.id) ? prev.map((r) => (r.id === row.id ? row : r)) : [...prev, row];
+      return orderFn ? [...next].sort(orderFn) : next;
+    });
+  };
+  // Same reasoning, the delete direction — e.g. undoing a check-in shouldn't wait on Realtime to
+  // stop showing "checked in" any more than checking in should wait on it to start.
+  const removeRow = (id) => setRows((prev) => prev.filter((r) => r.id !== id));
+
+  return { rows, loading, patchRow, removeRow };
 }
 
 export function useRehearsals() {
@@ -192,10 +213,10 @@ export function useSongCollectionItems() {
 // can read all of them; the collaborative-editing brief means seeing who's on what isn't private).
 // The UI picks out the signed-in member's own row per song from this same set.
 export function useSongAssignments() {
-  const { rows, loading } = useLiveTable('song_assignments', {
+  const { rows, loading, patchRow } = useLiveTable('song_assignments', {
     orderFn: (a, b) => a.updated_at.localeCompare(b.updated_at),
   });
-  return { assignments: rows, loading };
+  return { assignments: rows, loading, patchAssignment: patchRow };
 }
 
 export function useRehearsalSongs() {
@@ -206,10 +227,10 @@ export function useRehearsalSongs() {
 }
 
 export function useRecordings() {
-  const { rows, loading } = useLiveTable('recordings', {
+  const { rows, loading, patchRow, removeRow } = useLiveTable('recordings', {
     orderFn: (a, b) => b.uploaded_at.localeCompare(a.uploaded_at),
   });
-  return { recordings: rows, loading };
+  return { recordings: rows, loading, patchRecording: patchRow, removeRecording: removeRow };
 }
 
 // Storage/DB together (Stage 6) — the pair the storage.objects policies from migration 0009 were
@@ -264,13 +285,16 @@ export async function deleteRecording({ id, storagePath }) {
 // Song lyrics (Stage 2 of the Song Detail redesign, migration 0011). Deliberately not in
 // Realtime (agreed 2026-09-14) — this still uses the shared useLiveTable hook for consistency
 // with every other table here, but the subscription simply never receives anything for this one
-// since the table isn't in the supabase_realtime publication.
+// since the table isn't in the supabase_realtime publication. That means a successful save of
+// this client's OWN row is invisible until patchLyricsRow is called with the returned row (see
+// saveLyrics/hideLyrics call sites in repertoire.js) — found 2026-09-15 when a save reported
+// "Saved." but the text appeared gone on revisiting the tab.
 //
 // One row per song: song_id has a plain (non-partial) unique index, so upsert can target it
 // directly — unlike setSongPart below, there's no partial-index workaround needed here.
 export function useSongLyrics() {
-  const { rows, loading } = useLiveTable('song_lyrics');
-  return { songLyrics: rows, loading };
+  const { rows, loading, patchRow } = useLiveTable('song_lyrics');
+  return { songLyrics: rows, loading, patchLyricsRow: patchRow };
 }
 
 // updated_by/released_by are never sent — migration 0011's enforce_lyrics_audit() trigger
@@ -350,8 +374,8 @@ const byDateThenStart = (a, b) =>
   String(a.start_time || '').localeCompare(String(b.start_time || ''));
 
 export function useEvents() {
-  const { rows, loading } = useLiveTable('rehearsals', { orderFn: byDateThenStart });
-  return { events: rows, loading };
+  const { rows, loading, patchRow } = useLiveTable('rehearsals', { orderFn: byDateThenStart });
+  return { events: rows, loading, patchEvent: patchRow };
 }
 
 export function useTerms() {
@@ -365,8 +389,8 @@ export function useTerms() {
 // means an ordinary member gets back only their own rows here and a super gets everybody's.
 // The client never has to decide who's allowed to see what — it just renders what came back.
 export function useAbsences() {
-  const { rows, loading } = useLiveTable('rehearsal_absences');
-  return { absences: rows, loading };
+  const { rows, loading, patchRow, removeRow } = useLiveTable('rehearsal_absences');
+  return { absences: rows, loading, patchAbsence: patchRow, removeAbsence: removeRow };
 }
 
 // The ONLY way member-facing UI may resolve another member's name. `profiles` is own-row-or-super
@@ -436,8 +460,10 @@ export async function markAbsent(eventId, profileId) {
 }
 
 export async function clearAbsence(eventId, profileId) {
+  // `.select()` added 2026-09-15 (was missing): without it a delete blocked by RLS came back
+  // indistinguishable from a successful one, and the caller had nothing to hand to removeAbsence.
   return supabase.from('rehearsal_absences').delete()
-    .eq('rehearsal_id', eventId).eq('profile_id', profileId);
+    .eq('rehearsal_id', eventId).eq('profile_id', profileId).select();
 }
 
 // --- Leave / away dates ----------------------------------------------------
@@ -446,10 +472,10 @@ export async function clearAbsence(eventId, profileId) {
 // own-row-or-super under RLS (tightened in migration 0002), so a member gets only their own
 // ranges back and a super gets everyone's.
 export function useAwayDates() {
-  const { rows, loading } = useLiveTable('away_dates', {
+  const { rows, loading, patchRow } = useLiveTable('away_dates', {
     orderFn: (a, b) => a.starts_on.localeCompare(b.starts_on),
   });
-  return { awayDates: rows, loading };
+  return { awayDates: rows, loading, patchAwayDate: patchRow };
 }
 
 // Leave is a RANGE, so a member away on holiday doesn't mark every affected rehearsal one by one.
@@ -500,9 +526,15 @@ export function awayRangeFor(event, awayDates, profileId) {
 
 // Same single-hook-for-both-audiences reasoning as useAbsences: `checkins` is own-row-or-super
 // under RLS, so a member gets only their own row back and a super gets the whole event's.
+//
+// patchCheckinRow/removeCheckinRow exist because Realtime's own round trip isn't instant — Nina,
+// 2026-09-15: tapped "I'm here", the button didn't visibly change, tapped again and got "already
+// checked in". The insert had genuinely landed; the local `checkins` array just hadn't heard
+// about it yet. CheckInPanel calls these with its own insert/delete result the moment it has one,
+// instead of waiting on the subscription to patch it.
 export function useCheckins() {
-  const { rows, loading } = useLiveTable('checkins');
-  return { checkins: rows, loading };
+  const { rows, loading, patchRow, removeRow } = useLiveTable('checkins');
+  return { checkins: rows, loading, patchCheckinRow: patchRow, removeCheckinRow: removeRow };
 }
 
 // `checked_in_at` is deliberately not sent: a BEFORE INSERT trigger (migration 0003) overwrites

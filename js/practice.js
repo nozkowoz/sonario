@@ -54,12 +54,19 @@ function PracticeHeader({ title, subtitle, backLabel, onBack }) {
 }
 
 // --- Step 1: song selection ---------------------------------------------------
-function SongSelectScreen({ songs, collections, collectionItems, selectedIds, onToggleSong, onToggleGroup, onBack, onContinue }) {
+// A song with zero recordings — for ANY part — can't produce a single playable queue entry in
+// any mode, so it's disabled here rather than let someone select it and hit a wall of "no
+// recording yet" two screens later. This is deliberately coarse (any recording at all, not
+// "a recording for the mode/part you'll pick next") — mode isn't chosen until the next screen, so
+// that's the only thing knowable at this point. The finer per-part/mode gap (e.g. only a Bass
+// recording exists but you're Alto) is still caught by the existing queue-generation skip logic.
+function SongSelectScreen({ songs, collections, collectionItems, recordings, selectedIds, onToggleSong, onToggleGroup, onBack, onContinue }) {
   const songsById = useMemo(() => Object.fromEntries(songs.map((s) => [s.id, s])), [songs]);
   const groups = useMemo(
     () => groupSongsByCollection(collections, collectionItems, songsById),
     [collections, collectionItems, songsById],
   );
+  const recordedSongIds = useMemo(() => new Set(recordings.map((r) => r.song_id)), [recordings]);
   const count = selectedIds.size;
 
   return html`
@@ -68,25 +75,35 @@ function SongSelectScreen({ songs, collections, collectionItems, selectedIds, on
         subtitle=${`${count} ${count === 1 ? 'song' : 'songs'} selected`} />
       <div class="practice-body">
         ${groups.map(({ collection, songs: groupSongs }) => {
-          const allSelected = groupSongs.length > 0 && groupSongs.every((s) => selectedIds.has(s.id));
+          const selectable = groupSongs.filter((s) => recordedSongIds.has(s.id));
+          const allSelected = selectable.length > 0 && selectable.every((s) => selectedIds.has(s.id));
           return html`
             <div key=${collection.id} class="practice-group">
               <div class="section-header">
                 <p class="eyebrow eyebrow-tight" style="margin:0;">
                   ${collection.name}${collection.is_current ? ' · Current' : ''}
                 </p>
-                <button class="btn-quiet" onClick=${() => onToggleGroup(groupSongs, allSelected)}>Select all</button>
+                ${selectable.length > 0
+                  ? html`<button class="btn-quiet" onClick=${() => onToggleGroup(selectable, allSelected)}>Select all</button>`
+                  : null}
               </div>
               <div class="practice-select-list">
-                ${groupSongs.map((s) => html`
-                  <button key=${s.id} class=${`practice-select-row ${selectedIds.has(s.id) ? 'practice-select-row-on' : ''}`}
-                    onClick=${() => onToggleSong(s.id)}>
-                    <span class=${`practice-checkbox ${selectedIds.has(s.id) ? 'practice-checkbox-on' : ''}`}>
-                      ${selectedIds.has(s.id) ? html`<${IconCheck} size=${13} />` : null}
-                    </span>
-                    <span class="rep-song-title">${s.title}</span>
-                  </button>
-                `)}
+                ${groupSongs.map((s) => {
+                  const hasRecording = recordedSongIds.has(s.id);
+                  return html`
+                    <button key=${s.id}
+                      class=${`practice-select-row ${selectedIds.has(s.id) ? 'practice-select-row-on' : ''} ${!hasRecording ? 'practice-select-row-disabled' : ''}`}
+                      disabled=${!hasRecording} onClick=${() => onToggleSong(s.id)}>
+                      <span class=${`practice-checkbox ${selectedIds.has(s.id) ? 'practice-checkbox-on' : ''}`}>
+                        ${selectedIds.has(s.id) ? html`<${IconCheck} size=${13} />` : null}
+                      </span>
+                      <span class="practice-select-text">
+                        <span class="rep-song-title">${s.title}</span>
+                        ${!hasRecording ? html`<span class="form-hint" style="margin:0;">No recordings yet</span>` : null}
+                      </span>
+                    </button>
+                  `;
+                })}
               </div>
             </div>
           `;
@@ -166,22 +183,34 @@ function latestRecordingFor(recordings, songId, partKey) {
 // One entry per song for 'my_part'/'whole_choir'; TWO entries per song for 'both' (part then
 // whole choir, in that order, before the next song) — agreed 2026-09-15, explicitly NOT
 // song-level alternation. `recording` is null when nothing's been uploaded for that song+part
-// yet; Stage 2 is what actually shows/skips that state during playback.
+// (and no fallback exists either); Stage 2 is what actually shows/skips that state during playback.
+//
+// A 'part' entry with no isolated recording falls back to the whole-choir recording rather than
+// being treated as unavailable — Nina, 2026-09-15: "allow people to practice even if no alto only
+// recording, make it just default to the whole choir recording." `fallback: true` marks this so
+// the player can show what's actually playing (WHOLE CHOIR, not a fabricated ALTO ONLY) instead
+// of silently mislabelling it. In combined mode this can mean the same whole-choir recording
+// plays twice in a row for that song (once as the part fallback, once as the real whole-choir
+// entry) — a known, accepted consequence of always having something playable rather than
+// de-duplicating, which wasn't asked for.
 export function buildPracticeQueue({ songs, mode, assignments, profileId, recordings }) {
   const queue = [];
   for (const song of songs) {
     if (mode === 'my_part' || mode === 'both') {
       const mine = myAssignment(assignments, song.id, profileId);
       const partKey = mine?.part_label ?? null;
-      queue.push({
-        songId: song.id, songTitle: song.title, kind: 'part', partKey,
-        recording: partKey ? latestRecordingFor(recordings, song.id, partKey) : null,
-      });
+      let recording = partKey ? latestRecordingFor(recordings, song.id, partKey) : null;
+      let fallback = false;
+      if (!recording) {
+        const wholeChoir = latestRecordingFor(recordings, song.id, 'full_choir');
+        if (wholeChoir) { recording = wholeChoir; fallback = true; }
+      }
+      queue.push({ songId: song.id, songTitle: song.title, kind: 'part', partKey, recording, fallback });
     }
     if (mode === 'whole_choir' || mode === 'both') {
       queue.push({
         songId: song.id, songTitle: song.title, kind: 'whole_choir', partKey: 'full_choir',
-        recording: latestRecordingFor(recordings, song.id, 'full_choir'),
+        recording: latestRecordingFor(recordings, song.id, 'full_choir'), fallback: false,
       });
     }
   }
@@ -205,10 +234,12 @@ function PracticeWaveform() {
 }
 
 function partBadgeText(entry, partLabels) {
-  return entry.kind === 'whole_choir' ? 'WHOLE CHOIR' : `${partLabelText(entry.partKey, partLabels).toUpperCase()} ONLY`;
+  if (entry.kind === 'whole_choir' || entry.fallback) return 'WHOLE CHOIR';
+  return `${partLabelText(entry.partKey, partLabels).toUpperCase()} ONLY`;
 }
 function partBadgeSub(entry, partLabels) {
-  return entry.kind === 'whole_choir' ? 'Whole choir' : `${partLabelText(entry.partKey, partLabels)} only`;
+  if (entry.kind === 'whole_choir' || entry.fallback) return 'Whole choir';
+  return `${partLabelText(entry.partKey, partLabels)} only`;
 }
 
 // Steps from `startIndex` in `direction` (+1/-1) until it finds a queue entry with a resolved
@@ -356,7 +387,7 @@ function PlayerScreen({ queue, partLabels, onClose }) {
 }
 
 // --- Orchestrator ----------------------------------------------------------------
-export function PracticeFlow({ songs, collections, collectionItems, assignments, partLabels, recordings, profile, onClose }) {
+export function PracticeFlow({ songs, collections, collectionItems, assignments, partLabels, recordings, profile, onClose, onAssignmentSaved }) {
   const [step, setStep] = useState('select'); // 'select' | 'mode' | 'player'
   const [queue, setQueue] = useState(null);
   const [startError, setStartError] = useState(null);
@@ -394,6 +425,7 @@ export function PracticeFlow({ songs, collections, collectionItems, assignments,
     setSaving(false);
     if (error) { setPickError(error.message); return; }
     if (!data || data.length === 0) { setPickError("That didn't save — reload and try again."); return; }
+    onAssignmentSaved?.(data[0]);
     setEditingSong(null);
   };
 
@@ -405,6 +437,7 @@ export function PracticeFlow({ songs, collections, collectionItems, assignments,
     setSaving(false);
     if (error) { setPickError(error.message); return; }
     if (!data || data.length === 0) { setPickError("That didn't save — reload and try again."); return; }
+    onAssignmentSaved?.(data[0]);
     setEditingSong(null);
   };
 
@@ -430,7 +463,7 @@ export function PracticeFlow({ songs, collections, collectionItems, assignments,
   if (step === 'select') {
     return html`
       <${SongSelectScreen}
-        songs=${songs} collections=${collections} collectionItems=${collectionItems}
+        songs=${songs} collections=${collections} collectionItems=${collectionItems} recordings=${recordings}
         selectedIds=${selectedIds} onToggleSong=${toggleSong} onToggleGroup=${toggleGroup}
         onBack=${onClose} onContinue=${() => setStep('mode')} />
     `;

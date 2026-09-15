@@ -6,6 +6,7 @@ import {
 import { LoadingState, EmptyState, Sheet } from './shell.js';
 import {
   IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconUpload, IconSearch,
+  IconLock, IconLockOpen, IconBulb,
 } from './icons.js';
 import { PracticeEntryCard, PracticeFlow } from './practice.js';
 
@@ -220,7 +221,7 @@ function RecordingRow({ recording, uploaderName }) {
 // the Song Detail redesign moved the header's own upload shortcut to Search instead, so the
 // "which song?" first step this used to have when opened songless no longer has a caller. Removed
 // rather than kept dead, per the same reasoning as everywhere else unused code gets cut here.
-function AddRecordingSheet({ song, partLabels, recordings, profile, directory, onDone, onClose }) {
+function AddRecordingSheet({ song, partLabels, recordings, profile, directory, onDone, onClose, onRecordingSaved }) {
   const [step, setStep] = useState('part'); // 'part' | 'upload' | 'success'
   const [partLabel, setPartLabel] = useState(null);
   const [file, setFile] = useState(null);
@@ -263,6 +264,9 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
     });
     setUploading(false);
     if (err) { setError(err.message); return; }
+    // Same realtime-round-trip gap as everywhere else — the song's own recording list/tags
+    // shouldn't wait on the subscription to show what was just uploaded. 2026-09-15.
+    onRecordingSaved?.(data[0]);
     setUploaded(data[0]);
     setStep('success');
   };
@@ -358,9 +362,13 @@ function LyricsTab({ song, lyricsRow, canManage, onSave, onRelease, onHide }) {
 
   const run = async (action) => {
     setBusy(true); setError(null); setSaved(false);
-    const { error: err } = await action();
+    const { data, error: err } = await action();
     setBusy(false);
     if (err) { setError(err.message); return; }
+    // Same recurring trap as everywhere else in this app: a write filtered out by RLS returns no
+    // error and no rows — only a returned row proves it landed. Missing this check is exactly
+    // what let a genuinely-failed save report "Saved." (2026-09-15).
+    if (!data || data.length === 0) { setError("That didn't save — reload and try again."); return; }
     setSaved(true);
   };
 
@@ -368,23 +376,41 @@ function LyricsTab({ song, lyricsRow, canManage, onSave, onRelease, onHide }) {
     if (!released) {
       return html`<${EmptyState} title="Lyrics not released yet" body=${`${song.title}'s lyrics haven't been released — check back closer to when it's being sung.`} />`;
     }
-    return html`<p class="lyrics-body">${lyricsRow.lyrics}</p>`;
+    return html`<div class="card"><p class="lyrics-body">${lyricsRow.lyrics}</p></div>`;
   }
 
   return html`
     <div>
-      <p class="form-hint" style="margin:0 0 10px;">
-        ${released ? `Released ${formatShortDate(lyricsRow.released_at)} — visible to every member.` : 'Not released — only supers can see this.'}
-      </p>
-      <textarea rows="14" value=${text} placeholder="Paste or type the lyrics…"
-        onInput=${(e) => { setText(e.target.value); setSaved(false); }} />
-      ${error ? html`<p class="absence-error">${error}</p>` : null}
-      ${saved ? html`<p class="form-saved">Saved.</p>` : null}
-      <div class="form-actions" style="margin-top:12px;">
-        <button class="btn btn-outline" disabled=${busy} onClick=${() => run(() => onSave(text))}>Save</button>
-        ${released
-          ? html`<button class="btn btn-outline" disabled=${busy} onClick=${() => run(onHide)}>Hide lyrics</button>`
-          : html`<button class="btn btn-primary" disabled=${busy} onClick=${() => run(() => onRelease(text))}>Release lyrics</button>`}
+      <div class="card lyrics-card">
+        <div class="lyrics-status-row">
+          <${released ? IconLockOpen : IconLock} size=${16} />
+          <span>${released ? `Released ${formatShortDate(lyricsRow.released_at)} — visible to every member.` : 'Not released — only supers can see this.'}</span>
+        </div>
+        <div class="lyrics-textarea-wrap">
+          <textarea class="lyrics-textarea" rows="12" maxlength="10000" value=${text}
+            placeholder="Paste or type the lyrics…"
+            onInput=${(e) => { setText(e.target.value); setSaved(false); }} />
+          <span class="lyrics-char-count">${text.length.toLocaleString()} / 10,000</span>
+        </div>
+        ${error ? html`<p class="absence-error">${error}</p>` : null}
+        ${saved ? html`<p class="form-saved">Saved.</p>` : null}
+        <div class="lyrics-actions">
+          <button class="btn btn-outline" disabled=${busy} onClick=${() => run(() => onSave(text))}>Save draft</button>
+          ${released
+            ? html`<button class="btn btn-outline" disabled=${busy} onClick=${() => run(onHide)}>Hide lyrics</button>`
+            : html`<button class="btn btn-primary" disabled=${busy} onClick=${() => run(() => onRelease(text))}>
+                <${IconLock} size=${14} /> Release lyrics
+              </button>`}
+        </div>
+        <p class="lyrics-caption">${released ? 'Visible to every member right now.' : 'Visible to all members once released.'}</p>
+      </div>
+
+      <div class="lyrics-tip-card">
+        <span class="lyrics-tip-icon"><${IconBulb} size=${18} /></span>
+        <div>
+          <p class="lyrics-tip-title">Tip</p>
+          <p class="lyrics-tip-body">You can paste lyrics from a document or type them directly here.</p>
+        </div>
       </div>
     </div>
   `;
@@ -394,7 +420,7 @@ function LyricsTab({ song, lyricsRow, canManage, onSave, onRelease, onHide }) {
 // Overview / Lyrics / Recordings tabs, per the approved Song Detail redesign (2026-09-14).
 function SongDetail({
   song, collections, collectionItems, assignments, partLabels, recordings, profile, directory,
-  canManage, lyricsRow, onSaveLyrics, onReleaseLyrics, onHideLyrics,
+  canManage, lyricsRow, onSaveLyrics, onReleaseLyrics, onHideLyrics, onRecordingSaved,
   onBack, onEditPart,
 }) {
   const [panel, setPanel] = useState('overview'); // 'overview' | 'lyrics' | 'recordings'
@@ -482,7 +508,7 @@ function SongDetail({
 
       ${addOpen ? html`<${AddRecordingSheet}
         song=${song} partLabels=${partLabels} recordings=${recordings}
-        profile=${profile} directory=${directory}
+        profile=${profile} directory=${directory} onRecordingSaved=${onRecordingSaved}
         onDone=${() => setAddOpen(false)} onClose=${() => setAddOpen(false)} />` : null}
     </div>
   `;
@@ -657,7 +683,8 @@ function SearchResults({ songs, query, assignments, partLabels, profileId, recor
 // --- The tab -----------------------------------------------------------------
 export function RepertoireTab({
   profile, canManage, songs, songsLoading, collections, collectionItems, assignments, partLabels,
-  events, rehearsalSongs, recordings, directory, songLyrics,
+  events, rehearsalSongs, recordings, directory, songLyrics, onLyricsSaved,
+  onAssignmentSaved, onRecordingSaved,
 }) {
   const [mode, setMode] = useState('browse'); // 'browse' | 'all'
   const [practiceOpen, setPracticeOpen] = useState(false);
@@ -690,6 +717,9 @@ export function RepertoireTab({
     // Same recurring trap as everywhere else in this app: a write filtered out by RLS returns no
     // error and no rows. Only a returned row proves it landed.
     if (!data || data.length === 0) { setPickError("That didn't save — reload and try again."); return; }
+    // Realtime round trip isn't instant — same "go through everything" pass as check-ins,
+    // 2026-09-15 — so patch the shared assignments list directly rather than wait for it.
+    onAssignmentSaved?.(data[0]);
     setEditingSong(null);
   };
 
@@ -702,6 +732,7 @@ export function RepertoireTab({
     setSaving(false);
     if (error) { setPickError(error.message); return; }
     if (!data || data.length === 0) { setPickError("That didn't save — reload and try again."); return; }
+    onAssignmentSaved?.(data[0]);
     setEditingSong(null);
   };
 
@@ -713,7 +744,7 @@ export function RepertoireTab({
     return html`<${PracticeFlow}
       songs=${songs} collections=${collections} collectionItems=${collectionItems}
       assignments=${assignments} partLabels=${partLabels} recordings=${recordings}
-      profile=${profile} onClose=${() => setPracticeOpen(false)} />`;
+      profile=${profile} onClose=${() => setPracticeOpen(false)} onAssignmentSaved=${onAssignmentSaved} />`;
   }
 
   const picker = editingSong ? html`<${PartPickerSheet}
@@ -750,14 +781,23 @@ export function RepertoireTab({
     const song = songsById[detail.id];
     if (song) {
       const lyricsRow = songLyrics.find((l) => l.song_id === song.id) || null;
+      // song_lyrics is deliberately outside Realtime (2026-09-14), so a write this client makes
+      // never comes back through the postgres_changes subscription — onLyricsSaved patches the
+      // local cache directly with the row Supabase just handed back, the same fix as the one Save
+      // "went green" bug (2026-09-15) traced to: the write landed, the UI just never heard about it.
+      const persistLyrics = async (mutate) => {
+        const { data, error } = await mutate();
+        if (!error && data?.[0]) onLyricsSaved(data[0]);
+        return { data, error };
+      };
       return html`
         <${SongDetail} song=${song} collections=${collections} collectionItems=${collectionItems}
           assignments=${assignments} partLabels=${partLabels} recordings=${recordings}
           profile=${profile} directory=${directory}
-          canManage=${canManage} lyricsRow=${lyricsRow}
-          onSaveLyrics=${(text) => saveLyrics({ songId: song.id, lyrics: text })}
-          onReleaseLyrics=${(text) => saveLyrics({ songId: song.id, lyrics: text, release: true })}
-          onHideLyrics=${() => hideLyrics(lyricsRow.id)}
+          canManage=${canManage} lyricsRow=${lyricsRow} onRecordingSaved=${onRecordingSaved}
+          onSaveLyrics=${(text) => persistLyrics(() => saveLyrics({ songId: song.id, lyrics: text }))}
+          onReleaseLyrics=${(text) => persistLyrics(() => saveLyrics({ songId: song.id, lyrics: text, release: true }))}
+          onHideLyrics=${() => persistLyrics(() => hideLyrics(lyricsRow.id))}
           onBack=${() => setDetail(null)} onEditPart=${openPicker} />
         ${picker}
       `;

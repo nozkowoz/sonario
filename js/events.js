@@ -90,20 +90,27 @@ export function RailRow({ event, onOpen = null, trailing = null }) {
 // than the screen's main action — which is what a full-width button made it, especially on a
 // future event where check-in isn't offered yet and this was the only control present.
 // It's a one-tap flip either way, with no time limit, so a mistap costs nothing.
-export function AbsenceToggle({ event, myAbsence, profileId }) {
+export function AbsenceToggle({ event, myAbsence, profileId, onAbsenceSaved, onAbsenceRemoved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   if (event.status === 'cancelled' || isPast(event)) return null;
 
-  const run = async (fn) => {
+  // patchAbsence/removeAbsence update the parent's local list the moment this insert/delete has a
+  // result, rather than waiting for Realtime's round trip — same fix as CheckInPanel's, 2026-09-15
+  // ("go through everything" — this had the identical "nothing to set locally" gap).
+  const run = async (fn, { patch, removedId } = {}) => {
     setBusy(true);
     setError(null);
-    const { error: err } = await fn();
-    // Realtime patches the list, so there's nothing to set locally on success — but a failure
-    // has to surface rather than looking like it silently worked.
-    if (err) setError(err.message);
+    const { data, error: err } = await fn();
     setBusy(false);
+    if (err) { setError(err.message); return; }
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      setError("That didn't save — reload and try again.");
+      return;
+    }
+    if (patch) onAbsenceSaved?.(Array.isArray(data) ? data[0] : data);
+    if (removedId) onAbsenceRemoved?.(removedId);
   };
 
   return html`
@@ -111,13 +118,13 @@ export function AbsenceToggle({ event, myAbsence, profileId }) {
       ${myAbsence
         ? html`
           <button class="btn-quiet" disabled=${busy}
-            onClick=${() => run(() => clearAbsence(event.id, profileId))}>
+            onClick=${() => run(() => clearAbsence(event.id, profileId), { removedId: myAbsence.id })}>
             ${busy ? 'Saving…' : 'Actually, I can make it'}
           </button>
         `
         : html`
           <button class="btn-quiet" disabled=${busy}
-            onClick=${() => run(() => markAbsent(event.id, profileId))}>
+            onClick=${() => run(() => markAbsent(event.id, profileId), { patch: true })}>
             ${busy ? 'Saving…' : "Can't make it?"}
           </button>
         `}
@@ -244,7 +251,7 @@ function KebabMenu({ items, label = 'Event actions' }) {
 
 // Shared by the row and the detail screen: cancel/reinstate is a status flip, and an RLS-blocked
 // UPDATE returns no error and no rows, so "nothing came back" has to be reported as a failure.
-function useStatusFlip(event) {
+function useStatusFlip(event, onEventSaved) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -253,8 +260,11 @@ function useStatusFlip(event) {
     setError(null);
     const { data, error: err } = await setEventStatus(event.id, status);
     setBusy(false);
-    if (err) setError(err.message);
-    else if (!data) setError("That didn't save — check you still have organiser access.");
+    if (err) { setError(err.message); return; }
+    if (!data) { setError("That didn't save — check you still have organiser access."); return; }
+    // Same Realtime-round-trip gap as check-ins/absences — the row's own cancelled/scheduled
+    // badge shouldn't wait on the subscription to catch up. 2026-09-15.
+    onEventSaved?.(data);
   };
 
   return { busy, error, flip };
@@ -277,9 +287,9 @@ function adminMenuItems(event, { onEdit, onReschedule, flip, busy }) {
 // ---------------------------------------------------------------------------
 export function EventRow({
   event, myAbsence, myCheckin, myAway, canManage, onOpen, onEdit, onReschedule, onManage,
-  showRelative = false,
+  showRelative = false, onEventSaved,
 }) {
-  const { busy, error, flip } = useStatusFlip(event);
+  const { busy, error, flip } = useStatusFlip(event, onEventSaved);
   const cancelled = event.status === 'cancelled';
   const rail = formatDateRail(event.rehearsal_date);
   const rel = showRelative ? relativeDayLabel(event.rehearsal_date) : '';
@@ -330,7 +340,8 @@ export function EventRow({
 // ---------------------------------------------------------------------------
 export function EventDetail({
   event, term, myAbsence, myCheckin, myAway, absencesForEvent = [], checkinsForEvent = [],
-  canManage, profileId, directory = {}, onManage,
+  canManage, profileId, directory = {}, onManage, onCheckinSaved, onCheckinRemoved,
+  onAbsenceSaved, onAbsenceRemoved,
 }) {
   const cancelled = event.status === 'cancelled';
   const past = isPast(event);
@@ -377,7 +388,7 @@ export function EventDetail({
 
       ${cancelled ? null : html`
         <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
-          profileId=${profileId} />
+          profileId=${profileId} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved} />
       `}
 
       ${!cancelled ? html`
@@ -416,7 +427,8 @@ export function EventDetail({
         cancelled || myCheckin || myAway ? null : html`
         <div class="sheet-rule"></div>
         <div class="sheet-action">
-          <${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId} />
+          <${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId}
+            onAbsenceSaved=${onAbsenceSaved} onAbsenceRemoved=${onAbsenceRemoved} />
         </div>
       `}
 
@@ -505,7 +517,9 @@ export function EventForm({ event, terms, onDone, focusField = null }) {
     // Same reasoning as the cancel/reinstate guard on EventCard: a write filtered out by RLS
     // comes back as zero rows rather than an error, so don't report success without a row.
     if (!data) { setError("That didn't save — check you still have organiser access."); return; }
-    onDone();
+    // Hand the saved row back so the caller can patch its local `events` list immediately rather
+    // than wait on Realtime — same "go through everything" pass as check-ins, 2026-09-15.
+    onDone(data);
   };
 
   return html`

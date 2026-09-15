@@ -80,7 +80,7 @@ export function AttendanceStatus({ event, myCheckin, myAbsence, myAway, detailed
 // ---------------------------------------------------------------------------
 // Member self check-in
 // ---------------------------------------------------------------------------
-export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
+export function CheckInPanel({ event, myCheckin, myAbsence, profileId, onCheckinSaved, onCheckinRemoved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const now = useNow();
@@ -91,7 +91,10 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
   const msLeft = at ? UNDO_WINDOW_MS - (now - at) : 0;
   const canUndo = msLeft > 0;
 
-  const run = async (fn) => {
+  // `patch`/`removedId` update the parent's local checkins array the moment this insert/delete
+  // has a result, rather than waiting for Realtime's round trip — see useCheckins() in store.js
+  // for why that round trip isn't safe to depend on for the button's own feedback.
+  const run = async (fn, { patch, removedId } = {}) => {
     setBusy(true);
     setError(null);
     const { data, error: err } = await fn();
@@ -101,7 +104,10 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
     // rows, so silence is not success. Insert returns the row; delete returns the deleted row.
     if (!data || (Array.isArray(data) && data.length === 0)) {
       setError("That didn't save — reload and try again.");
+      return;
     }
+    if (patch) onCheckinSaved?.(Array.isArray(data) ? data[0] : data);
+    if (removedId) onCheckinRemoved?.(removedId);
   };
 
   const doCheckIn = () => run(async () => {
@@ -111,7 +117,7 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
     // successful check-in, and the absence row is only ever advisory.
     if (!res.error && res.data && myAbsence) await clearAbsence(event.id, profileId);
     return res;
-  });
+  }, { patch: true });
 
   const undoLabel = busy ? 'Saving…' : `Undo (${Math.max(1, Math.round(msLeft / 60000))} min left)`;
   const errorLine = error ? html`<p class="absence-error">${error}</p>` : null;
@@ -132,7 +138,7 @@ export function CheckInPanel({ event, myCheckin, myAbsence, profileId }) {
     <div class="checkin-row">
       ${canUndo ? html`
         <button class="btn-quiet" disabled=${busy}
-          onClick=${() => run(() => undoCheckIn(event.id, profileId))}>${undoLabel}</button>
+          onClick=${() => run(() => undoCheckIn(event.id, profileId), { removedId: myCheckin.id })}>${undoLabel}</button>
       ` : null}
       ${errorLine}
     </div>

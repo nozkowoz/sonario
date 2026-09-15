@@ -34,7 +34,7 @@ function App() {
 }
 
 function Gated({ session }) {
-  const { membership, profile, error, retry } = useMyMembership(session);
+  const { membership, profile, error, retry, patchProfile } = useMyMembership(session);
 
   if (error) {
     return html`
@@ -49,10 +49,10 @@ function Gated({ session }) {
   if (!membership || membership.status !== 'active') {
     return html`<${MembershipStatusScreen} status=${membership?.status} onSignOut=${() => supabase.auth.signOut()} />`;
   }
-  return html`<${Main} session=${session} membership=${membership} profile=${profile} />`;
+  return html`<${Main} session=${session} membership=${membership} profile=${profile} patchProfile=${patchProfile} />`;
 }
 
-function Main({ session, membership, profile }) {
+function Main({ session, membership, profile, patchProfile }) {
   const canManage = isSuper(membership);
   const [tab, setTab] = useActiveTab('home');
   // If a super is demoted while sitting on the Admin tab (role arrives over realtime), fall back
@@ -62,6 +62,28 @@ function Main({ session, membership, profile }) {
   // "Manage this event" so an organiser doesn't have to find the event again in a second list.
   const [adminView, setAdminView] = useState(null);
   const manageEvent = (ev) => { setAdminView({ section: 'events', editId: ev.id }); setTab('admin'); };
+
+  // Tapping the tab you're already on used to do nothing — useState bails out on an unchanged
+  // value, so a member stuck three screens deep in Repertoire (Practice Mode, a collection, Song
+  // Detail…) had no way back except the in-screen back buttons. Nina, 2026-09-15: re-tapping the
+  // active tab should jump back to that tab's top level, everywhere in the app.
+  //
+  // Each tab's own nested navigation (RepertoireTab's detail/practiceOpen/searchOpen, etc.) is
+  // local useState inside that component — bumping its `key` forces Preact to remount it fresh,
+  // which resets exactly that state without touching the data hooks up here (those live in Main,
+  // outside the remounted subtree, so nothing re-fetches or re-subscribes). Admin/More are the
+  // two exceptions: their "current view" is lifted up here rather than owned internally, so it's
+  // cleared explicitly too.
+  const [resetKeys, setResetKeys] = useState({ home: 0, calendar: 0, repertoire: 0, admin: 0, more: 0 });
+  const changeTab = (nextTab) => {
+    if (nextTab === activeTab) {
+      setResetKeys((prev) => ({ ...prev, [nextTab]: prev[nextTab] + 1 }));
+      if (nextTab === 'admin') setAdminView(null);
+      if (nextTab === 'more') setMoreView(null);
+      return;
+    }
+    setTab(nextTab);
+  };
   // ONE event sheet for the whole app, owned here rather than by a tab. Nina's Figma opens an
   // event as a sheet over whatever screen you were on, so Home and Calendar both need it — and
   // this is also where the data it wants (terms, absences, check-ins, leave, the directory)
@@ -73,11 +95,11 @@ function Main({ session, membership, profile }) {
   // Events/terms/absences/check-ins load once here rather than per tab: both Home and Calendar need the
   // same rows, useLiveTable names its realtime channel after the table, and switching tabs
   // shouldn't tear down and re-open a subscription (or briefly re-show a loading state).
-  const { events, loading: eventsLoading } = useEvents();
+  const { events, loading: eventsLoading, patchEvent } = useEvents();
   const { terms } = useTerms();
-  const { absences } = useAbsences();
-  const { checkins } = useCheckins();
-  const { awayDates } = useAwayDates();
+  const { absences, patchAbsence, removeAbsence } = useAbsences();
+  const { checkins, patchCheckinRow, removeCheckinRow } = useCheckins();
+  const { awayDates, patchAwayDate } = useAwayDates();
   // Used to be super-only ("members don't render anyone else's name"), but Stage 6 needs the
   // directory for every active member — a recording's uploader is shown to whoever can see the
   // recording at all, not just organisers. Always on now.
@@ -86,11 +108,11 @@ function Main({ session, membership, profile }) {
   const { songs, loading: songsLoading } = useSongs();
   const { collections } = useSongCollections();
   const { collectionItems } = useSongCollectionItems();
-  const { assignments } = useSongAssignments();
+  const { assignments, patchAssignment } = useSongAssignments();
   const { rehearsalSongs } = useRehearsalSongs();
   const { partLabels } = usePartLabels();
-  const { recordings } = useRecordings();
-  const { songLyrics } = useSongLyrics();
+  const { recordings, patchRecording } = useRecordings();
+  const { songLyrics, patchLyricsRow } = useSongLyrics();
 
   const termsById = Object.fromEntries(terms.map((t) => [t.id, t]));
   const openEvent = openEventId ? events.find((e) => e.id === openEventId) : null;
@@ -103,7 +125,7 @@ function Main({ session, membership, profile }) {
         <div class="app-header-inner">
           <h1 class="app-title">${CHOIR_NAME}</h1>
           <button class="avatar-btn" title=${displayNameOf(profile)}
-            aria-label=${`${displayNameOf(profile)} — open More`} onClick=${() => setTab('more')}>
+            aria-label=${`${displayNameOf(profile)} — open More`} onClick=${() => changeTab('more')}>
             ${profile.avatar_url
               // Google gives us this on sign-in, so the mockup's avatar costs nothing. This is not
               // the deferred profile-photo *upload* — there's no upload here, just what Google
@@ -115,43 +137,49 @@ function Main({ session, membership, profile }) {
       </header>
       <main class="app-main">
         ${activeTab === 'home' ? html`
-          <${HomeTab}
+          <${HomeTab} key=${resetKeys.home}
             profile=${profile}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins}
-            onNavigate=${setTab}
+            onNavigate=${changeTab}
             onOpenEvent=${(ev) => setOpenEventId(ev.id)}
+            onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow}
+            onAbsenceSaved=${patchAbsence} onAbsenceRemoved=${removeAbsence}
           />
         ` : null}
         ${activeTab === 'calendar' ? html`
-          <${CalendarTab}
+          <${CalendarTab} key=${resetKeys.calendar}
             profileId=${profile.id}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins} awayDates=${awayDates}
             onOpenEvent=${(ev) => setOpenEventId(ev.id)}
+            onAwayDateSaved=${patchAwayDate}
           />
         ` : null}
         ${activeTab === 'repertoire' ? html`
-          <${RepertoireTab}
+          <${RepertoireTab} key=${resetKeys.repertoire}
             profile=${profile} canManage=${canManage} songs=${songs} songsLoading=${songsLoading}
             collections=${collections} collectionItems=${collectionItems}
             assignments=${assignments} partLabels=${partLabels}
             events=${events} rehearsalSongs=${rehearsalSongs}
             recordings=${recordings} directory=${directory} songLyrics=${songLyrics}
+            onLyricsSaved=${patchLyricsRow}
+            onAssignmentSaved=${patchAssignment} onRecordingSaved=${patchRecording}
           />
         ` : null}
         ${activeTab === 'more' ? html`
-          <${MoreTab} profile=${profile} terms=${terms}
+          <${MoreTab} key=${resetKeys.more} profile=${profile} terms=${terms}
             view=${moreView} setView=${setMoreView}
-            onNavigate=${setTab} onSignOut=${() => supabase.auth.signOut()} />
+            onNavigate=${changeTab} onSignOut=${() => supabase.auth.signOut()}
+            onProfileSaved=${patchProfile} />
         ` : null}
         ${activeTab === 'admin' && canManage
-          ? html`<${AdminTab} session=${session} view=${adminView} setView=${setAdminView}
-              events=${events} eventsLoading=${eventsLoading} terms=${terms} />`
+          ? html`<${AdminTab} key=${resetKeys.admin} session=${session} view=${adminView} setView=${setAdminView}
+              events=${events} eventsLoading=${eventsLoading} terms=${terms} onEventSaved=${patchEvent} />`
           : null}
       </main>
       <p class="app-footer">${APP_VERSION}</p>
-      <${BottomNav} active=${activeTab} onChange=${setTab} canManage=${canManage} />
+      <${BottomNav} active=${activeTab} onChange=${changeTab} canManage=${canManage} />
 
       ${openEvent ? html`
         <${Sheet} label=${eventTitle(openEvent)} onClose=${() => setOpenEventId(null)}>
@@ -166,6 +194,8 @@ function Main({ session, membership, profile }) {
             canManage=${canManage}
             profileId=${profile.id}
             directory=${directory}
+            onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow}
+            onAbsenceSaved=${patchAbsence} onAbsenceRemoved=${removeAbsence}
             onManage=${canManage ? (ev) => { setOpenEventId(null); manageEvent(ev); } : null}
           />
         <//>

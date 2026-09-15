@@ -951,6 +951,32 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 
 .lyrics-body { white-space: pre-wrap; font-size: 15px; line-height: 1.6; margin: 0; }
 
+/* Lyrics tab, super view (2026-09-15 visual pass) -------------------------- */
+.lyrics-card { padding: 16px; }
+.lyrics-status-row {
+  display: flex; align-items: center; gap: 8px; color: var(--ink-soft);
+  font-size: 13px; margin-bottom: 12px;
+}
+.lyrics-textarea-wrap { position: relative; }
+.lyrics-textarea { width: 100%; min-height: 220px; padding-bottom: 28px; box-sizing: border-box; }
+.lyrics-char-count {
+  position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: var(--fig-mute);
+  pointer-events: none; background: #fff;
+}
+.lyrics-actions { display: flex; gap: 10px; margin-top: 14px; }
+.lyrics-actions .btn { flex: 1; }
+.lyrics-caption { margin: 10px 0 0; font-size: 12px; color: var(--fig-mute); text-align: center; }
+.lyrics-tip-card {
+  display: flex; align-items: flex-start; gap: 12px; background: var(--purple-light);
+  border-radius: var(--radius-lg); padding: 14px 16px; margin-top: 14px;
+}
+.lyrics-tip-icon {
+  flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: #fff;
+  color: var(--purple); display: grid; place-items: center;
+}
+.lyrics-tip-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--purple-dark); }
+.lyrics-tip-body { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+
 /* --- Practice Mode, Stage 1 (2026-09-15) ------------------------------------ */
 .practice-entry-card {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
@@ -982,6 +1008,8 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   padding: 13px 14px; cursor: pointer; font: inherit;
 }
 .practice-select-row-on { border-color: var(--purple); background: var(--purple-light); }
+.practice-select-row-disabled { cursor: default; opacity: 0.55; }
+.practice-select-text { display: flex; flex-direction: column; gap: 1px; }
 .practice-checkbox {
   flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--border);
   background: #fff; display: grid; place-items: center; color: #fff;

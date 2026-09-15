@@ -30,10 +30,10 @@ const SECTIONS = [
     body: 'Update choir details, term dates and preferences.', soon: true },
 ];
 
-export function AdminTab({ session, view, setView, events, eventsLoading, terms }) {
+export function AdminTab({ session, view, setView, events, eventsLoading, terms, onEventSaved }) {
   if (view?.section === 'events') {
     return html`<${AdminEvents} events=${events} loading=${eventsLoading} terms=${terms}
-      initialEditId=${view.editId || null} onBack=${() => setView(null)} />`;
+      initialEditId=${view.editId || null} onBack=${() => setView(null)} onEventSaved=${onEventSaved} />`;
   }
   if (view?.section === 'members') {
     return html`<${AdminMembers} session=${session} onBack=${() => setView(null)} />`;
@@ -96,7 +96,7 @@ function AdminHead({ title, onBack, action = null }) {
 // events are created or changed. Tapping a row here opens the editor rather than the member
 // detail screen — in this context editing is the intent, not reading.
 // ---------------------------------------------------------------------------
-function AdminEvents({ events, loading, terms, initialEditId, onBack }) {
+function AdminEvents({ events, loading, terms, initialEditId, onBack, onEventSaved }) {
   const [editing, setEditing] = useState(() => {
     if (!initialEditId) return null;
     const ev = events.find((e) => e.id === initialEditId);
@@ -116,6 +116,7 @@ function AdminEvents({ events, loading, terms, initialEditId, onBack }) {
     onOpen: (ev) => setEditing({ event: ev, focus: null }),
     onEdit: (ev) => setEditing({ event: ev, focus: null }),
     onReschedule: (ev) => setEditing({ event: ev, focus: 'date' }),
+    onEventSaved,
   });
 
   return html`
@@ -128,7 +129,7 @@ function AdminEvents({ events, loading, terms, initialEditId, onBack }) {
 
       ${editing ? html`
         <${EventForm} event=${editing.event} focusField=${editing.focus} terms=${terms}
-          onDone=${() => setEditing(null)} />
+          onDone=${(saved) => { onEventSaved?.(saved); setEditing(null); }} />
       ` : null}
 
       ${loading ? html`<${LoadingState} label="Loading events…" />` : null}
@@ -161,12 +162,12 @@ function AdminEvents({ events, loading, terms, initialEditId, onBack }) {
 // stops anyone approving or promoting themselves, so it's its own piece of work.
 // ---------------------------------------------------------------------------
 function AdminMembers({ session, onBack }) {
-  const { memberships } = useAllMemberships();
+  const { memberships, patchMembership } = useAllMemberships();
 
   return html`
     <div class="tab-content">
       <${AdminHead} title="Members" onBack=${onBack} />
-      <${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} />
+      <${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} onMembershipSaved=${patchMembership} />
     </div>
   `;
 }

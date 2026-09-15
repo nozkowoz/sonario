@@ -21,7 +21,7 @@ function useProfilesById(ids) {
   return byId;
 }
 
-function MemberRow({ membership, profile, myProfileId, onAction, onRole }) {
+function MemberRow({ membership, profile, myProfileId, onAction, onRole, onMembershipSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [confirming, setConfirming] = useState(null); // null | 'promote' | 'demote'
@@ -41,7 +41,11 @@ function MemberRow({ membership, profile, myProfileId, onAction, onRole }) {
     if (err) { setError(err.message); return; }
     if (!data || data.length === 0) {
       setError("That didn't save — check you still have organiser access.");
+      return;
     }
+    // Realtime round trip isn't instant — patch the local list directly, same pass as
+    // check-ins/absences/everything else, 2026-09-15.
+    onMembershipSaved?.(data[0]);
   };
 
   return html`
@@ -96,7 +100,7 @@ function MemberRow({ membership, profile, myProfileId, onAction, onRole }) {
   `;
 }
 
-export function ApprovalQueue({ memberships, myProfileId }) {
+export function ApprovalQueue({ memberships, myProfileId, onMembershipSaved }) {
   const [selected, setSelected] = useState(new Set());
   const [bulking, setBulking] = useState(false);
 
@@ -124,6 +128,8 @@ export function ApprovalQueue({ memberships, myProfileId }) {
     const results = await Promise.all([...selected].map((id) => doDecide(id, { status: 'active' })));
     // Same "no error, no rows" trap as the single actions: count what actually landed.
     const failed = results.filter((r) => r.error || !r.data || r.data.length === 0).length;
+    // Patch every row that genuinely landed, same reasoning as the single-row action above.
+    for (const r of results) { if (!r.error && r.data?.[0]) onMembershipSaved?.(r.data[0]); }
     setSelected(new Set());
     setBulking(false);
     if (failed) setBulkError(`${failed} of ${results.length} couldn't be approved — check you still have organiser access.`);
@@ -144,20 +150,20 @@ export function ApprovalQueue({ memberships, myProfileId }) {
         <div key=${m.id} style=${{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <input type="checkbox" checked=${selected.has(m.profile_id)} onChange=${() => toggle(m.profile_id)} style=${{ flexShrink: 0 }} />
           <div style=${{ flex: 1 }}>
-            <${MemberRow} membership=${m} profile=${profilesById[m.profile_id]} myProfileId=${myProfileId} onAction=${doDecide} onRole=${doRole} />
+            <${MemberRow} membership=${m} profile=${profilesById[m.profile_id]} myProfileId=${myProfileId} onAction=${doDecide} onRole=${doRole} onMembershipSaved=${onMembershipSaved} />
           </div>
         </div>
       `)}
 
       <h2 class="section-header-secondary">Active members</h2>
       ${active.length === 0 ? html`<p class="empty-state">Nobody active yet.</p>` : active.map((m) => html`
-        <${MemberRow} key=${m.id} membership=${m} profile=${profilesById[m.profile_id]} myProfileId=${myProfileId} onAction=${doDecide} onRole=${doRole} />
+        <${MemberRow} key=${m.id} membership=${m} profile=${profilesById[m.profile_id]} myProfileId=${myProfileId} onAction=${doDecide} onRole=${doRole} onMembershipSaved=${onMembershipSaved} />
       `)}
 
       ${other.length > 0 ? html`
         <h2 class="section-header-secondary">Declined / deactivated</h2>
         ${other.map((m) => html`
-          <${MemberRow} key=${m.id} membership=${m} profile=${profilesById[m.profile_id]} myProfileId=${myProfileId} onAction=${doDecide} onRole=${doRole} />
+          <${MemberRow} key=${m.id} membership=${m} profile=${profilesById[m.profile_id]} myProfileId=${myProfileId} onAction=${doDecide} onRole=${doRole} onMembershipSaved=${onMembershipSaved} />
         `)}
       ` : null}
     </div>

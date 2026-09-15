@@ -218,3 +218,20 @@ export const IconSkipForward = ({ size }) => svg(html`
   <path d="M6 5v14l11-7-11-7Z" />
   <rect x="17" y="5" width="2" height="14" rx="0.5" />
 `, { size, fill: 'currentColor', stroke: false });
+
+// Lyrics tab (Song Detail): locked/unlocked for the release status row and the Release button,
+// a lightbulb for the "Tip" callout.
+export const IconLock = ({ size }) => svg(html`
+  <rect x="5" y="10.5" width="14" height="9.5" rx="2.2" />
+  <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+`, { size });
+
+export const IconLockOpen = ({ size }) => svg(html`
+  <rect x="5" y="10.5" width="14" height="9.5" rx="2.2" />
+  <path d="M8 10.5V7.5a4 4 0 0 1 7.3-2.3" />
+`, { size });
+
+export const IconBulb = ({ size }) => svg(html`
+  <path d="M9.5 18h5M10.2 21h3.6" />
+  <path d="M12 3a6 6 0 0 0-3.4 10.9c.5.35.8.9.8 1.5v.1h5.2v-.1c0-.6.3-1.15.8-1.5A6 6 0 0 0 12 3Z" />
+`, { size });
