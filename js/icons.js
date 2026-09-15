@@ -202,3 +202,19 @@ export const IconSearch = ({ size }) => svg(html`
   <circle cx="10.5" cy="10.5" r="6.5" />
   <path d="M20 20l-5-5" />
 `, { size });
+
+// Practice Mode player (Stage 2): filled, matching IconPlay's convention.
+export const IconPause = ({ size }) => svg(html`
+  <rect x="6" y="4" width="4" height="16" rx="1" />
+  <rect x="14" y="4" width="4" height="16" rx="1" />
+`, { size, fill: 'currentColor', stroke: false });
+
+export const IconSkipBack = ({ size }) => svg(html`
+  <path d="M18 5v14l-11-7 11-7Z" />
+  <rect x="5" y="5" width="2" height="14" rx="0.5" />
+`, { size, fill: 'currentColor', stroke: false });
+
+export const IconSkipForward = ({ size }) => svg(html`
+  <path d="M6 5v14l11-7-11-7Z" />
+  <rect x="17" y="5" width="2" height="14" rx="0.5" />
+`, { size, fill: 'currentColor', stroke: false });

@@ -1010,6 +1010,58 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .practice-mode-title { font-size: 14px; font-weight: 700; color: var(--fig-ink); }
 .practice-remaining { font-size: 12px; font-weight: 700; color: var(--error); }
 
+/* --- Practice Mode player, Stage 2 (2026-09-15) ------------------------------ */
+/* Deliberately dark — the one screen in this app that isn't white/purple, per the Figma. Bleeds
+   edge to edge the same way .cal-top does, rather than a fixed-position overlay, since the app
+   header and bottom nav stay visible around it exactly like every other Repertoire screen. */
+.practice-player {
+  margin: calc(var(--main-pad) * -1) calc(var(--main-pad) * -1) calc(var(--main-pad) * -1 + 8px);
+  padding: 20px 20px 32px;
+  background: #120c24; color: #fff;
+  display: flex; flex-direction: column; align-items: center;
+  border-radius: var(--radius-lg);
+}
+.practice-player-top { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 22px; }
+.practice-player-done {
+  display: flex; align-items: center; gap: 4px; border: none; background: none; cursor: pointer;
+  color: #fff; font-size: 14px; font-weight: 600; padding: 0;
+}
+.practice-player-label { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); }
+.practice-waveform { margin: 4px 0 18px; max-width: 100%; }
+.practice-now-playing { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); margin: 0; }
+.practice-player-title { font-size: 22px; font-weight: 800; margin: 6px 0 12px; text-align: center; }
+.practice-player-badge {
+  background: rgba(112, 82, 205, 0.35); color: #cabdf4; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.4px; padding: 5px 14px; border-radius: 99px; text-transform: uppercase; margin-bottom: 20px;
+}
+.practice-skip-notice { font-size: 13px; color: #f0c9c9; margin: -8px 0 16px; text-align: center; }
+.practice-controls { display: flex; align-items: center; gap: 26px; margin-bottom: 28px; }
+.practice-control-btn { border: none; background: none; color: rgba(255, 255, 255, 0.65); cursor: pointer; padding: 6px; }
+.practice-control-btn:disabled { color: rgba(255, 255, 255, 0.2); cursor: default; }
+.practice-control-btn:not(:disabled):hover { color: #fff; }
+.practice-play-btn {
+  width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--purple); color: #fff; display: grid; place-items: center;
+}
+.practice-play-btn:disabled { opacity: 0.5; cursor: default; }
+.practice-up-next-label {
+  align-self: flex-start; width: 100%; font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: rgba(255, 255, 255, 0.45); margin: 0 0 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 16px;
+}
+.practice-queue-list { width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.practice-queue-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: none;
+  background: none; cursor: pointer; padding: 10px 8px; border-radius: 10px; color: #fff; font: inherit;
+}
+.practice-queue-row-active { background: rgba(255, 255, 255, 0.07); }
+.practice-queue-row-disabled { cursor: default; opacity: 0.45; }
+.practice-queue-index { width: 16px; flex-shrink: 0; font-size: 13px; font-weight: 700; color: #a48eea; text-align: center; }
+.practice-queue-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.practice-queue-title { font-size: 14px; font-weight: 700; }
+.practice-queue-sub { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+.practice-queue-row-active .practice-queue-sub { color: #cabdf4; }
+
 .rep-collection-list { display: flex; flex-direction: column; gap: 10px; }
 .rep-collection-card {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;

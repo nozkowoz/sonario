@@ -1,7 +1,10 @@
-import { html, useState, useMemo } from './lib.js';
-import { setSongPart, clearSongPart } from './store.js';
-import { IconBack, IconChevron, IconPlay, IconCheck } from './icons.js';
+import { html, useState, useEffect, useRef, useMemo } from './lib.js';
+import { setSongPart, clearSongPart, getRecordingUrl } from './store.js';
+import {
+  IconBack, IconChevron, IconPlay, IconCheck, IconPause, IconSkipBack, IconSkipForward,
+} from './icons.js';
 import { myAssignment, groupSongsByCollection, partLabelText, PartPickerSheet } from './repertoire.js';
+import { EmptyState } from './shell.js';
 
 // Practice Mode — Stage 1 (2026-09-15): song selection + mode/part setup, against the five Figma
 // screens Nina supplied. No new schema: everything here reads/writes the same songs/
@@ -99,7 +102,7 @@ function SongSelectScreen({ songs, collections, collectionItems, selectedIds, on
 }
 
 // --- Step 2: mode + per-song part resolution ----------------------------------
-function ModeAndPartsScreen({ songs, assignments, partLabels, profileId, mode, onModeChange, onEditPart, onBack, onStart }) {
+function ModeAndPartsScreen({ songs, assignments, partLabels, profileId, mode, onModeChange, onEditPart, onBack, onStart, startError }) {
   const needsParts = mode !== 'whole_choir';
   const remaining = needsParts ? songs.filter((s) => !myAssignment(assignments, s.id, profileId)).length : 0;
   const ready = !needsParts || remaining === 0;
@@ -144,6 +147,7 @@ function ModeAndPartsScreen({ songs, assignments, partLabels, profileId, mode, o
         ` : null}
       </div>
       <div class="practice-sticky-footer">
+        ${startError ? html`<p class="absence-error" style="margin:0 0 10px;">${startError}</p>` : null}
         <button class="btn btn-primary" style="width:100%;" disabled=${!ready} onClick=${onStart}>
           ${ready ? 'Start practicing' : `Choose ${remaining} more part${remaining === 1 ? '' : 's'}`}
         </button>
@@ -184,9 +188,178 @@ export function buildPracticeQueue({ songs, mode, assignments, profileId, record
   return queue;
 }
 
+// --- Step 3: the player ----------------------------------------------------------
+// Decorative/static only, per Nina 2026-09-15: "Absolutely no audio analysis or generated
+// waveform for MVP." Same bars every render, regardless of play state.
+function PracticeWaveform() {
+  const heights = [14, 20, 28, 38, 52, 68, 88, 68, 52, 38, 28, 20, 14];
+  const mid = (heights.length - 1) / 2;
+  return html`
+    <svg class="practice-waveform" viewBox="0 0 200 100" width="200" height="100" aria-hidden="true">
+      ${heights.map((h, i) => html`
+        <rect key=${i} x=${i * 15 + 5} y=${50 - h / 2} width="6" height=${h} rx="3"
+          fill=${Math.abs(i - mid) <= 1 ? 'var(--purple)' : 'rgba(255,255,255,0.25)'} />
+      `)}
+    </svg>
+  `;
+}
+
+function partBadgeText(entry, partLabels) {
+  return entry.kind === 'whole_choir' ? 'WHOLE CHOIR' : `${partLabelText(entry.partKey, partLabels).toUpperCase()} ONLY`;
+}
+function partBadgeSub(entry, partLabels) {
+  return entry.kind === 'whole_choir' ? 'Whole choir' : `${partLabelText(entry.partKey, partLabels)} only`;
+}
+
+// Steps from `startIndex` in `direction` (+1/-1) until it finds a queue entry with a resolved
+// recording, or runs off the end — -1 means "nothing playable that way". Used for initial track
+// selection, Previous/Next, and auto-advance-on-ended, so "landing on" an unavailable entry never
+// actually happens during playback — the position counter still reflects the real queue index
+// (queue entries aren't removed), it just silently steps past gaps.
+function findAvailable(queue, startIndex, direction) {
+  let i = startIndex;
+  while (i >= 0 && i < queue.length) {
+    if (queue[i].recording) return i;
+    i += direction;
+  }
+  return -1;
+}
+
+function PlayerScreen({ queue, partLabels, onClose }) {
+  const [queueIndex, setQueueIndex] = useState(() => findAvailable(queue, 0, 1));
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState(null);
+  const [skipNotice, setSkipNotice] = useState(null);
+  const audioRef = useRef(null);
+
+  const entry = queueIndex >= 0 ? queue[queueIndex] : null;
+
+  // Fetch a fresh signed URL whenever the current track changes, then autoplay it — the same
+  // on-demand pattern RecordingRow already uses, not pre-fetched for the whole queue up front
+  // (a long practice session would otherwise risk the 1-hour signed URL expiring mid-session).
+  useEffect(() => {
+    if (!entry?.recording) return;
+    let cancelled = false;
+    setLoadingUrl(true);
+    setError(null);
+    getRecordingUrl(entry.recording.storage_path).then(({ data, error: err }) => {
+      if (cancelled) return;
+      setLoadingUrl(false);
+      if (err || !data?.signedUrl) { setError("Couldn't load this recording — try again."); return; }
+      if (audioRef.current) {
+        audioRef.current.src = data.signedUrl;
+        audioRef.current.play().catch(() => {});
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry?.recording?.id]);
+
+  useEffect(() => {
+    if (!skipNotice) return;
+    const t = setTimeout(() => setSkipNotice(null), 3500);
+    return () => clearTimeout(t);
+  }, [skipNotice]);
+
+  const advance = (direction) => {
+    const from = queueIndex + direction;
+    if (from < 0 || from >= queue.length) return;
+    const found = findAvailable(queue, from, direction);
+    if (found === -1) return;
+    if (found !== from) {
+      const skipped = queue[from];
+      setSkipNotice(`No ${partBadgeSub(skipped, partLabels)} recording for "${skipped.songTitle}" — skipped`);
+    }
+    setPlaying(false);
+    setQueueIndex(found);
+  };
+
+  const jumpTo = (i) => {
+    if (!queue[i].recording || i === queueIndex) return;
+    setSkipNotice(null);
+    setPlaying(false);
+    setQueueIndex(i);
+  };
+
+  const togglePlay = () => {
+    const el = audioRef.current;
+    if (!el || !el.src || loadingUrl) return;
+    if (playing) el.pause(); else el.play().catch(() => {});
+  };
+
+  const canPrev = findAvailable(queue, queueIndex - 1, -1) !== -1;
+  const canNext = findAvailable(queue, queueIndex + 1, 1) !== -1;
+
+  if (!entry) {
+    // Reachable only if every queue entry became unavailable after the queue was built (a
+    // recording deleted mid-session) — the "nothing playable at all" case is caught before this
+    // screen ever opens, in PracticeFlow's start().
+    return html`
+      <div class="practice-player">
+        <button class="practice-player-done" onClick=${onClose}><${IconBack} size=${14} /> Done</button>
+        <${EmptyState} title="Nothing left to play" body="Every recording in this session is now unavailable." />
+      </div>
+    `;
+  }
+
+  return html`
+    <div class="practice-player">
+      <div class="practice-player-top">
+        <button class="practice-player-done" onClick=${onClose}><${IconBack} size=${14} /> Done</button>
+        <span class="practice-player-label">Practice Mode</span>
+        <span></span>
+      </div>
+
+      <${PracticeWaveform} />
+
+      <p class="practice-now-playing">Now playing · ${queueIndex + 1} of ${queue.length}</p>
+      <h2 class="practice-player-title">${entry.songTitle}</h2>
+      <span class="practice-player-badge">${partBadgeText(entry, partLabels)}</span>
+
+      ${skipNotice ? html`<p class="practice-skip-notice">${skipNotice}</p>` : null}
+      ${error ? html`<p class="practice-skip-notice">${error}</p>` : null}
+
+      <div class="practice-controls">
+        <button class="practice-control-btn" disabled=${!canPrev} aria-label="Previous" onClick=${() => advance(-1)}>
+          <${IconSkipBack} size=${20} />
+        </button>
+        <button class="practice-play-btn" disabled=${loadingUrl} aria-label=${playing ? 'Pause' : 'Play'} onClick=${togglePlay}>
+          ${playing ? html`<${IconPause} size=${22} />` : html`<${IconPlay} size=${22} />`}
+        </button>
+        <button class="practice-control-btn" disabled=${!canNext} aria-label="Next" onClick=${() => advance(1)}>
+          <${IconSkipForward} size=${20} />
+        </button>
+      </div>
+
+      <p class="practice-up-next-label">Up next</p>
+      <div class="practice-queue-list">
+        ${queue.map((q, i) => html`
+          <button key=${i}
+            class=${`practice-queue-row ${i === queueIndex ? 'practice-queue-row-active' : ''} ${!q.recording ? 'practice-queue-row-disabled' : ''}`}
+            disabled=${!q.recording} onClick=${() => jumpTo(i)}>
+            <span class="practice-queue-index">${i + 1}</span>
+            <span class="practice-queue-text">
+              <span class="practice-queue-title">${q.songTitle}</span>
+              <span class="practice-queue-sub">${q.recording ? partBadgeSub(q, partLabels) : `No ${partBadgeSub(q, partLabels)} recording yet`}</span>
+            </span>
+            ${q.recording ? html`<${IconPlay} size=${13} />` : null}
+          </button>
+        `)}
+      </div>
+
+      <audio ref=${audioRef} style="display:none;"
+        onEnded=${() => advance(1)} onPlay=${() => setPlaying(true)} onPause=${() => setPlaying(false)}
+        onError=${() => setError("Couldn't play this recording — try Next.")} />
+    </div>
+  `;
+}
+
 // --- Orchestrator ----------------------------------------------------------------
 export function PracticeFlow({ songs, collections, collectionItems, assignments, partLabels, recordings, profile, onClose }) {
-  const [step, setStep] = useState('select'); // 'select' | 'mode'
+  const [step, setStep] = useState('select'); // 'select' | 'mode' | 'player'
+  const [queue, setQueue] = useState(null);
+  const [startError, setStartError] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [mode, setMode] = useState('my_part');
   const [editingSong, setEditingSong] = useState(null);
@@ -241,13 +414,17 @@ export function PracticeFlow({ songs, collections, collectionItems, assignments,
     partLabels=${partLabels} saving=${saving} error=${pickError}
     onPick=${savePart} onClear=${clearPart} onClose=${closePicker} />` : null;
 
-  // Stage 1 stand-in for Stage 2's real player screen: prove the queue is right, don't build a
-  // throwaway placeholder UI that looks like it's trying to be the final design.
+  // Don't open the player at all if nothing in the session can actually play — agreed
+  // 2026-09-15 ("don't enter an empty player — show a useful message instead").
   const start = () => {
-    const queue = buildPracticeQueue({ songs: selectedSongs, mode, assignments, profileId: profile.id, recordings });
-    // eslint-disable-next-line no-console
-    console.log('[Practice Mode] generated queue', queue);
-    window.__practiceQueue = queue;
+    const q = buildPracticeQueue({ songs: selectedSongs, mode, assignments, profileId: profile.id, recordings });
+    if (!q.some((e) => e.recording)) {
+      setStartError('None of the selected songs have a recording yet for this practice mode — add one from Song Detail first.');
+      return;
+    }
+    setStartError(null);
+    setQueue(q);
+    setStep('player');
   };
 
   if (step === 'select') {
@@ -259,11 +436,15 @@ export function PracticeFlow({ songs, collections, collectionItems, assignments,
     `;
   }
 
+  if (step === 'player') {
+    return html`<${PlayerScreen} queue=${queue} partLabels=${partLabels} onClose=${onClose} />`;
+  }
+
   return html`
     <${ModeAndPartsScreen}
       songs=${selectedSongs} assignments=${assignments} partLabels=${partLabels} profileId=${profile.id}
       mode=${mode} onModeChange=${setMode} onEditPart=${openPicker}
-      onBack=${() => setStep('select')} onStart=${start} />
+      onBack=${() => setStep('select')} onStart=${start} startError=${startError} />
     ${picker}
   `;
 }
