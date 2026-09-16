@@ -279,6 +279,12 @@ export function CalendarTab({
   // road ahead. Scoping the list to the visible week would put six events on screen at most and
   // make the strip mandatory navigation rather than a shortcut.
   const today = todayStr();
+  // Nina, 2026-09-13: "make it more visually obvious which dates fall in Term 3 vs Term 4" — each
+  // month group now also names its term (from its first event's term_id), so scrolling past the
+  // September/October boundary doesn't rely on already knowing where one term ends and the next
+  // begins. A month landing entirely within one term (the normal case — the school-holiday gap
+  // between terms already tends to fall on a month boundary) shows one term name; this takes the
+  // first event's term either way rather than trying to represent a genuine split within a month.
   const groups = useMemo(() => {
     const upcoming = events
       .filter((e) => e.rehearsal_date >= today && matchesFilter(e));
@@ -288,10 +294,13 @@ export function CalendarTab({
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       const last = out[out.length - 1];
       if (last && last.key === key) last.events.push(e);
-      else out.push({ key, label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, events: [e] });
+      else {
+        const term = e.term_id ? terms.find((t) => t.id === e.term_id) : null;
+        out.push({ key, label: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, termName: term?.name || null, events: [e] });
+      }
     }
     return out;
-  }, [events, today, filter]);
+  }, [events, terms, today, filter]);
 
   const dayEvents = dayFilter ? (eventsByDate[dayFilter] || []).filter(matchesFilter) : [];
 
@@ -362,7 +371,10 @@ export function CalendarTab({
         ${groups.length
           ? groups.map((g) => html`
               <div key=${g.key} class="month-group">
-                <p class="month-group-title">${g.label}</p>
+                <div class="month-group-head">
+                  <p class="month-group-title">${g.label}</p>
+                  ${g.termName ? html`<span class="month-group-term">${g.termName}</span>` : null}
+                </div>
                 <div class="rail-list">${g.events.map(row)}</div>
               </div>
             `)

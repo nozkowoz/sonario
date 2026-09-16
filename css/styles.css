@@ -823,9 +823,14 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 
 /* --- Calendar: month groups in the list --------------------------------- */
 .month-group + .month-group { margin-top: 20px; }
+.month-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .month-group-title {
   margin: 0; font-size: 11px; font-weight: 800; line-height: 16.5px; letter-spacing: 1.32px;
   text-transform: uppercase; color: var(--fig-mute);
+}
+.month-group-term {
+  background: var(--purple-light); color: var(--purple-dark); font-weight: 700; font-size: 11px;
+  padding: 2px 8px; border-radius: 10px; white-space: nowrap;
 }
 .month-group .rail-list { margin-top: 8px; }
 

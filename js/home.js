@@ -167,10 +167,14 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
   );
 
   // Everything after the hero's own event, so the same rehearsal isn't listed twice.
+  // Cancelled events stay in this list rather than disappearing — Nina, 2026-09-17: "still good to
+  // have it for visibility". RailRow already renders a cancelled event crossed out
+  // (rowTintClass -> rail-row-cancelled), so no separate handling is needed here beyond not
+  // filtering it out.
   const upcoming = useMemo(() => {
     const today = todayStr();
     return events
-      .filter((e) => e.rehearsal_date >= today && e.status !== 'cancelled' && e.id !== next?.id)
+      .filter((e) => e.rehearsal_date >= today && e.id !== next?.id)
       .slice(0, 5);
   }, [events, next]);
 
