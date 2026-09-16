@@ -3,8 +3,9 @@ import { todayStr, formatEventDateLong } from './lib.js';
 import { ApprovalQueue } from './approvals.js';
 import { useAllMemberships, backfillCheckin, removeBackfillCheckin } from './store.js';
 import { EventRow, EventForm } from './events.js';
+import { AdminInvoices } from './invoices.js';
 import { EmptyState, LoadingState } from './shell.js';
-import { IconCalendar, IconUsers, IconCheckSquare, IconBell, IconAdmin, IconCrown,
+import { IconCalendar, IconUsers, IconCheckSquare, IconBell, IconAdmin, IconCrown, IconInvoice,
   IconChevron, IconBack, IconCheck } from './icons.js';
 
 // The organiser console. Everything an organiser does lives here, so the member-facing screens
@@ -24,6 +25,8 @@ const SECTIONS = [
   // these is real work rather than a screen waiting to be drawn.
   { key: 'attendance', label: 'Attendance', Icon: IconCheckSquare,
     body: 'Backfill past attendance for a member, week by week.' },
+  { key: 'invoices', label: 'Invoices', Icon: IconInvoice,
+    body: 'Generate term invoices and manage invoice numbering.' },
   { key: 'notifications', label: 'Notifications', Icon: IconBell,
     body: 'Send and schedule messages to your choir.', soon: true },
   { key: 'settings', label: 'Settings', Icon: IconAdmin,
@@ -44,6 +47,10 @@ export function AdminTab({
   if (view?.section === 'attendance') {
     return html`<${AdminAttendance} session=${session} events=${events} directory=${directory}
       checkins=${checkins} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved}
+      onBack=${() => setView(null)} />`;
+  }
+  if (view?.section === 'invoices') {
+    return html`<${AdminInvoices} terms=${terms} directory=${directory} profileId=${session.user.id}
       onBack=${() => setView(null)} />`;
   }
   if (view?.section) {

@@ -171,17 +171,14 @@ export function useRehearsals() {
 // (RSVPs became the absence-only model, and check-ins live in `checkins`). Nothing imported
 // them — the dead components query those old tables directly — and the name `useCheckins` is now
 // the real Step D hook further down.
-export function useSocialEvents() {
-  const { rows, loading } = useLiveTable('social_events', {
-    orderFn: (a, b) => a.event_date.localeCompare(b.event_date),
-  });
-  return { socialEvents: rows, loading };
-}
-
-export function useSocialRsvps() {
-  const { rows, loading } = useLiveTable('social_rsvps');
-  return { socialRsvps: rows, loading };
-}
+//
+// `useSocialEvents`/`useSocialRsvps` used to sit here too, pointing at `social_events`/
+// `social_rsvps` — the SAME kind of dead pre-rebuild leftover as the paragraph above, just missed
+// the first sweep. Confirmed 2026-09-17: neither table exists live (they're from the old
+// schema.sql, deliberately never applied — see 0001_foundation.sql's own note), and nothing
+// imported these two hooks either. Removed in the same commit that adds the real thing below,
+// which correctly keys off `rehearsal_id` — a social event today is just a `rehearsals` row with
+// event_type='social'.
 
 export function useSongs() {
   const { rows, loading } = useLiveTable('songs', {
@@ -242,10 +239,14 @@ export function useRecordings() {
 // The path shape is fixed: {song_id}/{part_label}/{id}.{ext} — agreed when the bucket was built.
 const extOf = (mimeType) => ({
   'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/wav': 'wav',
+  'video/mp4': 'mp4',
 }[mimeType] || 'bin');
 
-export async function uploadRecording({ songId, partLabel, profileId, file, title, durationSeconds }) {
-  const id = crypto.randomUUID();
+export async function uploadRecording({ songId, partLabel, profileId, file, title, durationSeconds, id }) {
+  // Caller may pass its own id (generated up front) so it can recognise and hide this row —
+  // Realtime broadcasts the DB insert below well before the Storage upload finishes, so without
+  // this the sheet's own in-flight upload flashes back at it as an "existing" recording.
+  id = id || crypto.randomUUID();
   const path = `${songId}/${partLabel}/${id}.${extOf(file.type)}`;
 
   const { data: row, error: insertError } = await supabase.from('recordings').insert({
@@ -420,7 +421,7 @@ export function useMemberDirectory(enabled = true) {
 // --- Event mutations (super only — enforced by the "super manage rehearsals" policy, not by
 // --- whether the client chose to render the button). -------------------------------------
 
-export const EVENT_TYPES = ['rehearsal', 'workshop', 'performance', 'social'];
+export const EVENT_TYPES = ['rehearsal', 'workshop', 'performance', 'social', 'other'];
 
 export async function createEvent(fields) {
   return supabase.from('rehearsals').insert(eventPayload(fields)).select().maybeSingle();
@@ -464,6 +465,29 @@ export async function clearAbsence(eventId, profileId) {
   // indistinguishable from a successful one, and the caller had nothing to hand to removeAbsence.
   return supabase.from('rehearsal_absences').delete()
     .eq('rehearsal_id', eventId).eq('profile_id', profileId).select();
+}
+
+// --- Social event RSVP (migration 0014) -------------------------------------
+// Unlike an absence (binary, insert-or-delete), an RSVP has three states a member moves between
+// freely, so upsert is the natural write — one call handles "first answer" and "changed my mind"
+// alike, letting the unique(rehearsal_id, profile_id) constraint do the "is this new or a change"
+// decision server-side instead of the client guessing which of insert/update to send.
+export function useEventRsvps() {
+  const { rows, loading, patchRow, removeRow } = useLiveTable('event_rsvps');
+  return { eventRsvps: rows, loading, patchRsvp: patchRow, removeRsvp: removeRow };
+}
+
+export async function setRsvp({ rehearsalId, profileId, status }) {
+  return supabase.from('event_rsvps')
+    .upsert({ rehearsal_id: rehearsalId, profile_id: profileId, status }, { onConflict: 'rehearsal_id,profile_id' })
+    .select().maybeSingle();
+}
+
+// "Clear" is a real third option alongside Going/Not going/Maybe — back to no answer at all —
+// distinct from "Not going", which is itself a positive answer.
+export async function clearRsvp(rehearsalId, profileId) {
+  return supabase.from('event_rsvps').delete()
+    .eq('rehearsal_id', rehearsalId).eq('profile_id', profileId).select();
 }
 
 // --- Leave / away dates ----------------------------------------------------
@@ -588,4 +612,77 @@ export async function backfillCheckin({ rehearsalId, profileId, correctedBy, rea
 // super fixing their own backfill mistake), not windowed to an hour like the live-checkin undo.
 export async function removeBackfillCheckin(id) {
   return supabase.from('checkins').delete().eq('id', id).eq('source', 'super_backfill').select();
+}
+
+// --- Invoicing (migration 0015/0016) ----------------------------------------
+// Deliberately NOT using useLiveTable's generic list pattern for `invoices` — unlike everything
+// else in this app, that table has no natural bound (it grows every term, indefinitely, across
+// years of the choir's life), and this feature never needs the WHOLE table client-side at once,
+// only "this run's invoices" or "does this term already have any". invoice_runs stays small and
+// bounded (one row per generation), so it does get the normal live-table treatment. Neither table
+// is in the Realtime publication (see 0015's header) — multi-admin live sync isn't needed for
+// admin-only tooling like this, so writes patch local state directly, same as song_lyrics.
+
+export function useInvoiceSettings() {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from('invoice_settings').select('*').eq('id', 1).maybeSingle().then(({ data, error }) => {
+      if (cancelled) return;
+      if (!error && data) setSettings(data);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  return { settings, loading, setSettings };
+}
+
+export async function updateInvoiceFee(feeCents, updatedBy) {
+  return supabase.from('invoice_settings')
+    .update({ fee_cents: feeCents, updated_by: updatedBy })
+    .eq('id', 1).select().maybeSingle();
+}
+
+// The one-time numbering setup RPC (see 0015 for the full set of database-side guarantees this
+// relies on — this call is deliberately thin, all the actual safety lives server-side).
+export async function initializeInvoiceNumbering(nextNumber) {
+  return supabase.rpc('initialize_invoice_numbering', { p_next_number: nextNumber });
+}
+
+export function useInvoiceRuns() {
+  const { rows, loading, patchRow } = useLiveTable('invoice_runs', {
+    orderFn: (a, b) => b.created_at.localeCompare(a.created_at),
+  });
+  return { invoiceRuns: rows, loading, patchInvoiceRun: patchRow };
+}
+
+// Generates a whole term's batch atomically server-side — see create_invoice_run() in 0015.
+// profileIds is the admin's own reviewed Preview-step selection, not re-derived here.
+export async function createInvoiceRun({ termId, invoiceDate, dueDate, feeCents, profileIds }) {
+  return supabase.rpc('create_invoice_run', {
+    p_term_id: termId, p_invoice_date: invoiceDate, p_due_date: dueDate,
+    p_fee_cents: feeCents, p_profile_ids: profileIds,
+  });
+}
+
+export async function fetchInvoicesForRun(runId) {
+  return supabase.from('invoices').select('*').eq('invoice_run_id', runId).order('invoice_number');
+}
+
+// For the Preview step: WHICH members already have an invoice for this term, not just a count —
+// unique(term_id, profile_id) means submitting even one of these in the run fails the WHOLE batch
+// (see create_invoice_run's atomicity in 0015), so Preview pre-deselects exactly these people
+// rather than surprising the admin with an all-or-nothing rejection after the fact.
+export async function fetchInvoicedProfileIdsForTerm(termId) {
+  const { data, error } = await supabase.from('invoices').select('profile_id').eq('term_id', termId);
+  return { data: data?.map((r) => r.profile_id) ?? null, error };
+}
+
+// due_date is the one field an issued invoice can change (see enforce_invoice_immutability() in
+// 0015 — attempting to touch anything else here fails at the database, not just in this app).
+export async function updateInvoiceDueDate(invoiceId, dueDate) {
+  return supabase.from('invoices').update({ due_date: dueDate }).eq('id', invoiceId).select().maybeSingle();
 }

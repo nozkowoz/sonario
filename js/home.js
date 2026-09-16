@@ -1,9 +1,9 @@
-import { html, useMemo } from './lib.js';
+import { html, useMemo, useState } from './lib.js';
 import { formatDateRail, formatWeekdayLong, formatDayMonthLong, formatTimeRange,
   parseLocalDate, relativeDayLabel, todayStr } from './lib.js';
 import { displayNameOf } from './store.js';
 import { EVENT_TYPE_LABEL, nextEvent, currentTermOf, AbsenceToggle, RailRow } from './events.js';
-import { CheckInPanel, AttendanceStatus, isCheckInDay } from './checkin.js';
+import { CheckInPanel, AttendanceStatus, AttendanceHistoryView, isCheckInDay } from './checkin.js';
 import { IconMegaphone, IconPinFilled } from './icons.js';
 import { LoadingState, EmptyState } from './shell.js';
 
@@ -102,8 +102,9 @@ function termStats({ term, events, checkins, profileId }) {
   };
 }
 
-export function HomeTab({ profile, events, loading, terms, absences, checkins, onNavigate,
-  onOpenEvent, onCheckinSaved, onCheckinRemoved, onAbsenceSaved, onAbsenceRemoved }) {
+export function HomeTab({ profile, events, loading, terms, absences, checkins, awayDates, eventRsvps,
+  onNavigate, onOpenEvent, onCheckinSaved, onCheckinRemoved, onAbsenceSaved, onAbsenceRemoved }) {
+  const [showHistory, setShowHistory] = useState(false);
   const next = useMemo(() => nextEvent(events), [events]);
   const term = useMemo(() => currentTermOf(terms), [terms]);
   const myAbsence = useMemo(
@@ -113,6 +114,10 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
   const myCheckin = useMemo(
     () => (next ? checkins.find((c) => c.rehearsal_id === next.id && c.profile_id === profile.id) : null),
     [checkins, next, profile.id],
+  );
+  const myRsvp = useMemo(
+    () => (next ? eventRsvps.find((r) => r.rehearsal_id === next.id && r.profile_id === profile.id) : null),
+    [eventRsvps, next, profile.id],
   );
   const stats = useMemo(
     () => termStats({ term, events, checkins, profileId: profile.id }),
@@ -131,6 +136,13 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
   const firstName = (displayNameOf(profile) || '').split(' ')[0];
   const rail = next ? formatDateRail(next.rehearsal_date) : null;
   const rel = next ? relativeDayLabel(next.rehearsal_date) : '';
+
+  // Same view More's own "Attendance History" row opens — one screen, two doors in. Nina,
+  // 2026-09-16.
+  if (showHistory) {
+    return html`<${AttendanceHistoryView} events=${events} checkins=${checkins} absences=${absences}
+      awayDates=${awayDates} profile=${profile} onBack=${() => setShowHistory(false)} />`;
+  }
 
   return html`
     <div class="tab-content home">
@@ -170,7 +182,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
                 ${next.location ? html`
                   <p class="next-loc"><${IconPinFilled} size=${11} />${next.location}</p>
                 ` : null}
-                <${AttendanceStatus} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence} />
+                <${AttendanceStatus} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence} myRsvp=${myRsvp} />
                 <${CheckInPanel} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence}
                   profileId=${profile.id} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved} />
               </div>
@@ -208,7 +220,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
       ` : null}
 
       ${stats ? html`
-        <div class="card term-stats">
+        <button class="card term-stats" onClick=${() => setShowHistory(true)} aria-label="My term — see attendance history">
           <div class="term-stats-head">
             <h3 class="term-stats-title">My term</h3>
             <span class="term-stats-name">${term.name}</span>
@@ -231,7 +243,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, o
             aria-label=${`${stats.pct}% attendance, ${stats.attended} of ${stats.soFar} rehearsals so far`}>
             <span style=${{ width: `${stats.pct}%` }}></span>
           </div>
-        </div>
+        </button>
       ` : null}
 
       ${upcoming.length ? html`

@@ -1,12 +1,12 @@
-import { html, useState, useMemo, formatEventDateLong } from './lib.js';
+import { html, useState, useMemo, useRef, formatEventDateLong } from './lib.js';
 import {
   displayNameOf, setSongPart, clearSongPart, uploadRecording, getRecordingUrl,
   saveLyrics, hideLyrics,
 } from './store.js';
 import { LoadingState, EmptyState, Sheet } from './shell.js';
 import {
-  IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconUpload, IconSearch,
-  IconLock, IconLockOpen, IconBulb,
+  IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconPause, IconUpload,
+  IconSearch, IconLock, IconLockOpen,
 } from './icons.js';
 import { PracticeEntryCard, PracticeFlow } from './practice.js';
 
@@ -159,8 +159,8 @@ function titleFromFilename(filename) {
   return filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ').trim();
 }
 
-const ALLOWED_MIME = ['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/wav', 'audio/x-wav'];
-const ALLOWED_EXT = ['.mp3', '.m4a', '.wav'];
+const ALLOWED_MIME = ['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/wav', 'audio/x-wav', 'video/mp4'];
+const ALLOWED_EXT = ['.mp3', '.m4a', '.wav', '.mp4'];
 const MAX_BYTES = 50 * 1024 * 1024;
 
 // Reads a file's duration via a throwaway <audio> element rather than a library — best effort
@@ -181,34 +181,46 @@ function readDuration(file) {
   });
 }
 
+// Play/pause is driven by the audio element's own events (onPlay/onPause), same pattern as
+// Practice Mode's player — the button reflects real state instead of a separate flag that could
+// drift out of sync with it. 2026-09-16: previously rendered a native <audio controls autoplay>
+// that started once and was never wired back to the purple button afterwards, so only the native
+// controls underneath could pause/resume.
 function RecordingRow({ recording, uploaderName }) {
-  const [audioUrl, setAudioUrl] = useState(null);
   const [loadingUrl, setLoadingUrl] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [playError, setPlayError] = useState(null);
+  const audioRef = useRef(null);
 
-  const play = async () => {
-    if (audioUrl || loadingUrl) return;
+  const togglePlay = async () => {
+    const el = audioRef.current;
+    if (!el || loadingUrl) return;
+    if (el.src) { if (playing) el.pause(); else el.play().catch(() => {}); return; }
     setLoadingUrl(true);
     setPlayError(null);
     const { data, error } = await getRecordingUrl(recording.storage_path);
     setLoadingUrl(false);
     if (error || !data?.signedUrl) { setPlayError("Couldn't load this recording — try again."); return; }
-    setAudioUrl(data.signedUrl);
+    el.src = data.signedUrl;
+    el.play().catch(() => setPlayError("Couldn't play this recording — try again."));
   };
 
   return html`
     <div class="rep-recording-row">
-      <button class="rep-play-btn" onClick=${play} disabled=${loadingUrl} aria-label=${`Play ${recording.title || 'recording'}`}>
-        <${IconPlay} size=${16} />
+      <button class="rep-play-btn" onClick=${togglePlay} disabled=${loadingUrl} aria-label=${`${playing ? 'Pause' : 'Play'} ${recording.title || 'recording'}`}>
+        ${playing ? html`<${IconPause} size=${16} />` : html`<${IconPlay} size=${16} />`}
       </button>
       <div class="rep-recording-body">
         <p class="rep-recording-title">${recording.title || 'Untitled recording'}</p>
         <p class="form-hint" style="margin:0;">
           ${uploaderName || 'Someone'} · ${formatShortDate(recording.uploaded_at)}${recording.duration_seconds ? ` · ${formatDuration(recording.duration_seconds)}` : ''}
         </p>
-        ${audioUrl ? html`<audio controls autoplay src=${audioUrl} style="width:100%;margin-top:8px;" />` : null}
         ${playError ? html`<p class="absence-error">${playError}</p>` : null}
       </div>
+      <audio ref=${audioRef} style="display:none;"
+        onPlay=${() => setPlaying(true)} onPause=${() => setPlaying(false)}
+        onEnded=${() => setPlaying(false)}
+        onError=${() => { setPlaying(false); setPlayError("Couldn't play this recording — try again."); }} />
     </div>
   `;
 }
@@ -231,11 +243,15 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [uploaded, setUploaded] = useState(null);
+  const [pendingId, setPendingId] = useState(null);
 
   const partsSorted = useMemo(() => [...partLabels].sort((a, b) => a.sort_order - b.sort_order), [partLabels]);
   const songRecordings = recordings.filter((r) => r.song_id === song.id);
+  // Excludes pendingId: Realtime reflects the DB-row-first insert back into `recordings` well
+  // before the Storage upload finishes, so without this a fresh upload briefly and confusingly
+  // shows up as an "existing" recording for the part you're already uploading to.
   const existingForPart = partLabel
-    ? songRecordings.filter((r) => r.part_label === partLabel).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
+    ? songRecordings.filter((r) => r.part_label === partLabel && r.id !== pendingId).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))
     : [];
 
   const pickPart = (key) => { setPartLabel(key); setStep('upload'); };
@@ -249,7 +265,7 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
     // a real recording just because the browser didn't label it the way we expected.
     const hasAllowedExt = ALLOWED_EXT.some((ext) => f.name.toLowerCase().endsWith(ext));
     if (!ALLOWED_MIME.includes(f.type) && !hasAllowedExt) {
-      setError('That file type isn\'t supported — use MP3, M4A or WAV.');
+      setError('That file type isn\'t supported — use MP3, M4A, MP4 or WAV.');
       return;
     }
     if (f.size > MAX_BYTES) {
@@ -262,12 +278,15 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
   };
 
   const upload = async () => {
+    const id = crypto.randomUUID();
+    setPendingId(id);
     setUploading(true);
     setError(null);
     const { data, error: err } = await uploadRecording({
-      songId: song.id, partLabel, profileId: profile.id, file, title, durationSeconds: duration,
+      songId: song.id, partLabel, profileId: profile.id, file, title, durationSeconds: duration, id,
     });
     setUploading(false);
+    setPendingId(null);
     if (err) { setError(err.message); return; }
     // Same realtime-round-trip gap as everywhere else — the song's own recording list/tags
     // shouldn't wait on the subscription to show what was just uploaded. 2026-09-15.
@@ -314,10 +333,14 @@ function AddRecordingSheet({ song, partLabels, recordings, profile, directory, o
 
           <label>
             Audio file
-            <input type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a,.wav"
+            <input type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,video/mp4,.mp3,.m4a,.wav,.mp4"
               onChange=${pickFile} />
           </label>
-          <p class="form-hint" style="margin:4px 0 14px;">MP3, M4A or WAV, up to 50MB.</p>
+          <p class="form-hint" style="margin:4px 0 4px;">MP3, M4A, MP4 or WAV, up to 50MB.</p>
+          <p class="form-hint" style="margin:0 0 14px;">
+            Recording in Voice Memos? It won't show up here directly. In Voice Memos, tap Share,
+            choose Save to Files, then pick it from Files below.
+          </p>
 
           ${file ? html`
             <label>
@@ -408,14 +431,6 @@ function LyricsTab({ song, lyricsRow, canManage, onSave, onRelease, onHide }) {
               </button>`}
         </div>
         <p class="lyrics-caption">${released ? 'Visible to every member right now.' : 'Visible to all members once released.'}</p>
-      </div>
-
-      <div class="lyrics-tip-card">
-        <span class="lyrics-tip-icon"><${IconBulb} size=${18} /></span>
-        <div>
-          <p class="lyrics-tip-title">Tip</p>
-          <p class="lyrics-tip-body">You can paste lyrics from a document or type them directly here.</p>
-        </div>
       </div>
     </div>
   `;

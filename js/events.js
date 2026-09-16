@@ -4,7 +4,8 @@ import { formatEventDate, formatEventDateLong, formatTimeRange, relativeDayLabel
 import { EVENT_TYPES, createEvent, updateEvent, setEventStatus, markAbsent, clearAbsence } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { CHOIR_NAME } from './config.js';
-import { CheckInPanel, AttendanceStatus, AttendanceSummary, isCheckInDay } from './checkin.js';
+import { CheckInPanel, AttendanceStatus, AttendanceSummary, SocialRsvpPanel, SocialRsvpSummary,
+  isCheckInDay } from './checkin.js';
 import { IconKebab, IconCheck, IconNote, IconEdit, IconReschedule, IconCancel, IconChevron,
   IconClock, IconExternal, IconPinFilled, IconCalendar } from './icons.js';
 
@@ -16,6 +17,7 @@ export const EVENT_TYPE_LABEL = {
   workshop: 'Workshop',
   performance: 'Performance',
   social: 'Social',
+  other: 'Other',
 };
 
 export const eventTitle = (ev) => ev.title || EVENT_TYPE_LABEL[ev.event_type] || 'Event';
@@ -46,9 +48,11 @@ export function nextEvent(events) {
 //
 // The tint is SEMANTIC — it comes from the event's type per DESIGN-RULES.md, and a cancelled
 // event overrides its type because "this isn't happening" outranks "this was going to be a
-// concert". Nina's Figma painted every non-rehearsal row the same sky blue, which encodes
-// rehearsal/not-rehearsal rather than what kind of thing it is; she chose semantic when asked,
-// so the palette's own colours are used here and rehearsals keep the Figma's white.
+// concert". Nina's Figma originally painted every non-rehearsal row the same sky blue, which
+// encoded rehearsal/not-rehearsal rather than what kind of thing it is; she chose semantic per-type
+// colours when first asked, then partially changed her mind (Nina, 2026-09-17): workshop and
+// performance are back to blue (see --sky in css/styles.css), social keeps its own teal, and
+// rehearsals keep the Figma's white.
 // ---------------------------------------------------------------------------
 export const rowTintClass = (ev) => (ev.status === 'cancelled' || ev.status === 'not_scheduled'
   ? 'rail-row-cancelled'
@@ -348,15 +352,18 @@ export function EventRow({
 // the organiser's attendance view are shown at length.
 // ---------------------------------------------------------------------------
 export function EventDetail({
-  event, term, myAbsence, myCheckin, myAway, absencesForEvent = [], checkinsForEvent = [],
-  canManage, profileId, directory = {}, onManage, onCheckinSaved, onCheckinRemoved,
-  onAbsenceSaved, onAbsenceRemoved,
+  event, term, myAbsence, myCheckin, myAway, myRsvp, absencesForEvent = [], checkinsForEvent = [],
+  rsvpsForEvent = [], canManage, profileId, directory = {}, onManage, onCheckinSaved, onCheckinRemoved,
+  onAbsenceSaved, onAbsenceRemoved, onRsvpSaved, onRsvpRemoved,
 }) {
   const cancelled = event.status === 'cancelled';
   const notScheduled = event.status === 'not_scheduled';
   const off = cancelled || notScheduled;
   const past = isPast(event);
-  const showAdmin = canManage && !off && (past || isCheckInDay(event) || absencesForEvent.length > 0);
+  // Social gets its own RSVP panel/summary below instead of check-in/absence — see
+  // AttendanceStatus in checkin.js for why the two ladders don't mix.
+  const isSocial = event.event_type === 'social';
+  const showAdmin = canManage && !off && !isSocial && (past || isCheckInDay(event) || absencesForEvent.length > 0);
 
   return html`
     <div class="sheet-detail">
@@ -395,11 +402,16 @@ export function EventDetail({
       </div>
 
       <${AttendanceStatus} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
-        myAway=${myAway} detailed=${true} />
+        myAway=${myAway} myRsvp=${myRsvp} detailed=${true} />
 
-      ${off ? null : html`
+      ${off || isSocial ? null : html`
         <${CheckInPanel} event=${event} myCheckin=${myCheckin} myAbsence=${myAbsence}
           profileId=${profileId} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved} />
+      `}
+
+      ${off || !isSocial ? null : html`
+        <${SocialRsvpPanel} event=${event} myRsvp=${myRsvp} profileId=${profileId}
+          onRsvpSaved=${onRsvpSaved} onRsvpRemoved=${onRsvpRemoved} />
       `}
 
       ${!off ? html`
@@ -435,11 +447,19 @@ export function EventDetail({
             DESIGN-RULES.md), and leave already covers this rehearsal, so offering it here would
             invite a second, redundant row saying the same thing. Cancel the leave if it's
             wrong. */
-        off || myCheckin || myAway ? null : html`
+        off || isSocial || myCheckin || myAway ? null : html`
         <div class="sheet-rule"></div>
         <div class="sheet-action">
           <${AbsenceToggle} event=${event} myAbsence=${myAbsence} profileId=${profileId}
             onAbsenceSaved=${onAbsenceSaved} onAbsenceRemoved=${onAbsenceRemoved} />
+        </div>
+      `}
+
+      ${off || !isSocial ? null : html`
+        <div class="sheet-rule"></div>
+        <div class="sheet-section">
+          <p class="sheet-section-head sheet-section-head-plain">Who's coming</p>
+          <${SocialRsvpSummary} rsvpsForEvent=${rsvpsForEvent} directory=${directory} />
         </div>
       `}
 

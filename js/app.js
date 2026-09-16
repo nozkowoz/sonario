@@ -2,7 +2,8 @@ import { html, render, useState } from './lib.js';
 import { supabase } from './supabaseClient.js';
 import {
   useSession, useMyMembership, displayNameOf, isSuper,
-  useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useMemberDirectory, awayRangeFor,
+  useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useEventRsvps, useMemberDirectory,
+  awayRangeFor,
   useSongs, useSongCollections, useSongCollectionItems, useSongAssignments, useRehearsalSongs,
   usePartLabels, useRecordings, useSongLyrics,
 } from './store.js';
@@ -14,13 +15,13 @@ import { CalendarTab } from './calendar.js';
 import { RepertoireTab } from './repertoire.js';
 import { AdminTab } from './admin.js';
 import { MoreTab } from './more.js';
-import { CHOIR_NAME, APP_VERSION } from './config.js';
+import { CHOIR_NAME } from './config.js';
 
 // Home and More are deliberately role-blind: a super sees exactly what an ordinary member sees,
 // so Nina can judge the member experience without switching accounts. Organiser controls live on
 // the super-only Admin tab, plus inline on Calendar where they're tied to a specific event.
-// Repertoire is wired up as of Stage 3 (read-only). Recordings/practice mode/leaderboard/social
-// remain later stages and aren't wired up here.
+// Repertoire is wired up as of Stage 3 (read-only). Recordings/practice mode are wired up too;
+// leaderboard remains a later stage. Social RSVP wired up 2026-09-17.
 function App() {
   const session = useSession();
 
@@ -100,6 +101,7 @@ function Main({ session, membership, profile, patchProfile }) {
   const { absences, patchAbsence, removeAbsence } = useAbsences();
   const { checkins, patchCheckinRow, removeCheckinRow } = useCheckins();
   const { awayDates, patchAwayDate } = useAwayDates();
+  const { eventRsvps, patchRsvp, removeRsvp } = useEventRsvps();
   // Used to be super-only ("members don't render anyone else's name"), but Stage 6 needs the
   // directory for every active member — a recording's uploader is shown to whoever can see the
   // recording at all, not just organisers. Always on now.
@@ -125,7 +127,8 @@ function Main({ session, membership, profile, patchProfile }) {
         <div class="app-header-inner">
           <h1 class="app-title">${CHOIR_NAME}</h1>
           <button class="avatar-btn" title=${displayNameOf(profile)}
-            aria-label=${`${displayNameOf(profile)} — open More`} onClick=${() => changeTab('more')}>
+            aria-label=${`${displayNameOf(profile)} — open My Profile`}
+            onClick=${() => { setMoreView('profile'); setTab('more'); }}>
             ${profile.avatar_url
               // Google gives us this on sign-in, so the mockup's avatar costs nothing. This is not
               // the deferred profile-photo *upload* — there's no upload here, just what Google
@@ -140,7 +143,7 @@ function Main({ session, membership, profile, patchProfile }) {
           <${HomeTab} key=${resetKeys.home}
             profile=${profile}
             events=${events} loading=${eventsLoading} terms=${terms}
-            absences=${absences} checkins=${checkins}
+            absences=${absences} checkins=${checkins} awayDates=${awayDates} eventRsvps=${eventRsvps}
             onNavigate=${changeTab}
             onOpenEvent=${(ev) => setOpenEventId(ev.id)}
             onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow}
@@ -169,6 +172,7 @@ function Main({ session, membership, profile, patchProfile }) {
         ` : null}
         ${activeTab === 'more' ? html`
           <${MoreTab} key=${resetKeys.more} profile=${profile} terms=${terms}
+            events=${events} absences=${absences} checkins=${checkins} awayDates=${awayDates}
             view=${moreView} setView=${setMoreView}
             onNavigate=${changeTab} onSignOut=${() => supabase.auth.signOut()}
             onProfileSaved=${patchProfile} />
@@ -180,7 +184,6 @@ function Main({ session, membership, profile, patchProfile }) {
               onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow} />`
           : null}
       </main>
-      <p class="app-footer">${APP_VERSION}</p>
       <${BottomNav} active=${activeTab} onChange=${changeTab} canManage=${canManage} />
 
       ${openEvent ? html`
@@ -191,13 +194,16 @@ function Main({ session, membership, profile, patchProfile }) {
             myAbsence=${mineFor(absences, openEvent.id)}
             myCheckin=${mineFor(checkins, openEvent.id)}
             myAway=${awayRangeFor(openEvent, awayDates, profile.id)}
+            myRsvp=${mineFor(eventRsvps, openEvent.id)}
             absencesForEvent=${forEvent(absences, openEvent.id)}
             checkinsForEvent=${forEvent(checkins, openEvent.id)}
+            rsvpsForEvent=${forEvent(eventRsvps, openEvent.id)}
             canManage=${canManage}
             profileId=${profile.id}
             directory=${directory}
             onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow}
             onAbsenceSaved=${patchAbsence} onAbsenceRemoved=${removeAbsence}
+            onRsvpSaved=${patchRsvp} onRsvpRemoved=${removeRsvp}
             onManage=${canManage ? (ev) => { setOpenEventId(null); manageEvent(ev); } : null}
           />
         <//>

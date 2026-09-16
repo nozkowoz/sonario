@@ -11,12 +11,21 @@
   --error: #b5342e;
   --error-bg: #fbe6e3;
   /* Semantic event/state colours — see DESIGN-RULES.md. Not decorative: each one means a thing. */
-  --green: #1f7a44;        /* positive: performance, expected, checked in, confirmed */
+  --green: #1f7a44;        /* positive: expected, checked in, confirmed */
   --green-bg: #e3f6ea;
-  --lilac: #6b4ea8;        /* workshop / extra rehearsal */
+  --lilac: #6b4ea8;        /* extra rehearsal; no longer workshop, see --sky below */
   --lilac-bg: #EEE6FF;
   --teal: #16697a;         /* social event */
   --teal-bg: #ddf1f4;
+  --sky: #1d4ed8;          /* workshop + performance. Nina, 2026-09-17: reverted from lilac/green
+                               back to her original Figma's sky blue for both — a genuine change
+                               of mind, not a bug (see DESIGN-RULES.md and rowTintClass in events.js
+                               for the semantic-colour decision this partially undoes). A distinct
+                               blue from --teal's social, not the same hex as --tint-social: the
+                               calendar rail row (see RailRow in events.js) carries no type label,
+                               only its tint, so three types sharing one exact colour would make
+                               them indistinguishable there — not something Nina asked to change. */
+  --sky-bg: #dbeafe;
   --butter: #8a6300;       /* tentative / TBC — no data behind it yet, see DESIGN-RULES.md */
   --butter-bg: #fdf3d7;
   --coral: #b5342e;        /* cancelled, or a genuine disruption. Reserved. */
@@ -33,12 +42,14 @@
   --pill-green-icon: #16A34A;
   /* Per-type row tints. Rehearsals stay WHITE — the common case shouldn't be colour-coded, so
      colour on a row means "this one isn't the usual Tuesday". Matched to the lightness of the
-     Figma's #E0F2FE so a mixed list reads evenly; lilac sits deeper than the others because it
-     has to separate from the --fig-lav ground behind it. */
+     Figma's #E0F2FE so a mixed list reads evenly. Workshop and performance share --sky-bg now
+     (Nina, 2026-09-17) rather than their own lilac/green — a different blue from social's, so a
+     mixed rail list (no type label, tint-only) can still tell the three apart. */
   --tint-rehearsal: #FFFFFF;
-  --tint-workshop: #E1D4FE;
-  --tint-performance: #DCFCE7;
+  --tint-workshop: var(--sky-bg);
+  --tint-performance: var(--sky-bg);
   --tint-social: #E0F2FE;
+  --tint-other: #E5E7EB;
   --tint-cancelled: #FEE2E2;
   --radius-lg: 16px;
   --radius-md: 10px;
@@ -201,7 +212,6 @@ button { font: inherit; }
 }
 .tab-btn.active { color: var(--purple-dark); border-bottom-color: var(--purple); }
 .app-main { max-width: 780px; margin: 0 auto; padding: var(--main-pad); padding-bottom: calc(var(--bottom-nav-h) + 20px); }
-.app-footer { text-align: center; color: #a89fc4; font-size: 12px; padding: 8px 20px calc(var(--bottom-nav-h) + 16px); }
 
 /* Tab content */
 /* Sentence case, not uppercase: the Figma sets every screen title as Inter 900 rather than as a
@@ -303,9 +313,10 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   background: var(--purple-light); color: var(--purple-dark);
 }
 .event-type-rehearsal { background: var(--purple-light); color: var(--purple-dark); }
-.event-type-workshop { background: var(--lilac-bg); color: var(--lilac); }
-.event-type-performance { background: var(--green-bg); color: var(--green); }
+.event-type-workshop { background: var(--sky-bg); color: var(--sky); }
+.event-type-performance { background: var(--sky-bg); color: var(--sky); }
 .event-type-social { background: var(--teal-bg); color: var(--teal); }
+.event-type-other { background: var(--fig-hair); color: var(--fig-meta); }
 .event-type-tentative { background: var(--butter-bg); color: var(--butter); }
 .event-type-neutral { background: var(--bg); color: var(--ink-soft); }
 .event-cancelled-badge { background: var(--coral-bg); color: var(--coral); }
@@ -333,6 +344,18 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .att-muted { color: var(--ink-soft); font-weight: 500; }
 .att-tick { color: var(--pill-green-icon); flex-shrink: 0; display: grid; place-items: center; }
 .att-lines { display: flex; flex-direction: column; min-width: 0; }
+
+/* Attendance History (2026-09-16): one row per past event, date on the left, this member's
+   outcome as a compact pill on the right — reuses att-good/att-off/att-muted rather than a
+   parallel colour set. */
+.att-history-list { display: flex; flex-direction: column; gap: 8px; }
+.att-history-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+.att-history-date { font-size: 13px; font-weight: 600; color: var(--ink); }
+.att-status-pill { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 10px; white-space: nowrap; }
 /* On purple the 92% green reads slightly warmer than a flat fill, which is what the design file
    specifies — the hero's purple shows through just enough to tie the pill to the card. */
 .next-detail .att-good { background: rgba(220, 252, 231, 0.92); }
@@ -355,11 +378,26 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .checkin-noted { margin: 0; font-size: 15px; font-weight: 700; color: var(--purple-dark); display: flex; align-items: center; gap: 8px; }
 .checkin-tick { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--purple); color: #fff; font-size: 13px; flex-shrink: 0; }
 
-/* Super-only attendance view, from the day of the event onwards. */
+/* Super-only attendance view, from the day of the event onwards. Reused (unchanged) by
+   SocialRsvpSummary, which is choir-wide visible rather than super-only. */
 .attendance-summary { margin: 12px 0 0; display: flex; flex-direction: column; gap: 4px; }
 .attendance-line { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .attendance-line strong { color: var(--ink); }
 .attendance-missing strong { color: var(--error); }
+
+/* Social RSVP (migration 0014): three equal-width buttons, not a single toggle — Going/Maybe/Not
+   going are three real answers, none of them a "default" the others merely undo. */
+.rsvp-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.rsvp-options { display: flex; gap: 8px; width: 100%; }
+.rsvp-btn {
+  flex: 1; padding: 10px 8px; border-radius: var(--radius-md); border: 1px solid var(--border);
+  background: #fff; color: var(--ink-soft); font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.rsvp-btn:hover { border-color: var(--purple); }
+.rsvp-btn:disabled { opacity: 0.6; cursor: default; }
+.rsvp-btn-going.rsvp-btn-active { background: var(--pill-green-bg); border-color: var(--pill-green-icon); color: var(--pill-green-text); }
+.rsvp-btn-maybe.rsvp-btn-active { background: var(--butter-bg); border-color: var(--butter); color: var(--butter); }
+.rsvp-btn-not-going.rsvp-btn-active { background: var(--error-bg); border-color: var(--error); color: var(--error); }
 
 .btn-sm { font-size: 13px; padding: 8px 14px; white-space: nowrap; }
 .form-heading { font-family: 'Inter', system-ui, sans-serif; font-size: 16px; text-transform: uppercase; letter-spacing: 0.3px; margin: 0; }
@@ -481,7 +519,13 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .notice-butter .notice-body { color: #6f5205; }
 
 /* --- Home: My Term ------------------------------------------------------ */
-.term-stats { padding: 16px; box-shadow: none; }
+.term-stats {
+  padding: 16px; box-shadow: none;
+  /* Now a <button> (tap → attendance history) — reset it back to looking like the plain card it
+     was, per the surrounding .card rules it still carries. */
+  display: block; width: 100%; text-align: left; border: none; font: inherit; cursor: pointer;
+}
+.term-stats:hover { box-shadow: var(--shadow-card); }
 .term-stats-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .term-stats-title {
   margin: 0; font-size: 12px; font-weight: 900; line-height: 18px; letter-spacing: 1.44px;
@@ -523,6 +567,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .rail-row-workshop { background: var(--tint-workshop); }
 .rail-row-performance { background: var(--tint-performance); }
 .rail-row-social { background: var(--tint-social); }
+.rail-row-other { background: var(--tint-other); }
 .rail-row-cancelled { background: var(--tint-cancelled); }
 .rail-row-cancelled .rail-title { text-decoration: line-through; text-decoration-thickness: 1px; }
 
@@ -669,9 +714,10 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   background: var(--fig-lav); color: var(--purple);
 }
 .sheet-type-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-.sheet-type-workshop { background: var(--tint-workshop); color: var(--lilac); }
-.sheet-type-performance { background: var(--tint-performance); color: var(--green); }
+.sheet-type-workshop { background: var(--tint-workshop); color: var(--sky); }
+.sheet-type-performance { background: var(--tint-performance); color: var(--sky); }
 .sheet-type-social { background: var(--tint-social); color: var(--teal); }
+.sheet-type-other { background: var(--tint-other); color: var(--fig-meta); }
 .sheet-type-cancelled { background: var(--tint-cancelled); color: var(--coral); }
 
 .sheet-meta { padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -968,16 +1014,6 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .lyrics-actions { display: flex; gap: 10px; margin-top: 14px; }
 .lyrics-actions .btn { flex: 1; }
 .lyrics-caption { margin: 10px 0 0; font-size: 12px; color: var(--fig-mute); text-align: center; }
-.lyrics-tip-card {
-  display: flex; align-items: flex-start; gap: 12px; background: var(--purple-light);
-  border-radius: var(--radius-lg); padding: 14px 16px; margin-top: 14px;
-}
-.lyrics-tip-icon {
-  flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: #fff;
-  color: var(--purple); display: grid; place-items: center;
-}
-.lyrics-tip-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--purple-dark); }
-.lyrics-tip-body { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
 
 /* --- Practice Mode, Stage 1 (2026-09-15) ------------------------------------ */
 .practice-entry-card {

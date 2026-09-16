@@ -1,6 +1,7 @@
 import { html, useState } from './lib.js';
 import { displayNameOf, updateDisplayName } from './store.js';
 import { currentTermOf } from './events.js';
+import { AttendanceHistoryView } from './checkin.js';
 import { EmptyState } from './shell.js';
 import { IconChevron, IconBack } from './icons.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
@@ -28,13 +29,15 @@ const SECTIONS = [
   { key: 'profile', label: 'My Profile', body: 'Your name and sign-in email' },
   { key: 'availability', label: 'My Availability', body: 'Log upcoming absences or leave',
     goTo: 'calendar' },
+  { key: 'attendance', label: 'Attendance History', body: 'Your past rehearsals and check-ins' },
   { key: 'notifications', label: 'Notification Settings', body: 'Control what Sonario sends you',
     soon: true },
   { key: 'help', label: 'Help & Feedback', body: 'Get support or share feedback', soon: true },
   { key: 'about', label: 'About Sonario', body: 'Version and how this app works' },
 ];
 
-export function MoreTab({ profile, terms, view, setView, onNavigate, onSignOut, onProfileSaved }) {
+export function MoreTab({ profile, terms, events, absences, checkins, awayDates,
+  view, setView, onNavigate, onSignOut, onProfileSaved }) {
   const term = currentTermOf(terms);
 
   if (view === 'profile') {
@@ -42,6 +45,12 @@ export function MoreTab({ profile, terms, view, setView, onNavigate, onSignOut, 
   }
   if (view === 'about') {
     return html`<${About} term=${term} onBack=${() => setView(null)} />`;
+  }
+  // Same view AttendanceHistoryView renders from Home's "My Term" card — one screen, two doors in,
+  // per Nina 2026-09-16.
+  if (view === 'attendance') {
+    return html`<${AttendanceHistoryView} events=${events} checkins=${checkins} absences=${absences}
+      awayDates=${awayDates} profile=${profile} onBack=${() => setView(null)} />`;
   }
   if (view) {
     const section = SECTIONS.find((s) => s.key === view);

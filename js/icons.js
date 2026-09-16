@@ -235,3 +235,10 @@ export const IconBulb = ({ size }) => svg(html`
   <path d="M9.5 18h5M10.2 21h3.6" />
   <path d="M12 3a6 6 0 0 0-3.4 10.9c.5.35.8.9.8 1.5v.1h5.2v-.1c0-.6.3-1.15.8-1.5A6 6 0 0 0 12 3Z" />
 `, { size });
+
+// Invoicing (migration 0015): a receipt with a torn bottom edge and a dollar sign, distinct from
+// IconAdmin/IconCheckSquare already used by other Admin sections.
+export const IconInvoice = ({ size }) => svg(html`
+  <path d="M6 3h12v18l-2.5-1.5L13 21l-2.5-1.5L8 21l-2-1.5V3Z" />
+  <path d="M9 8h6M9 12h6M9 16h3" />
+`, { size });
