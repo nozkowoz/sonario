@@ -34,8 +34,23 @@ const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 );
 
+// Edge Functions send NO CORS headers by default. A browser calling this via
+// supabase.functions.invoke() first sends an OPTIONS preflight; with nothing here to answer it,
+// the browser blocks the real request before it ever reaches this code, and supabase-js reports
+// that generically as "Failed to send a request to the Edge Function" — not a 401/500/network
+// error, just silence. This was missing on first deploy; every response below now carries these.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+const json = (body, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+});
+
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   // Identify the caller from their own JWT (supabase.functions.invoke() from the client sends
   // this automatically) — never trust a client-supplied profile id for who gets notified.
@@ -43,7 +58,7 @@ Deno.serve(async (req) => {
   const jwt = authHeader.replace('Bearer ', '');
   const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
   if (userError || !userData?.user) {
-    return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 });
+    return json({ error: 'Not authenticated' }, 401);
   }
   const profileId = userData.user.id;
 
@@ -52,13 +67,10 @@ Deno.serve(async (req) => {
     .select('id, endpoint, p256dh, auth')
     .eq('profile_id', profileId);
   if (subsError) {
-    return new Response(JSON.stringify({ error: subsError.message }), { status: 500 });
+    return json({ error: subsError.message }, 500);
   }
   if (!subs || subs.length === 0) {
-    return new Response(
-      JSON.stringify({ error: 'No push subscription found for this device yet.' }),
-      { status: 400 },
-    );
+    return json({ error: 'No push subscription found for this device yet.' }, 400);
   }
 
   // Claim step. The unique(dedupe_key) constraint on notification_log is what makes this an
@@ -70,10 +82,7 @@ Deno.serve(async (req) => {
     .select()
     .single();
   if (logInsertError || !logRow) {
-    return new Response(
-      JSON.stringify({ error: 'Could not claim a notification log row.' }),
-      { status: 500 },
-    );
+    return json({ error: 'Could not claim a notification log row.' }, 500);
   }
 
   const payload = JSON.stringify({
@@ -111,8 +120,5 @@ Deno.serve(async (req) => {
     })
     .eq('id', logRow.id);
 
-  return new Response(JSON.stringify({ ok: anySent, results }), {
-    status: anySent ? 200 : 502,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return json({ ok: anySent, results }, anySent ? 200 : 502);
 });
