@@ -5,7 +5,7 @@
 // not one designed to accept offline writes.
 //
 // Bump CACHE_VERSION on any meaningful change to force a clean cache.
-const CACHE_VERSION = 'sonario-v37';
+const CACHE_VERSION = 'sonario-v38';
 const SHELL_URLS = [
   './',
   './index.html',
@@ -81,6 +81,43 @@ self.addEventListener('fetch', (event) => {
         .then((res) => { if (res && res.status === 200) cache.put(req, res.clone()); return res; })
         .catch(() => cached);
       return cached || network;
+    })
+  );
+});
+
+// --- Push notifications, Stage A (2026-09-17) -------------------------------------------------
+// Added alongside the caching logic above, not instead of it — install/activate/fetch are
+// untouched. The payload shape (title/body/url) is whatever the sending Edge Function chose to
+// send; send-test-notification's is {title, body, url}, and every future rule should keep using
+// the same three fields rather than inventing a new shape per rule.
+self.addEventListener('push', (event) => {
+  let data = { title: 'Sonario', body: 'You have a new notification.', url: '/' };
+  try { if (event.data) data = { ...data, ...event.data.json() }; } catch { /* keep the fallback */ }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: 'icons/icon-192.png',
+      badge: 'icons/favicon-64.png',
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
+// Focuses an already-open Sonario tab where one exists, rather than always opening a new one —
+// per Nina's instruction, "focus existing Sonario client where practical, otherwise open the
+// relevant route". Deep-linking to a specific in-app screen (a song's Lyrics tab, an event's
+// detail sheet) is Stage B's job, done via `url` once those rules exist; Stage A always sends '/'.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })
   );
 });

@@ -1,8 +1,9 @@
 import { html, useState } from './lib.js';
-import { displayNameOf, updateDisplayName } from './store.js';
+import { displayNameOf, updateDisplayName, useMyPushSubscriptions, enablePushNotifications,
+  disablePushNotifications, sendTestNotification } from './store.js';
 import { currentTermOf } from './events.js';
 import { AttendanceHistoryView } from './checkin.js';
-import { EmptyState } from './shell.js';
+import { EmptyState, LoadingState } from './shell.js';
 import { IconChevron, IconBack } from './icons.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
@@ -30,8 +31,7 @@ const SECTIONS = [
   { key: 'availability', label: 'My Availability', body: 'Log upcoming absences or leave',
     goTo: 'calendar' },
   { key: 'attendance', label: 'Attendance History', body: 'Your past rehearsals and check-ins' },
-  { key: 'notifications', label: 'Notification Settings', body: 'Control what Sonario sends you',
-    soon: true },
+  { key: 'notifications', label: 'Notification Settings', body: 'Control what Sonario sends you' },
   { key: 'help', label: 'Help & Feedback', body: 'Get support or share feedback', soon: true },
   { key: 'about', label: 'About Sonario', body: 'Version and how this app works' },
 ];
@@ -51,6 +51,9 @@ export function MoreTab({ profile, terms, events, absences, checkins, awayDates,
   if (view === 'attendance') {
     return html`<${AttendanceHistoryView} events=${events} checkins=${checkins} absences=${absences}
       awayDates=${awayDates} profile=${profile} onBack=${() => setView(null)} />`;
+  }
+  if (view === 'notifications') {
+    return html`<${NotificationSettings} profile=${profile} onBack=${() => setView(null)} />`;
   }
   if (view) {
     const section = SECTIONS.find((s) => s.key === view);
@@ -107,6 +110,96 @@ function MoreHead({ title, onBack }) {
         <${IconBack} size=${20} />
       </button>
       <h2 class="admin-head-title">${title}</h2>
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Push notifications, Stage A (2026-09-17). "Enabled" is derived purely from whether this profile
+// has any push_subscriptions row — no separate preferences table, per Nina's explicit call not to
+// build granular per-type preferences yet. The explanation card is Sonario's own opt-in step,
+// shown BEFORE the real browser permission prompt fires (enablePushNotifications() is what
+// actually calls Notification.requestPermission(), only once "Continue" is tapped here) — never on
+// first app load. A denial just leaves the button available to try again; nothing else breaks.
+// ---------------------------------------------------------------------------
+function NotificationSettings({ profile, onBack }) {
+  const { subscriptions, loading, setSubscriptions } = useMyPushSubscriptions(profile.id);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [testResult, setTestResult] = useState(null);
+  const [showExplain, setShowExplain] = useState(false);
+
+  const enabled = subscriptions.length > 0;
+
+  const enable = async () => {
+    setBusy(true); setError(null);
+    const { data, error: err } = await enablePushNotifications(profile.id);
+    setBusy(false);
+    if (err) { setError(err.message); return; }
+    if (data) setSubscriptions(data);
+    setShowExplain(false);
+  };
+
+  const disable = async () => {
+    setBusy(true); setError(null);
+    await disablePushNotifications();
+    setBusy(false);
+    setSubscriptions([]);
+    setTestResult(null);
+  };
+
+  const sendTest = async () => {
+    setBusy(true); setError(null); setTestResult(null);
+    const { data, error: err } = await sendTestNotification();
+    setBusy(false);
+    if (err) { setError(err.message || 'Could not send a test notification.'); return; }
+    setTestResult(data?.ok ? 'Sent, check this device.' : "Send failed. If this keeps happening, the Edge Function's logs will say why.");
+  };
+
+  return html`
+    <div class="tab-content">
+      <${MoreHead} title="Notification Settings" onBack=${onBack} />
+      ${loading ? html`<${LoadingState} label="Checking notification status…" />` : html`
+        <div class="card">
+          <p style="margin:0 0 8px;font-weight:700;">
+            ${enabled ? 'Notifications are on for this device' : 'Notifications are off for this device'}
+          </p>
+          <p class="form-hint" style="margin:0 0 14px;">
+            ${enabled
+              ? "You'll get a push notification here for the things Sonario decides are worth telling you about."
+              : 'Turn these on to get a push notification for things like an upcoming rehearsal reminder.'}
+          </p>
+
+          ${!enabled && !showExplain ? html`
+            <button class="btn btn-primary" onClick=${() => setShowExplain(true)}>Enable notifications</button>
+          ` : null}
+
+          ${!enabled && showExplain ? html`
+            <div class="card" style="background:var(--purple-light);margin:0 0 12px;box-shadow:none;">
+              <p style="margin:0 0 12px;">
+                Sonario would like to send you notifications for things like rehearsal reminders and
+                important changes to an event. Your browser will ask you to confirm next.
+              </p>
+              <div class="form-actions">
+                <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${enable}>
+                  ${busy ? 'Enabling…' : 'Continue'}
+                </button>
+                <button class="btn-quiet" disabled=${busy} onClick=${() => setShowExplain(false)}>Not now</button>
+              </div>
+            </div>
+          ` : null}
+
+          ${enabled ? html`
+            <div class="form-actions">
+              <button class="btn btn-outline btn-sm" disabled=${busy} onClick=${sendTest}>Send test notification</button>
+              <button class="btn-quiet" disabled=${busy} onClick=${disable}>Turn off on this device</button>
+            </div>
+          ` : null}
+
+          ${testResult ? html`<p class="form-saved" style="margin-top:10px;">${testResult}</p>` : null}
+          ${error ? html`<p class="absence-error" style="margin-top:10px;">${error}</p>` : null}
+        </div>
+      `}
     </div>
   `;
 }

@@ -20,6 +20,11 @@ export const CHOIR_NAME = 'Sonario';
 export const MEMBER_PASSPHRASE = 'PURPLEHEART';
 export const SUPER_PASSPHRASE = 'SUPERPURPLEHEART';
 
+// Push notifications, Stage A (2026-09-17). The VAPID PUBLIC key only — safe to ship client-side,
+// same as the Supabase anon key above. The PRIVATE key lives in Supabase's Edge Function secrets
+// and must never appear in this repo. Generated once via `npx web-push generate-vapid-keys`.
+export const VAPID_PUBLIC_KEY = 'BBtT7tEaktzeWISLws1H0WijTOsLzr4seBV3GtkkAILNlnDAC5ZzR9DY6ZdhnAJpjkDVbWBQjvASAoIqoDiHZi8';
+
 // Shown in the footer so people can check they're on the latest build — useful given the PWA
 // caching quirks (see sw.js). Bump this by one on every deploy that ships a real change.
-export const APP_VERSION = 'v46-cancelled-visibility-term-pills';
+export const APP_VERSION = 'v47-push-stage-a';

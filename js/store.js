@@ -1,5 +1,6 @@
 import { useEffect, useState } from './lib.js';
 import { supabase } from './supabaseClient.js';
+import { VAPID_PUBLIC_KEY } from './config.js';
 
 // Current auth session, kept live via onAuthStateChange. `undefined` means "still checking",
 // `null` means "signed out" — App.js uses that distinction to show a loading state vs AuthGate.
@@ -685,4 +686,77 @@ export async function fetchInvoicedProfileIdsForTerm(termId) {
 // 0015 — attempting to touch anything else here fails at the database, not just in this app).
 export async function updateInvoiceDueDate(invoiceId, dueDate) {
   return supabase.from('invoices').update({ due_date: dueDate }).eq('id', invoiceId).select().maybeSingle();
+}
+
+// --- Push notifications, Stage A (migration 0017) ---------------------------
+// Subscribing/unsubscribing write straight to push_subscriptions via the normal client — the
+// existing own-row RLS already allows it, no Edge Function needed for this half. Only actually
+// SENDING a push needs server-side code, since the VAPID private key can never reach the browser.
+
+export function useMyPushSubscriptions(profileId) {
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from('push_subscriptions').select('*').eq('profile_id', profileId).then(({ data, error }) => {
+      if (cancelled) return;
+      if (!error && data) setSubscriptions(data);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [profileId]);
+
+  return { subscriptions, loading, setSubscriptions };
+}
+
+// PushManager.subscribe() needs the VAPID public key as a raw Uint8Array, not the base64url
+// string it's stored/shipped as.
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+};
+
+// Nina, 2026-09-17: never call this on first load — only from an explicit "Enable" tap, after
+// Sonario's own explanation screen. requestPermission() itself is what shows the real browser
+// prompt; a denial here must never break anything else in the app.
+export async function enablePushNotifications(profileId) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return { error: { message: 'Push notifications aren\'t supported on this device or browser.' } };
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    return { error: { message: 'Notification permission wasn\'t granted.' } };
+  }
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+  const json = subscription.toJSON();
+  // upsert on endpoint (the table's own unique column) — re-enabling on a device that already
+  // has a (possibly stale) row updates it in place rather than erroring.
+  return supabase.from('push_subscriptions').upsert({
+    profile_id: profileId, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth,
+  }, { onConflict: 'endpoint' }).select();
+}
+
+// Per-device only, matching push_subscriptions' own model — a member's other devices are
+// untouched.
+export async function disablePushNotifications() {
+  if (!('serviceWorker' in navigator)) return { error: null };
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return { error: null };
+  await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
+  await subscription.unsubscribe();
+  return { error: null };
+}
+
+// Stage A verification only — see supabase/functions/send-test-notification. Sends to the
+// CALLER's own subscriptions, never anyone else's.
+export async function sendTestNotification() {
+  return supabase.functions.invoke('send-test-notification', { method: 'POST' });
 }
