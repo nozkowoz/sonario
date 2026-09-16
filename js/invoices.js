@@ -33,6 +33,20 @@ const AdminHeadInvoices = ({ title, onBack }) => html`
 const formatCents = (cents) => `$${(cents / 100).toFixed(2)}`;
 const centsFromDollarsInput = (v) => Math.round(Number(v) * 100);
 
+// The real Sonario wordmark (Nina, 2026-09-17 — a clean recreation, black on white, no
+// transparency needed since the invoice page is white too). Fetched once per page load and
+// cached; a missing/blocked file falls back to plain bold text rather than breaking PDF
+// generation, same defensive shape as everything else that fetches an asset at runtime here.
+let wordmarkImageBytesPromise = null;
+function loadWordmarkImageBytes() {
+  if (!wordmarkImageBytesPromise) {
+    wordmarkImageBytesPromise = fetch('assets/sonario-wordmark.png')
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null);
+  }
+  return wordmarkImageBytesPromise;
+}
+
 const INV_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Plain "16 Sep 2026" — no weekday. Every existing date formatter in lib.js either includes one or
 // is uppercase-rail-styled; an invoice wants neither, so this stays local rather than exported.
@@ -83,9 +97,9 @@ function downloadBlob(blob, filename) {
 // static exports are woff2, which fontkit/pdf-lib can't parse), and pdf-lib's embedFont has no way
 // to select a variable font's weight axis — it only accepts raw bytes and always renders whatever
 // the font's default instance is, which for this family is Thin, not Black. Tested directly (see
-// this session's transcript): looked wrong, worse than Helvetica. Staying on Helvetica Bold until
-// Nina can supply an actual static "Black"/900 font file or a real logo image — swapping either in
-// is a single change here (a new embedFont call, or embedPng/embedJpg + drawImage for a logo).
+// this session's transcript): looked wrong, worse than Helvetica. Resolved properly with a real
+// wordmark IMAGE instead (Nina supplied one, see loadWordmarkImageBytes above) — falls back to
+// Helvetica Bold text only if that file is ever missing.
 async function buildInvoicePdfBytes({
   invoiceNumberLabel, memberName, memberEmail, invoiceDateStr, dueDateStr, amountCents, termLabel,
   isSample = false,
@@ -95,7 +109,6 @@ async function buildInvoicePdfBytes({
   const { width } = page.getSize();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const wordmark = bold;
   const ink = rgb(0.13, 0.11, 0.18);
   const soft = rgb(0.35, 0.33, 0.44);
   const warn = rgb(0.71, 0.2, 0.18);
@@ -106,8 +119,18 @@ async function buildInvoicePdfBytes({
   };
   const gap = (n) => { y -= n; };
 
-  text('SONARIO', { size: 28, f: wordmark });
-  gap(34);
+  // Wordmark image if it's available; a target WIDTH is chosen and height follows the image's own
+  // aspect ratio, so it never looks stretched regardless of the source file's exact dimensions.
+  const wordmarkImageBytes = await loadWordmarkImageBytes();
+  const wordmarkImage = wordmarkImageBytes ? await pdfDoc.embedPng(wordmarkImageBytes) : null;
+  const drawWordmark = (targetWidth) => {
+    if (!wordmarkImage) { text('SONARIO', { size: targetWidth / 5.4, f: bold }); gap(targetWidth / 4.4); return; }
+    const h = targetWidth * (wordmarkImage.height / wordmarkImage.width);
+    page.drawImage(wordmarkImage, { x: 50, y: y - h, width: targetWidth, height: h });
+    gap(h + 12);
+  };
+
+  drawWordmark(150);
   if (isSample) {
     text('SAMPLE ONLY, not a real invoice', { size: 10, f: bold, color: warn });
     gap(18);
@@ -151,8 +174,7 @@ async function buildInvoicePdfBytes({
   text('and are non-refundable.', { size: 9, color: soft });
   gap(40);
 
-  text('SONARIO', { size: 13, f: wordmark, color: soft });
-  gap(15);
+  drawWordmark(60);
   text('A SINGING ENSEMBLE', { size: 9, color: soft });
 
   return pdfDoc.save();

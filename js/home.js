@@ -69,6 +69,44 @@ function lastWeekNotice(term, events, today) {
   };
 }
 
+// School holidays — the gap between terms. Nina, 2026-09-16: the yellow banner should say when
+// holidays are CURRENTLY on, not just cover the last-week-of-term case above. currentTermOf(terms)
+// already returns null for exactly this gap, so this only ever fires when lastWeekNotice's own
+// `!term` guard would otherwise leave Home silent between terms.
+//
+// Nina, 2026-09-17: mirrors lastWeekNotice's own 7-day threshold, the return-side equivalent —
+// once the next term's first rehearsal is within a week, the banner switches from the open-ended
+// "no rehearsals until X" to "starts back this week", same shape as "last week of term" flips to
+// naming the actual final rehearsal once it's close. A Monday-morning push notification for this
+// is a good idea but not buildable yet — no push infrastructure exists at all — logged to TODO.md.
+function holidayNotice(terms, events, today) {
+  const next = terms.filter((t) => t.starts_on > today).sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0];
+  if (!next) return null; // no known upcoming term to name — nothing useful to say yet
+
+  const nextEvents = events
+    .filter((e) => e.term_id === next.id && e.status !== 'cancelled')
+    .sort((a, b) => a.rehearsal_date.localeCompare(b.rehearsal_date));
+  const firstBack = nextEvents[0];
+  const kind = (EVENT_TYPE_LABEL[firstBack?.event_type] || 'rehearsal').toLowerCase();
+  const firstBackDate = firstBack?.rehearsal_date || next.starts_on;
+  const when = firstBack
+    ? `${formatWeekdayLong(firstBackDate)} ${formatDayMonthLong(firstBackDate)}`
+    : formatDayMonthLong(firstBackDate);
+
+  const daysAway = Math.round((parseLocalDate(firstBackDate) - parseLocalDate(today)) / 86400000);
+  if (daysAway <= 7) {
+    return {
+      title: 'Choir starts back this week',
+      body: `${when} is the first ${kind} of ${next.name}.`,
+    };
+  }
+
+  return {
+    title: 'School holidays',
+    body: `No rehearsals until ${when}, the first ${kind} of ${next.name}.`,
+  };
+}
+
 // My Term. THE DENOMINATOR IS REHEARSALS THAT HAVE ALREADY HAPPENED, not everything scheduled in
 // the term — in week 2 having attended both it reads 2/2, never 2/10. That's an explicit rule.
 function termStats({ term, events, checkins, profileId }) {
@@ -123,7 +161,10 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
     () => termStats({ term, events, checkins, profileId: profile.id }),
     [term, events, checkins, profile.id],
   );
-  const termNotice = useMemo(() => lastWeekNotice(term, events, todayStr()), [term, events]);
+  const termNotice = useMemo(
+    () => lastWeekNotice(term, events, todayStr()) || holidayNotice(terms, events, todayStr()),
+    [term, terms, events],
+  );
 
   // Everything after the hero's own event, so the same rehearsal isn't listed twice.
   const upcoming = useMemo(() => {
