@@ -32,6 +32,7 @@ webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  { db: { schema: 'sonario' } },
 );
 
 // Edge Functions send NO CORS headers by default. A browser calling this via
