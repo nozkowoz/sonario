@@ -242,3 +242,15 @@ export const IconInvoice = ({ size }) => svg(html`
   <path d="M6 3h12v18l-2.5-1.5L13 21l-2.5-1.5L8 21l-2-1.5V3Z" />
   <path d="M9 8h6M9 12h6M9 16h3" />
 `, { size });
+
+// Practice Mode player, shuffle/repeat toggles (crossed-arrows / looping-arrows convention).
+export const IconShuffle = ({ size }) => svg(html`
+  <path d="M17 3h4v4" /><path d="M21 3l-7 7" />
+  <path d="M3 17l6-6" /><path d="M3 7l4 0" /><path d="M3 7l6 6" />
+  <path d="M21 21l-6-6" /><path d="M17 21h4v-4" />
+`, { size });
+
+export const IconRepeat = ({ size }) => svg(html`
+  <path d="M17 2l4 4-4 4" /><path d="M3 12V10a4 4 0 0 1 4-4h14" />
+  <path d="M7 22l-4-4 4-4" /><path d="M21 12v2a4 4 0 0 1-4 4H3" />
+`, { size });

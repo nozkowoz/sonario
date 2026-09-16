@@ -2,6 +2,7 @@ import { html, useState, useEffect, useRef, useMemo } from './lib.js';
 import { setSongPart, clearSongPart, getRecordingUrl } from './store.js';
 import {
   IconBack, IconChevron, IconPlay, IconCheck, IconPause, IconSkipBack, IconSkipForward,
+  IconShuffle, IconRepeat,
 } from './icons.js';
 import { myAssignment, groupSongsByCollection, partLabelText, PartPickerSheet } from './repertoire.js';
 import { EmptyState } from './shell.js';
@@ -217,6 +218,23 @@ export function buildPracticeQueue({ songs, mode, assignments, profileId, record
   return queue;
 }
 
+// Shuffles SONG order, not individual queue entries — a song's part/whole-choir pair (in 'both'
+// mode) always stays adjacent and in that order, so shuffle never plays a whole-choir mix before
+// its own part-only recording. Fisher-Yates over the song groups, then flattened back out.
+function shuffleQueue(queue) {
+  const order = [];
+  const bySong = new Map();
+  for (const entry of queue) {
+    if (!bySong.has(entry.songId)) { bySong.set(entry.songId, []); order.push(entry.songId); }
+    bySong.get(entry.songId).push(entry);
+  }
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order.flatMap((songId) => bySong.get(songId));
+}
+
 // --- Step 3: the player ----------------------------------------------------------
 // Decorative/static only, per Nina 2026-09-15: "Absolutely no audio analysis or generated
 // waveform for MVP." Same bars every render, regardless of play state.
@@ -257,14 +275,37 @@ function findAvailable(queue, startIndex, direction) {
 }
 
 function PlayerScreen({ queue, partLabels, onClose }) {
-  const [queueIndex, setQueueIndex] = useState(() => findAvailable(queue, 0, 1));
+  const [shuffleOn, setShuffleOn] = useState(false);
+  const [repeatOn, setRepeatOn] = useState(false);
+  const [shuffledQueue, setShuffledQueue] = useState(() => shuffleQueue(queue));
+  const activeQueue = shuffleOn ? shuffledQueue : queue;
+  const [queueIndex, setQueueIndex] = useState(() => findAvailable(activeQueue, 0, 1));
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(null);
   const [skipNotice, setSkipNotice] = useState(null);
   const audioRef = useRef(null);
 
-  const entry = queueIndex >= 0 ? queue[queueIndex] : null;
+  const entry = queueIndex >= 0 ? activeQueue[queueIndex] : null;
+
+  // Re-rolls the shuffle order and restarts from its first track — simplest, most predictable
+  // behaviour for a small practice session, matching a "shuffle play" button rather than trying to
+  // reorder only the not-yet-played remainder around a still-playing track.
+  const toggleShuffle = () => {
+    if (!shuffleOn) {
+      const fresh = shuffleQueue(queue);
+      setShuffledQueue(fresh);
+      setShuffleOn(true);
+      setSkipNotice(null);
+      setPlaying(false);
+      setQueueIndex(findAvailable(fresh, 0, 1));
+    } else {
+      setShuffleOn(false);
+      setSkipNotice(null);
+      setPlaying(false);
+      setQueueIndex(findAvailable(queue, 0, 1));
+    }
+  };
 
   // Fetch a fresh signed URL whenever the current track changes, then autoplay it — the same
   // on-demand pattern RecordingRow already uses, not pre-fetched for the whole queue up front
@@ -293,13 +334,25 @@ function PlayerScreen({ queue, partLabels, onClose }) {
     return () => clearTimeout(t);
   }, [skipNotice]);
 
+  // Repeat only wraps the FORWARD boundary (queue end -> start) — once all songs finish, not a
+  // per-track loop and not applied to Previous at the very start, matching "repeat once songs
+  // finish" rather than a single-track repeat.
   const advance = (direction) => {
     const from = queueIndex + direction;
-    if (from < 0 || from >= queue.length) return;
-    const found = findAvailable(queue, from, direction);
+    if (direction === 1 && from >= activeQueue.length) {
+      if (!repeatOn) return;
+      const found = findAvailable(activeQueue, 0, 1);
+      if (found === -1) return;
+      setSkipNotice(null);
+      setPlaying(false);
+      setQueueIndex(found);
+      return;
+    }
+    if (from < 0 || from >= activeQueue.length) return;
+    const found = findAvailable(activeQueue, from, direction);
     if (found === -1) return;
     if (found !== from) {
-      const skipped = queue[from];
+      const skipped = activeQueue[from];
       setSkipNotice(`No ${partBadgeSub(skipped, partLabels)} recording for "${skipped.songTitle}" — skipped`);
     }
     setPlaying(false);
@@ -307,7 +360,7 @@ function PlayerScreen({ queue, partLabels, onClose }) {
   };
 
   const jumpTo = (i) => {
-    if (!queue[i].recording || i === queueIndex) return;
+    if (!activeQueue[i].recording || i === queueIndex) return;
     setSkipNotice(null);
     setPlaying(false);
     setQueueIndex(i);
@@ -319,8 +372,9 @@ function PlayerScreen({ queue, partLabels, onClose }) {
     if (playing) el.pause(); else el.play().catch(() => {});
   };
 
-  const canPrev = findAvailable(queue, queueIndex - 1, -1) !== -1;
-  const canNext = findAvailable(queue, queueIndex + 1, 1) !== -1;
+  const canPrev = findAvailable(activeQueue, queueIndex - 1, -1) !== -1;
+  const canNext = findAvailable(activeQueue, queueIndex + 1, 1) !== -1
+    || (repeatOn && findAvailable(activeQueue, 0, 1) !== -1);
 
   if (!entry) {
     // Reachable only if every queue entry became unavailable after the queue was built (a
@@ -344,7 +398,7 @@ function PlayerScreen({ queue, partLabels, onClose }) {
 
       <${PracticeWaveform} />
 
-      <p class="practice-now-playing">Now playing · ${queueIndex + 1} of ${queue.length}</p>
+      <p class="practice-now-playing">Now playing · ${queueIndex + 1} of ${activeQueue.length}</p>
       <h2 class="practice-player-title">${entry.songTitle}</h2>
       <span class="practice-player-badge">${partBadgeText(entry, partLabels)}</span>
 
@@ -352,6 +406,10 @@ function PlayerScreen({ queue, partLabels, onClose }) {
       ${error ? html`<p class="practice-skip-notice">${error}</p>` : null}
 
       <div class="practice-controls">
+        <button class=${`practice-control-btn ${shuffleOn ? 'practice-control-btn-on' : ''}`}
+          aria-label=${shuffleOn ? 'Shuffle on' : 'Shuffle off'} aria-pressed=${shuffleOn} onClick=${toggleShuffle}>
+          <${IconShuffle} size=${18} />
+        </button>
         <button class="practice-control-btn" disabled=${!canPrev} aria-label="Previous" onClick=${() => advance(-1)}>
           <${IconSkipBack} size=${20} />
         </button>
@@ -361,11 +419,15 @@ function PlayerScreen({ queue, partLabels, onClose }) {
         <button class="practice-control-btn" disabled=${!canNext} aria-label="Next" onClick=${() => advance(1)}>
           <${IconSkipForward} size=${20} />
         </button>
+        <button class=${`practice-control-btn ${repeatOn ? 'practice-control-btn-on' : ''}`}
+          aria-label=${repeatOn ? 'Repeat on' : 'Repeat off'} aria-pressed=${repeatOn} onClick=${() => setRepeatOn((v) => !v)}>
+          <${IconRepeat} size=${18} />
+        </button>
       </div>
 
       <p class="practice-up-next-label">Up next</p>
       <div class="practice-queue-list">
-        ${queue.map((q, i) => html`
+        ${activeQueue.map((q, i) => html`
           <button key=${i}
             class=${`practice-queue-row ${i === queueIndex ? 'practice-queue-row-active' : ''} ${!q.recording ? 'practice-queue-row-disabled' : ''}`}
             disabled=${!q.recording} onClick=${() => jumpTo(i)}>

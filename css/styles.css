@@ -1106,10 +1106,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   letter-spacing: 0.4px; padding: 5px 14px; border-radius: 99px; text-transform: uppercase; margin-bottom: 20px;
 }
 .practice-skip-notice { font-size: 13px; color: #f0c9c9; margin: -8px 0 16px; text-align: center; }
-.practice-controls { display: flex; align-items: center; gap: 26px; margin-bottom: 28px; }
+.practice-controls { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
 .practice-control-btn { border: none; background: none; color: rgba(255, 255, 255, 0.65); cursor: pointer; padding: 6px; }
 .practice-control-btn:disabled { color: rgba(255, 255, 255, 0.2); cursor: default; }
 .practice-control-btn:not(:disabled):hover { color: #fff; }
+.practice-control-btn-on { color: #cabdf4; }
+.practice-control-btn-on:not(:disabled):hover { color: #cabdf4; }
 .practice-play-btn {
   width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
   background: var(--purple); color: #fff; display: grid; place-items: center;

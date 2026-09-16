@@ -27,4 +27,4 @@ export const VAPID_PUBLIC_KEY = 'BBtT7tEaktzeWISLws1H0WijTOsLzr4seBV3GtkkAILNlnD
 
 // Shown in the footer so people can check they're on the latest build — useful given the PWA
 // caching quirks (see sw.js). Bump this by one on every deploy that ships a real change.
-export const APP_VERSION = 'v47-push-stage-a';
+export const APP_VERSION = 'v48-practice-shuffle-repeat';
