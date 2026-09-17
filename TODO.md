@@ -64,8 +64,34 @@ checkpoint-complete — most of it is superseded by the rebuild brief.
 - ~~**Editable check-in time (best-guess correction).**~~ DONE 2026-09-15, migration confirmed live 2026-09-16 — same migration adds an own-row-or-super UPDATE policy on `checkins`; `CheckInPanel` has an "Edit time" control, no time window, no separate "verified" state (Nina's explicit call: "I think we don't need it 'verified'").
 - ~~**Social events need a real Going/Not going/Maybe RSVP.**~~ DONE 2026-09-17, migration `0014_social_rsvps.sql` confirmed live (new `event_rsvps` table). Correction made along the way: the pre-existing `useSocialEvents`/`useSocialRsvps` hooks in `store.js` were dead code pointing at a `social_events`/`social_rsvps` table pair that doesn't exist (leftover from the old pre-rebuild `schema.sql`, never applied) — removed, and the real feature keys off `rehearsal_id` like everything else instead. `AttendanceStatus` now has a fully separate ladder for `event_type === 'social'` (no check-in/away/absence involved), a new `SocialRsvpPanel` (Going/Maybe/Not going, upsert-based) and `SocialRsvpSummary` (visible to every member, not just supers — unlike rehearsal attendance, seeing who's going is the point) are wired into `EventDetail` for socials only.
 
+- ~~**Practice Mode: shuffle and repeat.**~~ DONE 2026-09-17, deployed and confirmed live (Vercel deployment `dpl_EvKHFScqwy3QmnimdvK7GhVkxEzV` READY). New `IconShuffle`/`IconRepeat` in `icons.js`; `PlayerScreen` (`js/practice.js`) gained `shuffleQueue()` (shuffles SONG order only — a song's part/whole-choir pair in "both" mode always stays adjacent) and a `repeatOn` toggle that wraps the queue back to track 1 once the last track finishes, instead of just stopping. Both are new buttons flanking Prev/Play/Next, highlighted when active.
+
+## Push notifications, Stage A — status as of 2026-09-17
+
+Infra is proven genuinely working end to end: VAPID keys, the stored push subscription, and
+Apple's web push relay all confirmed good via a direct test push sent straight to Nina's phone
+(bypassing the app), which she received. **But the in-app path is still broken**: the
+`send-test-notification` Edge Function (`supabase/functions/send-test-notification/index.ts`)
+still returns a 500 even after fixing a real bug found this session — `supabaseAdmin` was
+created without `{db: {schema: 'sonario'}}`, so every query against `push_subscriptions`/
+`notification_log` was silently hitting `public` instead (same bug class as the old `store.js`
+realtime issue). That fix is deployed (function version 6) but a fresh test after redeploying
+still 500'd — there's a second bug still in there, not yet found. Nina's call: don't chase it
+tonight. Next session should pull fresh `function_logs`/`function_edge_logs` from Supabase after
+a live test and keep debugging from there — the anon-JWT probe trick (curl the function with just
+the anon key as the bearer token) is a fast way to check the function still boots/responds without
+needing a real logged-in session.
+
+Also still undecided (asked, not answered): should "send test notification" live in Admin only,
+not every member's More menu? Nina, earlier session: "each person doesn't need to be able to send
+themselves a test notification."
+
+Stage B (check-in reminders, lyrics release, event-change notifications, the term-boundary/recap
+rules already scoped elsewhere in this file) stays blocked until Stage A's in-app path actually
+works, not just the infra underneath it.
+
 ## Build queue, agreed 2026-09-14
 
 1. ~~Song Detail redesign + lyrics release~~ DONE — Stage 1 migration `0011_song_lyrics.sql` confirmed applied live 2026-09-16 (`sonario.song_lyrics` table + both RLS policies verified); UI (lyrics release/hide) already live per Repertoire.
 2. Invoicing (see "Invoice generation and emailing" above)
-3. Push notifications (see Push Notification Rules doc comparison + the term-boundary rule above)
+3. Push notifications (see "Push notifications, Stage A — status" above, and the Push Notification Rules doc comparison + the term-boundary rule further up)
