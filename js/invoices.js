@@ -382,9 +382,26 @@ function InvoicingSetup({ settings, terms, profileId, onSettingsSaved, onBack })
       <${AdminHeadInvoices} title="Invoicing Setup" onBack=${onBack} />
 
       <div class="card" style="margin-bottom:14px;">
-        <p class="form-hint" style="margin:0 0 8px;">1. Invoice email</p>
+        <p class="form-hint" style="margin:0 0 8px;">1. Invoice email — one-time setup</p>
+        <p style="margin:0 0 10px;">
+          Sending invoices from inside Sonario isn't built yet, but it will send from Sean's Gmail —
+          which needs a one-time password from his Google Account before that can happen. Ask Sean
+          to do this and text the result to Nina on <strong>0438 477 458</strong>:
+        </p>
+        <ol style="margin:0 0 10px;padding-left:20px;">
+          <li>Go to <strong>myaccount.google.com/apppasswords</strong> (search "app passwords" in
+            Google Account settings if that doesn't open directly — it needs 2-Step Verification
+            turned on first, which it'll prompt for if it isn't already).</li>
+          <li>Create a new app password and name it <strong>Sonario</strong>.</li>
+          <li>Google shows a 16-character password once — copy it.</li>
+          <li>Text that password to Nina on <strong>0438 477 458</strong>. Don't email it, and don't
+            type it into Sonario itself — it goes straight into Supabase's secret store.</li>
+        </ol>
         <button class="btn btn-outline btn-sm" disabled>Send test email <span class="admin-soon">Soon</span></button>
-        <p class="form-hint" style="margin:8px 0 0;">Not built yet — invoices are generated as downloadable PDFs for now.</p>
+        <p class="form-hint" style="margin:8px 0 0;">
+          The send button itself isn't built yet — invoices are downloadable PDFs for now — but
+          having Sean's app password ready means the setup step above is one less thing later.
+        </p>
       </div>
 
       <div class="card" style="margin-bottom:14px;">
