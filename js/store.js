@@ -191,8 +191,11 @@ export function useSongs() {
 // Super-only (RLS: "super manage songs"/"super manage collection items"). No local patch needed
 // on success — songs and song_collection_items are both on the realtime useLiveTable pattern
 // above, so the insert this makes comes back through the subscription like any other client's
-// would. collectionId/position are optional — a song can exist with no collection yet.
-export async function createSong({ title, composer, collectionId, position }) {
+// would. collectionIds/positionFor are optional — a song can exist with no collection yet, or in
+// several: song_collection_items is a many-to-many join, so one song can sit in this term's set
+// AND Sonario Classics at once. positionFor(collectionId) is called per id since each collection
+// orders its own items independently.
+export async function createSong({ title, composer, collectionIds = [], positionFor }) {
   const { data: songRows, error: songError } = await supabase.from('songs')
     .insert({ title, composer: composer || '' })
     .select();
@@ -200,9 +203,11 @@ export async function createSong({ title, composer, collectionId, position }) {
     return { data: null, error: songError || new Error("That didn't save — reload and try again.") };
   }
   const song = songRows[0];
-  if (collectionId) {
+  if (collectionIds.length > 0) {
     const { error: itemError } = await supabase.from('song_collection_items')
-      .insert({ collection_id: collectionId, song_id: song.id, position });
+      .insert(collectionIds.map((collectionId) => ({
+        collection_id: collectionId, song_id: song.id, position: positionFor(collectionId),
+      })));
     if (itemError) return { data: null, error: itemError };
   }
   return { data: song, error: null };

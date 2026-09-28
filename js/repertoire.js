@@ -135,30 +135,42 @@ export function PartPickerSheet({ song, currentPartKey, partLabels, saving, erro
 
 // Super-only. No local patch on success needed — songs/song_collection_items are both realtime
 // (useLiveTable), so the insert this makes comes back the same way any other client's would; this
-// just closes the sheet. Collection is optional at the DB level, but always offering the current
-// one preselected (falling back to the first collection, then to "no collection yet") means the
-// common case — adding a song for what's being worked on right now — needs no extra tap.
+// just closes the sheet. Collections are optional at the DB level and a song can sit in more than
+// one at once (e.g. this term's set AND Sonario Classics) — song_collection_items is already a
+// many-to-many join, chips just let more than one be picked. The current collection starts
+// preselected (falling back to the first one) so the common case — adding a song for what's being
+// worked on right now — needs no extra tap.
 function AddSongSheet({ collections, collectionItems, onClose }) {
   const [title, setTitle] = useState('');
   const [composer, setComposer] = useState('');
-  const [collectionId, setCollectionId] = useState(
-    () => collections.find((c) => c.is_current)?.id || collections[0]?.id || '',
-  );
+  const [collectionIds, setCollectionIds] = useState(() => {
+    const initial = collections.find((c) => c.is_current)?.id || collections[0]?.id;
+    return initial ? new Set([initial]) : new Set();
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   const ready = title.trim().length > 0;
 
+  const toggleCollection = (id) => setCollectionIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
   const save = async () => {
     if (!ready || busy) return;
     setBusy(true);
     setError(null);
-    const itemsInCollection = collectionItems.filter((i) => i.collection_id === collectionId);
-    const position = itemsInCollection.length > 0
-      ? Math.max(...itemsInCollection.map((i) => i.position)) + 1 : 1;
     const { error: err } = await createSong({
       title: title.trim(), composer: composer.trim(),
-      collectionId: collectionId || null, position,
+      collectionIds: [...collectionIds],
+      // Each collection gets its own next position, computed against its own items.
+      positionFor: (collectionId) => {
+        const itemsInCollection = collectionItems.filter((i) => i.collection_id === collectionId);
+        return itemsInCollection.length > 0
+          ? Math.max(...itemsInCollection.map((i) => i.position)) + 1 : 1;
+      },
     });
     setBusy(false);
     if (err) { setError(err.message); return; }
@@ -179,11 +191,14 @@ function AddSongSheet({ collections, collectionItems, onClose }) {
           placeholder="Optional" onInput=${(e) => setComposer(e.target.value)} />
       </label>
       <label>
-        Collection
-        <select value=${collectionId} disabled=${busy} onChange=${(e) => setCollectionId(e.target.value)}>
-          <option value="">No collection yet</option>
-          ${collections.map((c) => html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
-        </select>
+        Collections
+        <div class="chips" style="margin:6px 0 0;">
+          ${collections.map((c) => html`
+            <button key=${c.id} type="button" disabled=${busy}
+              class=${`chip ${collectionIds.has(c.id) ? 'chip-on' : ''}`}
+              onClick=${() => toggleCollection(c.id)}>${c.name}</button>
+          `)}
+        </div>
       </label>
       ${error ? html`<p class="absence-error">${error}</p>` : null}
       <div class="form-actions">
