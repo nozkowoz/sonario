@@ -141,7 +141,6 @@ export function PartPickerSheet({ song, currentPartKey, partLabels, saving, erro
 function AddSongSheet({ collections, collectionItems, onClose }) {
   const [title, setTitle] = useState('');
   const [composer, setComposer] = useState('');
-  const [voicing, setVoicing] = useState('');
   const [collectionId, setCollectionId] = useState(
     () => collections.find((c) => c.is_current)?.id || collections[0]?.id || '',
   );
@@ -158,7 +157,7 @@ function AddSongSheet({ collections, collectionItems, onClose }) {
     const position = itemsInCollection.length > 0
       ? Math.max(...itemsInCollection.map((i) => i.position)) + 1 : 1;
     const { error: err } = await createSong({
-      title: title.trim(), composer: composer.trim(), voicing: voicing.trim(),
+      title: title.trim(), composer: composer.trim(),
       collectionId: collectionId || null, position,
     });
     setBusy(false);
@@ -175,14 +174,9 @@ function AddSongSheet({ collections, collectionItems, onClose }) {
           placeholder="Song title" onInput=${(e) => setTitle(e.target.value)} />
       </label>
       <label>
-        Composer
+        Artist
         <input type="text" value=${composer} disabled=${busy} maxlength="200"
           placeholder="Optional" onInput=${(e) => setComposer(e.target.value)} />
-      </label>
-      <label>
-        Voicing
-        <input type="text" value=${voicing} disabled=${busy} maxlength="80"
-          placeholder="e.g. SATB — optional" onInput=${(e) => setVoicing(e.target.value)} />
       </label>
       <label>
         Collection
@@ -900,7 +894,7 @@ export function RepertoireTab({
           ${searchOpen ? html`
             <div class="rep-search-row">
               <input class="rep-search-input" type="search" autofocus value=${query}
-                placeholder="Search by title or composer" onInput=${(e) => setQuery(e.target.value)} />
+                placeholder="Search by title or artist" onInput=${(e) => setQuery(e.target.value)} />
               <button class="icon-btn-on-purple" aria-label="Close search" onClick=${closeSearch}>
                 <span style="font-size:20px;line-height:1;">×</span>
               </button>

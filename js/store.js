@@ -192,9 +192,9 @@ export function useSongs() {
 // on success — songs and song_collection_items are both on the realtime useLiveTable pattern
 // above, so the insert this makes comes back through the subscription like any other client's
 // would. collectionId/position are optional — a song can exist with no collection yet.
-export async function createSong({ title, composer, voicing, collectionId, position }) {
+export async function createSong({ title, composer, collectionId, position }) {
   const { data: songRows, error: songError } = await supabase.from('songs')
-    .insert({ title, composer: composer || '', voicing: voicing || '' })
+    .insert({ title, composer: composer || '' })
     .select();
   if (songError || !songRows || songRows.length === 0) {
     return { data: null, error: songError || new Error("That didn't save — reload and try again.") };
