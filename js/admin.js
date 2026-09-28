@@ -1,7 +1,7 @@
 import { html, useState, useMemo } from './lib.js';
 import { todayStr, formatEventDateLong } from './lib.js';
-import { ApprovalQueue } from './approvals.js';
-import { useAllMemberships, backfillCheckin, removeBackfillCheckin } from './store.js';
+import { AdminMembers } from './members.js';
+import { backfillCheckin, removeBackfillCheckin } from './store.js';
 import { EventRow, EventForm } from './events.js';
 import { AdminInvoices } from './invoices.js';
 import { AdminNotifications } from './notifications.js';
@@ -284,18 +284,3 @@ function AdminAttendance({ session, events, directory, checkins, onCheckinSaved,
   `;
 }
 
-// ---------------------------------------------------------------------------
-// Admin > Members. The approval queue, moved off the More tab so More reads the same for
-// everyone. Promoting a member to super is NOT here yet — it needs care around the policy that
-// stops anyone approving or promoting themselves, so it's its own piece of work.
-// ---------------------------------------------------------------------------
-function AdminMembers({ session, onBack }) {
-  const { memberships, patchMembership } = useAllMemberships();
-
-  return html`
-    <div class="tab-content">
-      <${AdminHead} title="Members" onBack=${onBack} />
-      <${ApprovalQueue} memberships=${memberships} myProfileId=${session.user.id} onMembershipSaved=${patchMembership} />
-    </div>
-  `;
-}

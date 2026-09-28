@@ -5,7 +5,7 @@
 // not one designed to accept offline writes.
 //
 // Bump CACHE_VERSION on any meaningful change to force a clean cache.
-const CACHE_VERSION = 'sonario-v38';
+const CACHE_VERSION = 'sonario-v39';
 const SHELL_URLS = [
   './',
   './index.html',
@@ -17,7 +17,9 @@ const SHELL_URLS = [
   './js/config.js',
   './js/auth.js',
   './js/shell.js',
-  './js/approvals.js',
+  './js/members.js',
+  './js/notifications.js',
+  './js/invoices.js',
   './js/home.js',
   './js/events.js',
   './js/checkin.js',
