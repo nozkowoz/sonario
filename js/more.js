@@ -3,6 +3,7 @@ import { displayNameOf, updateProfileNames, useMyPushSubscriptions, enablePushNo
   disablePushNotifications } from './store.js';
 import { currentTermOf } from './events.js';
 import { AttendanceHistoryView } from './checkin.js';
+import { MyInvoicesList, MemberInvoiceDetail } from './memberinvoices.js';
 import { EmptyState, LoadingState } from './shell.js';
 import { IconChevron, IconBack } from './icons.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
@@ -31,14 +32,16 @@ const SECTIONS = [
   { key: 'availability', label: 'My Availability', body: 'Log upcoming absences or leave',
     goTo: 'calendar' },
   { key: 'attendance', label: 'Attendance History', body: 'Your past rehearsals and check-ins' },
+  { key: 'invoices', label: 'My Invoices', body: 'Your invoices and membership fees' },
   { key: 'notifications', label: 'Notification Settings', body: 'Control what Sonario sends you' },
   { key: 'help', label: 'Help & Feedback', body: 'Get support or share feedback', soon: true },
   { key: 'about', label: 'About Sonario', body: 'Version and how this app works' },
 ];
 
-export function MoreTab({ profile, terms, events, absences, checkins, awayDates,
+export function MoreTab({ profile, terms, events, absences, checkins, awayDates, myInvoices,
   view, setView, onNavigate, onSignOut, onProfileSaved }) {
   const term = currentTermOf(terms);
+  const [viewingInvoice, setViewingInvoice] = useState(null);
 
   if (view === 'profile') {
     return html`<${MyProfile} profile=${profile} onBack=${() => setView(null)} onProfileSaved=${onProfileSaved} />`;
@@ -53,7 +56,17 @@ export function MoreTab({ profile, terms, events, absences, checkins, awayDates,
       awayDates=${awayDates} profile=${profile} onBack=${() => setView(null)} />`;
   }
   if (view === 'notifications') {
-    return html`<${NotificationSettings} profile=${profile} canManage=${canManage} onBack=${() => setView(null)} />`;
+    return html`<${NotificationSettings} profile=${profile} onBack=${() => setView(null)} />`;
+  }
+  // Same detail screen Home's fee card opens (see viewingInvoice in home.js) — one screen, two
+  // doors in, per the pattern already established for attendance history.
+  if (view === 'invoices') {
+    if (viewingInvoice) {
+      return html`<${MemberInvoiceDetail} invoice=${viewingInvoice} terms=${terms}
+        onBack=${() => setViewingInvoice(null)} />`;
+    }
+    return html`<${MyInvoicesList} myInvoices=${myInvoices} terms=${terms}
+      onOpen=${setViewingInvoice} onBack=${() => setView(null)} />`;
   }
   if (view) {
     const section = SECTIONS.find((s) => s.key === view);

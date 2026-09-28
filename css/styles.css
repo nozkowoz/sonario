@@ -1262,6 +1262,38 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 }
 .setup-icon-badge-green { background: var(--green-bg, #e6f6ec); color: var(--green); }
 
+/* --- Member-facing invoices (2026-09-28) ---------------------------------
+   Baby-blue gives fees their own visual category, distinct from butter (notices), green
+   (confirmed) and red (attention) — Nina's call after reviewing the mockup: a plain white card
+   blended into the surrounding list, and a fully red/yellow card read as more alarming than a
+   due-date fact deserves. */
+.fee-card {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  border: none; cursor: pointer; background: #E4F2FA; font: inherit; color: inherit;
+}
+.fee-icon {
+  width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+  display: grid; place-items: center; background: rgba(112, 82, 205, 0.13); font-size: 17px;
+}
+.fee-body { flex: 1; min-width: 0; }
+.fee-label-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; flex-wrap: wrap; }
+.fee-label { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--ink-soft); }
+.fee-state-pill {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.3px; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 99px;
+}
+.fee-state-pill.soon { background: var(--butter-bg); color: var(--butter); }
+.fee-state-pill.passed { background: var(--error-bg); color: var(--error); }
+.fee-amount { font-size: 20px; font-weight: 800; line-height: 1.15; }
+.fee-due { font-size: 12.5px; color: var(--ink-soft); margin-top: 1px; }
+.fee-link { font-size: 12.5px; font-weight: 700; color: var(--purple); margin-top: 4px; display: block; }
+
+.inv-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.inv-row:last-child { border-bottom: none; }
+.inv-row .k { color: var(--ink-soft); }
+.inv-row .v { font-weight: 600; text-align: right; }
+.section-label { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--ink-soft); }
+
 @media (max-width: 480px) {
   /* Must be a real rule, and --main-pad must be the ONLY place the body padding is set: the Home
      hero cancels it with negative margins, so a hardcoded .app-main padding here would leave the

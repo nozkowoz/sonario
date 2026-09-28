@@ -5,7 +5,7 @@ import {
   useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useEventRsvps, useMemberDirectory,
   awayRangeFor,
   useSongs, useSongCollections, useSongCollectionItems, useSongAssignments, useRehearsalSongs,
-  usePartLabels, useRecordings, useSongLyrics,
+  usePartLabels, useRecordings, useSongLyrics, useMyInvoices,
 } from './store.js';
 import { SignInScreen, MembershipStatusScreen } from './auth.js';
 import { LoadingState, ErrorState, BottomNav, Sheet, useActiveTab } from './shell.js';
@@ -103,6 +103,10 @@ function Main({ session, membership, profile, patchProfile }) {
   const { checkins, patchCheckinRow, removeCheckinRow } = useCheckins();
   const { awayDates, patchAwayDate } = useAwayDates();
   const { eventRsvps, patchRsvp, removeRsvp } = useEventRsvps();
+  // Member-facing invoices (2026-09-28) — own rows only, per migration 0026. Fetched here rather
+  // than lazily so Home's fee card and More's My Invoices share one fetch, same reasoning as
+  // everything else on this list.
+  const { invoices: myInvoices } = useMyInvoices(profile.id);
   // Used to be super-only ("members don't render anyone else's name"), but Stage 6 needs the
   // directory for every active member — a recording's uploader is shown to whoever can see the
   // recording at all, not just organisers. Always on now.
@@ -145,6 +149,7 @@ function Main({ session, membership, profile, patchProfile }) {
             profile=${profile}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins} awayDates=${awayDates} eventRsvps=${eventRsvps}
+            myInvoices=${myInvoices}
             onNavigate=${changeTab}
             onOpenEvent=${(ev) => setOpenEventId(ev.id)}
             onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow}
@@ -174,6 +179,7 @@ function Main({ session, membership, profile, patchProfile }) {
         ${activeTab === 'more' ? html`
           <${MoreTab} key=${resetKeys.more} profile=${profile} terms=${terms}
             events=${events} absences=${absences} checkins=${checkins} awayDates=${awayDates}
+            myInvoices=${myInvoices}
             view=${moreView} setView=${setMoreView}
             onNavigate=${changeTab} onSignOut=${() => supabase.auth.signOut()}
             onProfileSaved=${patchProfile} />

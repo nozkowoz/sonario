@@ -744,6 +744,31 @@ export async function updateInvoiceDueDate(invoiceId, dueDate) {
   return supabase.from('invoices').update({ due_date: dueDate }).eq('id', invoiceId).select().maybeSingle();
 }
 
+// Member-facing (2026-09-28, migration 0026): every invoice this member has ever been issued,
+// newest first. Works only because of that migration's new "member reads own invoice" policy —
+// before it, this same query just came back empty under RLS, the same silent-nothing trap as
+// every other own-row-or-super table in this app. Not realtime (same reasoning as invoice_runs/
+// invoice_settings: this table has no natural bound and a member never needs to watch it live).
+export function useMyInvoices(profileId) {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!profileId) { setInvoices([]); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    supabase.from('invoices').select('*').eq('profile_id', profileId)
+      .order('invoice_date', { ascending: false }).then(({ data, error }) => {
+        if (cancelled) return;
+        if (!error && data) setInvoices(data);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [profileId]);
+
+  return { invoices, loading };
+}
+
 // --- Push notifications, Stage A (migration 0017) ---------------------------
 // Subscribing/unsubscribing write straight to push_subscriptions via the normal client — the
 // existing own-row RLS already allows it, no Edge Function needed for this half. Only actually

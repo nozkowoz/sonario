@@ -4,6 +4,7 @@ import { formatDateRail, formatWeekdayLong, formatDayMonthLong, formatTimeRange,
 import { displayNameOf } from './store.js';
 import { EVENT_TYPE_LABEL, nextEvent, currentTermOf, AbsenceToggle, RailRow } from './events.js';
 import { CheckInPanel, AttendanceStatus, AttendanceHistoryView, isCheckInDay } from './checkin.js';
+import { TermFeesCard, MemberInvoiceDetail } from './memberinvoices.js';
 import { IconMegaphone, IconPinFilled } from './icons.js';
 import { LoadingState, EmptyState } from './shell.js';
 
@@ -141,8 +142,9 @@ function termStats({ term, events, checkins, profileId }) {
 }
 
 export function HomeTab({ profile, events, loading, terms, absences, checkins, awayDates, eventRsvps,
-  onNavigate, onOpenEvent, onCheckinSaved, onCheckinRemoved, onAbsenceSaved, onAbsenceRemoved }) {
+  myInvoices, onNavigate, onOpenEvent, onCheckinSaved, onCheckinRemoved, onAbsenceSaved, onAbsenceRemoved }) {
   const [showHistory, setShowHistory] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState(null);
   const next = useMemo(() => nextEvent(events), [events]);
   const term = useMemo(() => currentTermOf(terms), [terms]);
   const myAbsence = useMemo(
@@ -187,6 +189,13 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
   if (showHistory) {
     return html`<${AttendanceHistoryView} events=${events} checkins=${checkins} absences=${absences}
       awayDates=${awayDates} profile=${profile} onBack=${() => setShowHistory(false)} />`;
+  }
+
+  // Same reasoning as showHistory just above: one detail screen, reached from both Home's fee
+  // card and More > My Invoices, per Nina's spec.
+  if (viewingInvoice) {
+    return html`<${MemberInvoiceDetail} invoice=${viewingInvoice} terms=${terms}
+      onBack=${() => setViewingInvoice(null)} />`;
   }
 
   return html`
@@ -263,6 +272,8 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
           </div>
         </div>
       ` : null}
+
+      <${TermFeesCard} myInvoices=${myInvoices} terms=${terms} onOpen=${setViewingInvoice} />
 
       ${stats ? html`
         <button class="card term-stats" onClick=${() => setShowHistory(true)} aria-label="My term — see attendance history">

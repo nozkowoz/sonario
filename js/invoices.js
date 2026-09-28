@@ -20,8 +20,14 @@ import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle } from './ico
 // --- Sonario's fixed invoice details --------------------------------------------------------
 // Nina, 2026-09-17: real details from the current invoices, not placeholders. The fee itself is
 // the one thing expected to change over time, hence it living in invoice_settings instead of here.
-const SONARIO_ABN = '64 562 823 088';
-const SONARIO_EMAIL = 'sonario.au@gmail.com';
+// Exported (2026-09-28) so the member-facing invoice screen (memberinvoices.js) shows the exact
+// same payment details the PDF does, from one source, rather than a second hardcoded copy.
+export const SONARIO_ABN = '64 562 823 088';
+export const SONARIO_EMAIL = 'sonario.au@gmail.com';
+export const SONARIO_ACCOUNT_NAME = 'Sonario';
+export const SONARIO_BANK = 'Bendigo Bank';
+export const SONARIO_BSB = '633-000';
+export const SONARIO_ACCOUNT_NUMBER = '171622970';
 
 const AdminHeadInvoices = ({ title, onBack }) => html`
   <div class="detail-head">
@@ -30,7 +36,7 @@ const AdminHeadInvoices = ({ title, onBack }) => html`
   </div>
 `;
 
-const formatCents = (cents) => `$${(cents / 100).toFixed(2)}`;
+export const formatCents = (cents) => `$${(cents / 100).toFixed(2)}`;
 const centsFromDollarsInput = (v) => Math.round(Number(v) * 100);
 
 // The real Sonario wordmark (Nina, 2026-09-17 — a clean recreation, black on white, no
@@ -50,7 +56,7 @@ function loadWordmarkImageBytes() {
 const INV_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 // Plain "16 Sep 2026" — no weekday. Every existing date formatter in lib.js either includes one or
 // is uppercase-rail-styled; an invoice wants neither, so this stays local rather than exported.
-function formatInvoiceDate(dateStr) {
+export function formatInvoiceDate(dateStr) {
   const d = parseLocalDate(dateStr);
   return `${d.getDate()} ${INV_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
@@ -64,7 +70,7 @@ function addDays(dateStr, days) {
 // term.name is "Term 3 2026" live (confirmed against the real data) — parsed rather than
 // hardcoded so the invoice heading is automatically correct in future years. Falls back
 // gracefully if a term is ever named differently.
-function parseTermLabel(term) {
+export function parseTermLabel(term) {
   const m = /Term\s+(\d+)\s+(\d{4})/.exec(term?.name || '');
   if (m) return { number: m[1], year: m[2] };
   const year = term?.starts_on ? parseLocalDate(term.starts_on).getFullYear() : new Date().getFullYear();
@@ -72,9 +78,9 @@ function parseTermLabel(term) {
 }
 
 const slug = (s) => String(s || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '');
-const invoiceFilename = (invoice) => `Invoice-${invoice.invoice_number}-${slug(invoice.member_name)}.pdf`;
+export const invoiceFilename = (invoice) => `Invoice-${invoice.invoice_number}-${slug(invoice.member_name)}.pdf`;
 
-function downloadBlob(blob, filename) {
+export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -100,7 +106,7 @@ function downloadBlob(blob, filename) {
 // this session's transcript): looked wrong, worse than Helvetica. Resolved properly with a real
 // wordmark IMAGE instead (Nina supplied one, see loadWordmarkImageBytes above) — falls back to
 // Helvetica Bold text only if that file is ever missing.
-async function buildInvoicePdfBytes({
+export async function buildInvoicePdfBytes({
   invoiceNumberLabel, memberName, memberEmail, invoiceDateStr, dueDateStr, amountCents, termLabel,
   isSample = false,
 }) {
@@ -163,10 +169,10 @@ async function buildInvoicePdfBytes({
   gap(36);
 
   text('Payment (EFT)', { f: bold }); gap(16);
-  text('Account name: Sonario', { size: 10 }); gap(14);
-  text('Bank: Bendigo Bank', { size: 10 }); gap(14);
-  text('BSB: 633-000', { size: 10 }); gap(14);
-  text('Account: 171622970', { size: 10 }); gap(14);
+  text(`Account name: ${SONARIO_ACCOUNT_NAME}`, { size: 10 }); gap(14);
+  text(`Bank: ${SONARIO_BANK}`, { size: 10 }); gap(14);
+  text(`BSB: ${SONARIO_BSB}`, { size: 10 }); gap(14);
+  text(`Account: ${SONARIO_ACCOUNT_NUMBER}`, { size: 10 }); gap(14);
   text(`Reference: ${memberName}`, { size: 10 }); gap(30);
 
   text('Fees are invoiced at the start of each term, due within 7 days of the invoice date,', { size: 9, color: soft });
