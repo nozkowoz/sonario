@@ -1254,6 +1254,14 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .switch input:checked + .switch-track::before { transform: translateX(18px); }
 .switch input:disabled + .switch-track { opacity: .5; }
 
+/* --- Invoice Email Setup wizard ------------------------------------------ */
+.setup-icon-badge {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--purple-light); color: var(--purple);
+}
+.setup-icon-badge-green { background: var(--green-bg, #e6f6ec); color: var(--green); }
+
 @media (max-width: 480px) {
   /* Must be a real rule, and --main-pad must be the ONLY place the body padding is set: the Home
      hero cancels it with negative margins, so a hardcoded .app-main padding here would leave the

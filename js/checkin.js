@@ -352,8 +352,13 @@ export function AttendanceSummary({ checkinsForEvent, absencesForEvent, director
 // same status precedence as AttendanceStatus (checked in > away > absence > nothing recorded),
 // but only ever renders the past-tense outcome since every row here is already over.
 // ---------------------------------------------------------------------------
-export function AttendanceHistoryView({ events, checkins, absences, awayDates, profile, onBack }) {
+// `subjectName` is optional and only changes wording, never data: omitted (the two existing
+// self-view call sites, home.js/more.js), every string reads as second person ("you"). Passed
+// (Admin > Attendance's member-history viewer), the same rows render with that person's name
+// instead, since "you" would read strangely when someone else is looking.
+export function AttendanceHistoryView({ events, checkins, absences, awayDates, profile, onBack, subjectName }) {
   const today = todayStr();
+  const isSelf = !subjectName;
 
   const rows = useMemo(() => events
     .filter((e) => e.counts_towards_attendance && e.status === 'scheduled' && e.rehearsal_date < today)
@@ -367,10 +372,10 @@ export function AttendanceHistoryView({ events, checkins, absences, awayDates, p
         : myAway
           ? { text: 'Away', tone: 'off' }
           : myAbsence
-            ? { text: "Said you couldn't make it", tone: 'off' }
+            ? { text: isSelf ? "Said you couldn't make it" : `${subjectName} said they couldn't make it`, tone: 'off' }
             : { text: 'No check-in recorded', tone: 'muted' };
       return { event: e, state };
-    }), [events, checkins, absences, awayDates, profile.id, today]);
+    }), [events, checkins, absences, awayDates, profile.id, today, isSelf, subjectName]);
 
   return html`
     <div class="tab-content">
@@ -381,7 +386,9 @@ export function AttendanceHistoryView({ events, checkins, absences, awayDates, p
         <h2 class="admin-head-title">Attendance History</h2>
       </div>
       ${!rows.length
-        ? html`<p class="form-hint" style="padding:0 4px;">Past rehearsals you've attended will show up here.</p>`
+        ? html`<p class="form-hint" style="padding:0 4px;">
+            ${isSelf ? "Past rehearsals you've attended will show up here." : `${subjectName} hasn't attended any past rehearsals yet.`}
+          </p>`
         : html`
           <div class="att-history-list">
             ${rows.map(({ event: e, state }) => html`

@@ -264,3 +264,21 @@ export const IconPlus = ({ size }) => svg(html`
 export const IconSend = ({ size }) => svg(html`
   <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7Z" />
 `, { size });
+
+// Admin > Attendance home: single member (vs IconUsers' two-person icon) and a plain list.
+export const IconUser = ({ size }) => svg(html`
+  <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+`, { size });
+
+export const IconList = ({ size }) => svg(html`
+  <path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" />
+`, { size });
+
+// Invoice Email Setup wizard's step-badge icons.
+export const IconMail = ({ size }) => svg(html`
+  <rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" />
+`, { size });
+
+export const IconKey = ({ size }) => svg(html`
+  <circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M17 6l3 3M14 9l2 2" />
+`, { size });

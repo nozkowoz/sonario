@@ -15,7 +15,7 @@ import {
   createInvoiceRun, fetchInvoicesForRun, fetchInvoicedProfileIdsForTerm, updateInvoiceDueDate,
 } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
-import { IconBack, IconChevron } from './icons.js';
+import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle } from './icons.js';
 
 // --- Sonario's fixed invoice details --------------------------------------------------------
 // Nina, 2026-09-17: real details from the current invoices, not placeholders. The fee itself is
@@ -348,6 +348,166 @@ function FeeEditor({ settings, profileId, onSaved }) {
 }
 
 // ---------------------------------------------------------------------------
+// Invoice Email Setup wizard (2026-09-28, per Nina's mockup with one deliberate change): screens
+// 1 through 4 follow the mockup closely (Overview, Gmail account, 2-Step Verification, Create an
+// App Password), but there is no screen 5/6 here, no "enter the app password into Sonario" field,
+// no in-app "send test email". Nina's explicit call: the password gets texted to her and goes
+// straight into Supabase's secret store, same as the existing plan already in TODO.md, kept for a
+// real reason, not an oversight — a live email-sending credential sitting in the app's own
+// database is reachable by any future bug or an overly broad RLS policy in a way Supabase's actual
+// secrets vault isn't. The final screen explains this, rather than silently ending at "text Nina"
+// with no reason given.
+const WIZARD_STEP_COUNT = 4;
+
+function StepBadge({ Icon, tone = 'purple' }) {
+  return html`<span class="setup-icon-badge setup-icon-badge-${tone}"><${Icon} size=${20} /></span>`;
+}
+
+function InvoiceEmailSetupWizard({ onClose }) {
+  const [step, setStep] = useState(0);
+  const next = () => setStep((s) => Math.min(s + 1, WIZARD_STEP_COUNT));
+  const back = () => (step === 0 ? onClose() : setStep((s) => s - 1));
+
+  const titles = ['Invoice Email Setup', '1. Gmail account', '2. Turn on 2-Step Verification',
+    '3. Create an App Password', 'Text it to Nina'];
+
+  return html`
+    <div class="tab-content">
+      <div class="detail-head">
+        <button class="icon-btn" aria-label="Back" onClick=${back}>
+          <${IconBack} size=${20} />
+        </button>
+        <h2 class="admin-head-title">${titles[step]}</h2>
+      </div>
+
+      ${step === 0 ? html`
+        <p style="margin:0 0 16px;">
+          Sonario will send invoice emails via the Sonario Gmail account, using a secure connection.
+        </p>
+        <div class="card" style="display:flex;gap:12px;margin-bottom:16px;">
+          <${StepBadge} Icon=${IconMail} />
+          <div>
+            <p style="margin:0;font-weight:700;">What you'll need</p>
+            <p class="form-hint" style="margin:2px 0 0;">
+              The Sonario Gmail account (${SONARIO_EMAIL}), with 2-Step Verification and an app password.
+            </p>
+          </div>
+        </div>
+        <div class="step-row">
+          <span class="step-num">1</span>
+          <div><p style="margin:0;font-weight:700;">Turn on 2-Step Verification</p>
+            <p class="form-hint" style="margin:0;">Required by Google before it will issue an app password.</p></div>
+        </div>
+        <div class="step-row">
+          <span class="step-num">2</span>
+          <div><p style="margin:0;font-weight:700;">Create an App Password</p>
+            <p class="form-hint" style="margin:0;">A 16-character password Sonario's Edge Function will use to send emails.</p></div>
+        </div>
+        <div class="step-row" style="margin-bottom:20px;">
+          <span class="step-num">3</span>
+          <div><p style="margin:0;font-weight:700;">Text it to Nina</p>
+            <p class="form-hint" style="margin:0;">She adds it to Supabase's secret store. It's never typed into Sonario itself.</p></div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onClick=${next}>Let's get started</button>
+      ` : null}
+
+      ${step === 1 ? html`
+        <p style="margin:0 0 16px;">Use the Sonario Gmail account for sending invoice emails.</p>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;gap:12px;margin-bottom:12px;">
+            <${StepBadge} Icon=${IconMail} />
+            <p style="margin:0;font-weight:700;align-self:center;">${SONARIO_EMAIL}</p>
+          </div>
+          <ul style="margin:0;padding-left:20px;">
+            <li>The same account already used for Sonario's Drive folders and sign-in.</li>
+            <li>Keeps invoice emails separate from anyone's personal email.</li>
+            <li>Makes it clear to recipients where invoices come from.</li>
+          </ul>
+        </div>
+        <p class="form-hint" style="margin:0 0 20px;">
+          Sean needs to sign in to this account (or already has access to it) to complete the next
+          two steps.
+        </p>
+        <button class="btn btn-primary" style="width:100%;" onClick=${next}>I have access to this account</button>
+      ` : null}
+
+      ${step === 2 ? html`
+        <div class="card" style="display:flex;gap:12px;margin-bottom:16px;">
+          <${StepBadge} Icon=${IconCheckCircle} tone="green" />
+          <div>
+            <p style="margin:0;font-weight:700;">Why this is needed</p>
+            <p class="form-hint" style="margin:2px 0 0;">
+              2-Step Verification is what lets Google issue an app password for Sonario at all.
+            </p>
+          </div>
+        </div>
+        <p style="margin:0 0 8px;font-weight:700;">How to turn it on</p>
+        <div class="step-row">
+          <span class="step-num">1</span>
+          <p style="margin:0;">
+            Go to <strong>myaccount.google.com/security</strong>, signed in as ${SONARIO_EMAIL}.
+          </p>
+        </div>
+        <div class="step-row">
+          <span class="step-num">2</span>
+          <p style="margin:0;">Under "How you sign in to Google", select 2-Step Verification.</p>
+        </div>
+        <div class="step-row" style="margin-bottom:20px;">
+          <span class="step-num">3</span>
+          <p style="margin:0;">Follow Google's prompts to turn it on, if it isn't on already.</p>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onClick=${next}>I've turned on 2-Step Verification</button>
+      ` : null}
+
+      ${step === 3 ? html`
+        <div class="card" style="display:flex;gap:12px;margin-bottom:16px;">
+          <${StepBadge} Icon=${IconKey} />
+          <div>
+            <p style="margin:0;font-weight:700;">What is an app password?</p>
+            <p class="form-hint" style="margin:2px 0 0;">
+              A 16-character password Google generates for one specific app. It lets Sonario send
+              email without ever knowing the real Gmail password.
+            </p>
+          </div>
+        </div>
+        <p style="margin:0 0 8px;font-weight:700;">How to create it</p>
+        <div class="step-row">
+          <span class="step-num">1</span>
+          <p style="margin:0;">Go to <strong>myaccount.google.com/apppasswords</strong>.</p>
+        </div>
+        <div class="step-row">
+          <span class="step-num">2</span>
+          <p style="margin:0;">Give it a name, e.g. "Sonario".</p>
+        </div>
+        <div class="step-row" style="margin-bottom:20px;">
+          <span class="step-num">3</span>
+          <p style="margin:0;">Click "Create" and copy the 16-character password shown.</p>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onClick=${next}>I have my app password</button>
+      ` : null}
+
+      ${step === 4 ? html`
+        <div class="card" style="text-align:center;margin-bottom:16px;">
+          <p style="margin:0 0 6px;font-weight:700;font-size:16px;">Text that password to Nina</p>
+          <p style="margin:0 0 4px;font-size:22px;font-weight:800;color:var(--purple);">0438 477 458</p>
+          <p class="form-hint" style="margin:0;">Don't email it. Don't type it into Sonario itself.</p>
+        </div>
+        <div class="card" style="margin-bottom:16px;">
+          <p style="margin:0 0 8px;font-weight:700;">Why text it instead of entering it here?</p>
+          <p style="margin:0;">
+            The password could send email as sonario.au@gmail.com, so it needs to live somewhere
+            more locked down than the app's own database. Nina adds it directly to Supabase's
+            secret store, where only the Edge Function that sends invoices can ever read it, not
+            any table a bug or a permissions mistake could expose.
+          </p>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onClick=${onClose}>Done</button>
+      ` : null}
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
 // Invoicing Setup — the onboarding checklist. Only the numbering step is enforced at the database
 // level (see 0015); the rest is sequencing for a good first-run experience. Email is intentionally
 // not built in this pass — see the Send test email row below.
@@ -358,6 +518,11 @@ function InvoicingSetup({ settings, terms, profileId, onSettingsSaved, onBack })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [sampleBusy, setSampleBusy] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  if (wizardOpen) {
+    return html`<${InvoiceEmailSetupWizard} onClose=${() => setWizardOpen(false)} />`;
+  }
 
   const setNumbering = async () => {
     const n = parseInt(nextNumber, 10);
@@ -383,24 +548,15 @@ function InvoicingSetup({ settings, terms, profileId, onSettingsSaved, onBack })
 
       <div class="card" style="margin-bottom:14px;">
         <p class="form-hint" style="margin:0 0 8px;">1. Invoice email (one-time setup)</p>
-        <p style="margin:0 0 10px;">
+        <p style="margin:0 0 12px;">
           Sending invoices from inside Sonario isn't built yet, but it will send from the Sonario
-          Gmail, which needs a one-time password before that can happen. Ask Sean to do this and
-          text the result to Nina on <strong>0438 477 458</strong>:
+          Gmail once that account has an app password ready. A guided walkthrough for Sean covers
+          getting it and texting it to Nina.
         </p>
-        <ol style="margin:0 0 10px;padding-left:20px;">
-          <li>Go to <strong>myaccount.google.com/apppasswords</strong> on the Sonario Gmail account
-            (search "app passwords" in Google Account settings if that doesn't open directly; it
-            needs 2-Step Verification turned on first, which it'll prompt for if it isn't already).</li>
-          <li>Create a new app password and name it <strong>Sonario</strong>.</li>
-          <li>Google shows a 16-character password once, copy it.</li>
-          <li>Text that password to Nina on <strong>0438 477 458</strong>. Don't email it, and don't
-            type it into Sonario itself, it goes straight into Supabase's secret store.</li>
-        </ol>
-        <button class="btn btn-outline btn-sm" disabled>Send test email <span class="admin-soon">Soon</span></button>
+        <button class="btn btn-outline btn-sm" onClick=${() => setWizardOpen(true)}>Start setup</button>
         <p class="form-hint" style="margin:8px 0 0;">
           The send button itself isn't built yet (invoices are downloadable PDFs for now), but
-          having the app password ready means the setup step above is one less thing later.
+          having the app password ready means this step is one less thing later.
         </p>
       </div>
 

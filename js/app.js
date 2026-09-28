@@ -181,7 +181,7 @@ function Main({ session, membership, profile, patchProfile }) {
         ${activeTab === 'admin' && canManage
           ? html`<${AdminTab} key=${resetKeys.admin} session=${session} view=${adminView} setView=${setAdminView}
               events=${events} eventsLoading=${eventsLoading} terms=${terms} onEventSaved=${patchEvent}
-              directory=${directory} checkins=${checkins}
+              directory=${directory} checkins=${checkins} absences=${absences} awayDates=${awayDates}
               onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow} />`
           : null}
       </main>
