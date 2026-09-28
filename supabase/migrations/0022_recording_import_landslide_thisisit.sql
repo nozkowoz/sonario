@@ -1,0 +1,10 @@
+-- 0022_recording_import_landslide_thisisit.sql
+-- Adds recordings for Landslide and This Is It, found in past-year Drive folders
+-- (neither is in the 2026 repertoire zips Nina downloaded earlier, since both are
+-- carried-over songs with no NEW 2026 recording folder). Landslide's 3 files are from
+-- 2023 but still usable; This Is It's single unlabelled file is treated as full_choir,
+-- the same convention used elsewhere for one recording covering a whole song.
+insert into sonario.recordings (id, song_id, part_label, storage_path, title, uploaded_by, mime_type, file_size_bytes, duration_seconds) values ('a0fee13d-f621-4ba9-ab13-920609a0302f', 'b0000000-0000-0000-0000-000000000007', 'alto', 'b0000000-0000-0000-0000-000000000007/alto/2552750e-3796-44b0-8489-d568ee0740b3.m4a', 'Landslide - Alto', 'bfe5db43-2a4a-4bf0-a1b3-881b180b6246', 'audio/x-m4a', 1711508, 205.1);
+insert into sonario.recordings (id, song_id, part_label, storage_path, title, uploaded_by, mime_type, file_size_bytes, duration_seconds) values ('b0758110-78e0-456e-beb5-8518aa1300dd', 'b0000000-0000-0000-0000-000000000007', 'sop', 'b0000000-0000-0000-0000-000000000007/sop/91b7001f-4ee0-452c-9035-b6dfbdcc390c.m4a', 'Landslide - Soprano', 'bfe5db43-2a4a-4bf0-a1b3-881b180b6246', 'audio/x-m4a', 1660062, 199.5);
+insert into sonario.recordings (id, song_id, part_label, storage_path, title, uploaded_by, mime_type, file_size_bytes, duration_seconds) values ('96915f05-9e08-4551-8def-5fffa4326b4a', 'b0000000-0000-0000-0000-000000000007', 'tenor', 'b0000000-0000-0000-0000-000000000007/tenor/2bd01521-8b5d-49d4-bf4b-755b5d2204c4.m4a', 'Landslide Tenor', 'bfe5db43-2a4a-4bf0-a1b3-881b180b6246', 'audio/x-m4a', 1700243, 199.9);
+insert into sonario.recordings (id, song_id, part_label, storage_path, title, uploaded_by, mime_type, file_size_bytes, duration_seconds) values ('cb3c9da9-738a-4ae7-9169-d4cd5dc5c65b', 'b0000000-0000-0000-0000-000000000003', 'full_choir', 'b0000000-0000-0000-0000-000000000003/full_choir/37c8860a-0623-4f94-8a17-10a1ae35171f.m4a', 'This Is It', 'bfe5db43-2a4a-4bf0-a1b3-881b180b6246', 'audio/x-m4a', 1793335, 214.3);
