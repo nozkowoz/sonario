@@ -63,6 +63,17 @@ Deno.serve(async (req) => {
   }
   const profileId = userData.user.id;
 
+  // Only supers may trigger a test push (Nina, 2026-09-28) — enforced here, not just by hiding the
+  // button client-side, since anyone with a valid JWT could otherwise call this function directly.
+  const { data: membership, error: membershipError } = await supabaseAdmin
+    .from('memberships')
+    .select('role')
+    .eq('profile_id', profileId)
+    .single();
+  if (membershipError || membership?.role !== 'super') {
+    return json({ error: 'Only super users can send a test notification.' }, 403);
+  }
+
   const { data: subs, error: subsError } = await supabaseAdmin
     .from('push_subscriptions')
     .select('id, endpoint, p256dh, auth')

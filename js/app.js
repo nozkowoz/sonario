@@ -171,7 +171,7 @@ function Main({ session, membership, profile, patchProfile }) {
           />
         ` : null}
         ${activeTab === 'more' ? html`
-          <${MoreTab} key=${resetKeys.more} profile=${profile} terms=${terms}
+          <${MoreTab} key=${resetKeys.more} profile=${profile} terms=${terms} canManage=${canManage}
             events=${events} absences=${absences} checkins=${checkins} awayDates=${awayDates}
             view=${moreView} setView=${setMoreView}
             onNavigate=${changeTab} onSignOut=${() => supabase.auth.signOut()}
