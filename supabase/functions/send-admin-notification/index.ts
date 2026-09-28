@@ -53,8 +53,12 @@ Deno.serve(async (req) => {
     .select('role')
     .eq('profile_id', callerId)
     .single();
-  if (membershipError || membership?.role !== 'super') {
-    return json({ error: 'Only super users can send a notification.' }, 403);
+  // Admin + Super Admin, migration 0028 — manual notification broadcast is operational, not
+  // financial, same boundary as the rest of the Admin tab. send-test-notification stays
+  // Super-Admin-only on purpose (Nina, 2026-09-29): that one's a dev/test tool, this is the real
+  // feature.
+  if (membershipError || !['admin', 'super'].includes(membership?.role)) {
+    return json({ error: 'Only Admins and Super Admins can send a notification.' }, 403);
   }
 
   let title, body;
