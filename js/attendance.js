@@ -1,6 +1,6 @@
 import { html, useState, useMemo } from './lib.js';
 import { formatEventDateLong, formatTimeRange } from './lib.js';
-import { displayNameOf, useProfilesById, useAllMemberships, backfillCheckin } from './store.js';
+import { displayNameOf, useProfilesById, useAllMemberships, backfillCheckin, removeBackfillCheckin } from './store.js';
 import { AttendanceHistoryView } from './checkin.js';
 import { EmptyState, Sheet } from './shell.js';
 import { IconBack, IconChevron, IconSearch, IconCalendar, IconUser, IconList, IconCheck } from './icons.js';
@@ -105,7 +105,7 @@ function ConfirmBackfillSheet({ count, reason, setReason, busy, onConfirm, onCan
   `;
 }
 
-function BackfillRehearsalSelect({ member, profile, events, checkins, session, onCheckinSaved, onBack }) {
+function BackfillRehearsalSelect({ member, profile, events, checkins, session, onCheckinSaved, onCheckinRemoved, onBack }) {
   const today = new Date().toISOString().slice(0, 10);
   const pastRehearsals = useMemo(() => events
     .filter((e) => e.counts_towards_attendance && e.status === 'scheduled' && e.rehearsal_date < today)
@@ -122,12 +122,27 @@ function BackfillRehearsalSelect({ member, profile, events, checkins, session, o
   const [error, setError] = useState(null);
   const [justMarked, setJustMarked] = useState(null); // Set of rehearsal ids, for the success banner
   const [dismissedSuccess, setDismissedSuccess] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
 
   const toggle = (rehearsalId) => setSelected((prev) => {
     const next = new Set(prev);
     if (next.has(rehearsalId)) next.delete(rehearsalId); else next.add(rehearsalId);
     return next;
   });
+
+  // Nina, 2026-09-28: "we need to be able to undo anything" — a backfilled row can be removed
+  // again from right here, same as the pre-redesign screen could. A REAL check-in (not our own
+  // super_backfill source) still can't be touched from this screen: backfilling closes gaps, it
+  // was never meant to let a super silently overwrite someone's genuine record.
+  const undoBackfill = async (checkinId) => {
+    setRemovingId(checkinId);
+    setError(null);
+    const { data, error: err } = await removeBackfillCheckin(checkinId);
+    setRemovingId(null);
+    if (err) { setError(err.message); return; }
+    if (!data || data.length === 0) { setError("That didn't save, reload and try again."); return; }
+    onCheckinRemoved?.(checkinId);
+  };
 
   const confirm = async () => {
     setBusy(true);
@@ -185,6 +200,7 @@ function BackfillRehearsalSelect({ member, profile, events, checkins, session, o
             ${pastRehearsals.map((r) => {
               const existing = checkinFor(r.id);
               const isAttended = !!existing; // either a real check-in or an earlier backfill
+              const isOurBackfill = existing?.source === 'super_backfill';
               if (isAttended) {
                 return html`
                   <div key=${r.id} class="practice-select-row practice-select-row-disabled">
@@ -193,6 +209,12 @@ function BackfillRehearsalSelect({ member, profile, events, checkins, session, o
                       <span class="form-hint" style="margin:0;">${formatTimeRange(r.start_time, r.end_time)}</span>
                     </span>
                     <span class="event-type-badge" style="background:var(--green-bg, #e6f6ec);color:var(--green);">Attended</span>
+                    ${isOurBackfill ? html`
+                      <button class="btn-quiet" disabled=${removingId === existing.id}
+                        onClick=${() => undoBackfill(existing.id)}>
+                        ${removingId === existing.id ? 'Removing…' : 'Remove'}
+                      </button>
+                    ` : null}
                   </div>
                 `;
               }
@@ -245,7 +267,7 @@ export function AdminAttendance({ session, events, checkins, absences, awayDates
   if (screen === 'backfill-select' && chosen) {
     return html`<${BackfillRehearsalSelect} member=${chosen.membership} profile=${chosen.profile}
       events=${events} checkins=${checkins} session=${session} onCheckinSaved=${onCheckinSaved}
-      onBack=${() => setScreen('backfill-pick')} />`;
+      onCheckinRemoved=${onCheckinRemoved} onBack=${() => setScreen('backfill-pick')} />`;
   }
   if (screen === 'history-pick') {
     return html`<${MemberPicker} title="Attendance history" subtitle="Choose a member to see their attendance record."
