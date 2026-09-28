@@ -24,6 +24,8 @@ import { IconBack, IconChevron, IconSearch } from './icons.js';
 // (Approve/Decline/Deactivate/Reactivate), just grouped under one "Access & status" card instead
 // of scattered, plus a distinct danger-zone card for the irreversible-feeling ones.
 
+const ROLE_LABEL = { admin: 'Admin', super: 'Super Admin' }; // 'member' gets no badge at all
+
 const initialsOf = (profile) => {
   const first = (profile?.first_name || displayNameOf(profile) || '?').trim()[0] || '?';
   const last = (profile?.last_name || '').trim()[0] || '';
@@ -48,14 +50,14 @@ const AdminHeadMembers = ({ title, onBack }) => html`
 
 function MemberListRow({ membership, profile, myProfileId, onOpen }) {
   const isSelf = membership.profile_id === myProfileId;
-  const isSuper = membership.role === 'super';
+  const roleLabel = ROLE_LABEL[membership.role];
   return html`
     <button class="card member-row" onClick=${() => onOpen(membership)}>
       <span class="member-avatar" aria-hidden="true" style="flex-shrink:0;">${initialsOf(profile)}</span>
       <div class="member-row-main">
         <div class="member-row-name">
           ${displayNameOf(profile) || 'Unknown'}${isSelf ? ' (you)' : ''}
-          ${isSuper ? html`<span class="event-type-badge role-badge">Super</span>` : null}
+          ${roleLabel ? html`<span class="event-type-badge role-badge">${roleLabel}</span>` : null}
         </div>
         ${profile?.google_email ? html`<div class="member-row-email">${profile.google_email}</div>` : null}
       </div>
@@ -85,7 +87,7 @@ function PendingPreviewCard({ pending, profilesById, onViewAll }) {
   `;
 }
 
-export function AdminMembers({ session, onBack }) {
+export function AdminMembers({ session, isSuperAdmin, onBack }) {
   const { memberships, patchMembership } = useAllMemberships();
   const [tab, setTab] = useState('active'); // 'active' | 'pending' | 'deactivated'
   const [query, setQuery] = useState('');
@@ -113,7 +115,8 @@ export function AdminMembers({ session, onBack }) {
 
   if (openMembership) {
     return html`<${MemberDetail} membership=${openMembership} profile=${profilesById[openMembership.profile_id]}
-      myProfileId=${myProfileId} onBack=${() => setOpenId(null)} onMembershipSaved=${patchMembership} />`;
+      myProfileId=${myProfileId} isSuperAdmin=${isSuperAdmin}
+      onBack=${() => setOpenId(null)} onMembershipSaved=${patchMembership} />`;
   }
 
   return html`
@@ -158,13 +161,24 @@ export function AdminMembers({ session, onBack }) {
   `;
 }
 
+const ROLE_OPTIONS = [
+  { key: 'member', label: 'Member' },
+  { key: 'admin', label: 'Admin' },
+  { key: 'super', label: 'Super Admin' },
+];
+
 // --- Member detail -----------------------------------------------------------
-function MemberDetail({ membership, profile, myProfileId, onBack, onMembershipSaved }) {
+function MemberDetail({ membership, profile, myProfileId, isSuperAdmin, onBack, onMembershipSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [confirmingRole, setConfirmingRole] = useState(null); // null | 'promote' | 'demote'
+  const [confirmingRole, setConfirmingRole] = useState(null); // null | 'member' | 'admin' | 'super'
+  // Only relevant while approving a pending member, and only a Super Admin gets to set it —
+  // an admin approving someone always leaves them at the default 'member' role (Nina, 2026-09-29:
+  // "only Super Admins can promote/demote Admin/Super Admin roles", which applies at approval
+  // time too, not just to changing an existing member's role later).
+  const [approvalRole, setApprovalRole] = useState('member');
   const isSelf = membership.profile_id === myProfileId;
-  const isSuper = membership.role === 'super';
+  const roleLabel = ROLE_LABEL[membership.role];
 
   const act = async (fn) => {
     setBusy(true);
@@ -173,15 +187,18 @@ function MemberDetail({ membership, profile, myProfileId, onBack, onMembershipSa
     setBusy(false);
     setConfirmingRole(null);
     if (err) { setError(err.message); return; }
-    if (!data || data.length === 0) {
+    // decideMembership (a raw .update().select()) returns an array; setMemberRole (an RPC
+    // returning a single row) returns a plain object — handle both shapes.
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
       setError("That didn't save — check you still have organiser access.");
       return;
     }
-    onMembershipSaved?.(data[0]);
+    onMembershipSaved?.(row);
   };
 
   const doDecide = (patch) => act(() => decideMembership(membership.profile_id, patch, myProfileId));
-  const doRole = (role) => act(() => setMemberRole(membership.profile_id, role, myProfileId));
+  const doRole = (role) => act(() => setMemberRole(membership.profile_id, role));
 
   return html`
     <div class="tab-content">
@@ -192,7 +209,7 @@ function MemberDetail({ membership, profile, myProfileId, onBack, onMembershipSa
         <div style="min-width:0;">
           <div class="member-row-name" style="font-size:16px;">
             ${displayNameOf(profile) || 'Unknown'}${isSelf ? ' (you)' : ''}
-            ${isSuper ? html`<span class="event-type-badge role-badge">Super</span>` : null}
+            ${roleLabel ? html`<span class="event-type-badge role-badge">${roleLabel}</span>` : null}
           </div>
           ${profile?.google_email ? html`<div class="member-row-email">${profile.google_email}</div>` : null}
           ${joinedDateText(membership.requested_at) ? html`
@@ -207,8 +224,20 @@ function MemberDetail({ membership, profile, myProfileId, onBack, onMembershipSa
         <p style="margin:0 0 12px;font-weight:700;">Access &amp; status</p>
 
         ${membership.status === 'pending' ? html`
+          ${isSuperAdmin ? html`
+            <p style="margin:0 0 8px;font-weight:600;">Role on approval</p>
+            <div class="chips" style="margin-bottom:14px;">
+              ${ROLE_OPTIONS.map((r) => html`
+                <button key=${r.key} class="chip ${approvalRole === r.key ? 'chip-on' : ''}"
+                  onClick=${() => setApprovalRole(r.key)}>${r.label}</button>
+              `)}
+            </div>
+          ` : null}
           <div class="form-actions">
-            <button class="btn btn-primary btn-sm" disabled=${busy || isSelf} onClick=${() => doDecide({ status: 'active' })}>Approve</button>
+            <button class="btn btn-primary btn-sm" disabled=${busy || isSelf}
+              onClick=${() => doDecide({ status: 'active', role: isSuperAdmin ? approvalRole : undefined })}>
+              Approve${isSuperAdmin && approvalRole !== 'member' ? ` as ${ROLE_LABEL[approvalRole]}` : ''}
+            </button>
             <button class="btn-quiet" disabled=${busy || isSelf} onClick=${() => doDecide({ status: 'declined' })}>Decline</button>
           </div>
         ` : html`
@@ -217,33 +246,31 @@ function MemberDetail({ membership, profile, myProfileId, onBack, onMembershipSa
           </p>
         `}
 
-        ${membership.status === 'active' ? html`
-          <div style="border-top:1px solid var(--border);margin-top:${membership.status === 'pending' ? '14px' : '0'};padding-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <div>
-              <p style="margin:0;font-weight:600;">Super user</p>
-              <p class="form-hint" style="margin:2px 0 0;">
-                Super users can manage members, send notifications and access admin features.
-              </p>
+        ${membership.status === 'active' && isSuperAdmin ? html`
+          <div style="border-top:1px solid var(--border);margin-top:${membership.status === 'pending' ? '14px' : '0'};padding-top:14px;">
+            <p style="margin:0 0 4px;font-weight:600;">Role</p>
+            <p class="form-hint" style="margin:0 0 10px;">
+              Admins manage choir operations. Super Admins can also manage invoicing and roles.
+            </p>
+            <div class="chips">
+              ${ROLE_OPTIONS.map((r) => html`
+                <button key=${r.key} class="chip ${membership.role === r.key ? 'chip-on' : ''}"
+                  disabled=${busy || isSelf || membership.role === r.key}
+                  onClick=${() => setConfirmingRole(r.key)}>${r.label}</button>
+              `)}
             </div>
-            <label class="switch">
-              <input type="checkbox" checked=${isSuper} disabled=${busy || isSelf}
-                onChange=${() => setConfirmingRole(isSuper ? 'demote' : 'promote')} />
-              <span class="switch-track"></span>
-            </label>
           </div>
         ` : null}
 
         ${confirmingRole ? html`
           <div class="card" style="background:var(--purple-light);box-shadow:none;margin-top:14px;">
             <p style="margin:0 0 12px;">
-              ${confirmingRole === 'promote'
-                ? html`Give <strong>${displayNameOf(profile)}</strong> full organiser access?`
-                : html`Remove organiser access from <strong>${displayNameOf(profile)}</strong>?`}
+              Change <strong>${displayNameOf(profile)}</strong> from ${ROLE_LABEL[membership.role] || 'Member'}
+              to ${ROLE_LABEL[confirmingRole] || 'Member'}?
             </p>
             <div class="form-actions">
-              <button class="btn btn-primary btn-sm" disabled=${busy}
-                onClick=${() => doRole(confirmingRole === 'promote' ? 'super' : 'member')}>
-                ${busy ? 'Saving…' : confirmingRole === 'promote' ? 'Yes, make super' : 'Yes, remove'}
+              <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${() => doRole(confirmingRole)}>
+                ${busy ? 'Saving…' : 'Yes, change role'}
               </button>
               <button class="btn-quiet" disabled=${busy} onClick=${() => setConfirmingRole(null)}>Cancel</button>
             </div>

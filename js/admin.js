@@ -10,13 +10,14 @@ import { IconCalendar, IconUsers, IconCheckSquare, IconBell, IconAdmin, IconCrow
   IconChevron, IconBack, IconCheck } from './icons.js';
 
 // The organiser console. Everything an organiser does lives here, so the member-facing screens
-// (Home, Calendar, More) read identically whether you're a super or not — which is the whole
+// (Home, Calendar, More) read identically whether you're staff or not — which is the whole
 // point: Nina can judge the member experience without a second account, and can't cancel a
 // rehearsal by mis-tapping while browsing.
 //
-// Hiding this tab is presentation only. Every action below is still enforced by RLS — the
-// "super manage rehearsals" and "super decides memberships" policies — so a member who somehow
-// reached this screen could look at it and change nothing.
+// Hiding a section here is presentation only. Every action below is still enforced by RLS/the
+// underlying functions — an admin who somehow reached the Invoices screen could look at it and
+// change nothing, since that data/those RPCs are Super-Admin-gated server-side (migrations
+// 0028-0030). superOnly here just keeps a plain admin from being shown a dead end.
 const SECTIONS = [
   { key: 'events', label: 'Events', Icon: IconCalendar,
     body: 'Create, edit and manage all choir events and rehearsals.' },
@@ -27,7 +28,7 @@ const SECTIONS = [
   { key: 'attendance', label: 'Attendance', Icon: IconCheckSquare,
     body: 'Backfill past attendance for a member, week by week.' },
   { key: 'invoices', label: 'Invoices', Icon: IconInvoice,
-    body: 'Generate term invoices and manage invoice numbering.' },
+    body: 'Generate term invoices and manage invoice numbering.', superOnly: true },
   { key: 'notifications', label: 'Notifications', Icon: IconBell,
     body: 'Send a push notification to your choir.' },
   { key: 'settings', label: 'Settings', Icon: IconAdmin,
@@ -35,7 +36,7 @@ const SECTIONS = [
 ];
 
 export function AdminTab({
-  session, view, setView, events, eventsLoading, terms, onEventSaved,
+  session, isSuperAdmin, view, setView, events, eventsLoading, terms, onEventSaved,
   directory, checkins, absences, awayDates, onCheckinSaved, onCheckinRemoved,
 }) {
   if (view?.section === 'events') {
@@ -43,7 +44,7 @@ export function AdminTab({
       initialEditId=${view.editId || null} onBack=${() => setView(null)} onEventSaved=${onEventSaved} />`;
   }
   if (view?.section === 'members') {
-    return html`<${AdminMembers} session=${session} onBack=${() => setView(null)} />`;
+    return html`<${AdminMembers} session=${session} isSuperAdmin=${isSuperAdmin} onBack=${() => setView(null)} />`;
   }
   if (view?.section === 'attendance') {
     return html`<${AdminAttendance} session=${session} events=${events} checkins=${checkins}
@@ -51,7 +52,10 @@ export function AdminTab({
       onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved}
       onBack=${() => setView(null)} />`;
   }
-  if (view?.section === 'invoices') {
+  // Defense in depth on top of RLS: a plain admin who navigates here directly (e.g. a stale
+  // deep-link from before a demotion) sees the same "not available" state as any other
+  // super-only section, not a screen that quietly does nothing when they tap a button.
+  if (view?.section === 'invoices' && isSuperAdmin) {
     return html`<${AdminInvoices} terms=${terms} directory=${directory} profileId=${session.user.id}
       onBack=${() => setView(null)} />`;
   }
@@ -63,18 +67,22 @@ export function AdminTab({
     return html`
       <div class="tab-content">
         <${AdminHead} title=${section?.label || 'Admin'} onBack=${() => setView(null)} />
-        <${EmptyState} title="Not built yet"
-          body=${`${section?.body || ''} This is next on the list rather than a screen waiting to be filled in.`} />
+        <${EmptyState} title=${section?.superOnly && !isSuperAdmin ? 'Super Admin only' : 'Not built yet'}
+          body=${section?.superOnly && !isSuperAdmin
+            ? 'Invoicing is only available to Super Admins.'
+            : `${section?.body || ''} This is next on the list rather than a screen waiting to be filled in.`} />
       </div>
     `;
   }
+
+  const visibleSections = SECTIONS.filter((s) => !s.superOnly || isSuperAdmin);
 
   return html`
     <div class="tab-content">
       <h2>Admin</h2>
       <p class="admin-intro">Manage your choir, events and members.</p>
       <div class="admin-menu">
-        ${SECTIONS.map((s) => html`
+        ${visibleSections.map((s) => html`
           <button key=${s.key} class="admin-row ${s.soon ? 'admin-row-soon' : ''}"
             onClick=${() => setView({ section: s.key })}>
             <span class="admin-row-icon"><${s.Icon} size=${22} /></span>
@@ -91,8 +99,12 @@ export function AdminTab({
       <div class="card super-card">
         <span class="super-card-icon"><${IconCrown} size=${20} /></span>
         <div>
-          <p class="super-card-title">Super user access</p>
-          <p class="super-card-body">You have full administrative access to Sonario.</p>
+          <p class="super-card-title">${isSuperAdmin ? 'Super Admin access' : 'Admin access'}</p>
+          <p class="super-card-body">
+            ${isSuperAdmin
+              ? 'You have full administrative access to Sonario, including invoicing and roles.'
+              : 'You have administrative access to Sonario. Invoicing and role changes are Super Admin only.'}
+          </p>
         </div>
       </div>
     </div>

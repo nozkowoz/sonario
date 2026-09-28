@@ -38,7 +38,7 @@ const SECTIONS = [
   { key: 'about', label: 'About Sonario', body: 'Version and how this app works' },
 ];
 
-export function MoreTab({ profile, terms, events, absences, checkins, awayDates, myInvoices,
+export function MoreTab({ profile, terms, events, absences, checkins, awayDates, myInvoices, onInvoiceUpdated,
   view, setView, onNavigate, onSignOut, onProfileSaved }) {
   const term = currentTermOf(terms);
   const [viewingInvoice, setViewingInvoice] = useState(null);
@@ -63,6 +63,7 @@ export function MoreTab({ profile, terms, events, absences, checkins, awayDates,
   if (view === 'invoices') {
     if (viewingInvoice) {
       return html`<${MemberInvoiceDetail} invoice=${viewingInvoice} terms=${terms}
+        onInvoiceUpdated=${(updated) => { onInvoiceUpdated?.(updated); setViewingInvoice(updated); }}
         onBack=${() => setViewingInvoice(null)} />`;
     }
     return html`<${MyInvoicesList} myInvoices=${myInvoices} terms=${terms}

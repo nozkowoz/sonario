@@ -1,7 +1,7 @@
 import { html, render, useState } from './lib.js';
 import { supabase } from './supabaseClient.js';
 import {
-  useSession, useMyMembership, displayNameOf, isSuper,
+  useSession, useMyMembership, displayNameOf, isSuper, isStaff,
   useEvents, useTerms, useAbsences, useCheckins, useAwayDates, useEventRsvps, useMemberDirectory,
   awayRangeFor,
   useSongs, useSongCollections, useSongCollectionItems, useSongAssignments, useRehearsalSongs,
@@ -55,9 +55,15 @@ function Gated({ session }) {
 }
 
 function Main({ session, membership, profile, patchProfile }) {
-  const canManage = isSuper(membership);
+  // canManage now means "can see the Admin tab and do operational choir management" (admin or
+  // super — migration 0028). isSuperAdmin is the narrower, invoicing-and-roles-only boundary.
+  // Every existing use of canManage below (event management, repertoire editing, notifications)
+  // is operational, so it correctly widens to admin automatically; only Invoicing and role
+  // management need the stricter flag, threaded through separately where they're used.
+  const canManage = isStaff(membership);
+  const isSuperAdmin = isSuper(membership);
   const [tab, setTab] = useActiveTab('home');
-  // If a super is demoted while sitting on the Admin tab (role arrives over realtime), fall back
+  // If a demoted staff member is sitting on the Admin tab (role arrives over realtime), fall back
   // rather than leaving them on a screen that no longer belongs to them.
   const activeTab = tab === 'admin' && !canManage ? 'home' : tab;
   // Which Admin screen is open, and optionally which event to edit — set from Calendar's
@@ -106,7 +112,7 @@ function Main({ session, membership, profile, patchProfile }) {
   // Member-facing invoices (2026-09-28) — own rows only, per migration 0026. Fetched here rather
   // than lazily so Home's fee card and More's My Invoices share one fetch, same reasoning as
   // everything else on this list.
-  const { invoices: myInvoices } = useMyInvoices(profile.id);
+  const { invoices: myInvoices, patchInvoice: patchMyInvoice } = useMyInvoices(profile.id);
   // Used to be super-only ("members don't render anyone else's name"), but Stage 6 needs the
   // directory for every active member — a recording's uploader is shown to whoever can see the
   // recording at all, not just organisers. Always on now.
@@ -149,7 +155,7 @@ function Main({ session, membership, profile, patchProfile }) {
             profile=${profile}
             events=${events} loading=${eventsLoading} terms=${terms}
             absences=${absences} checkins=${checkins} awayDates=${awayDates} eventRsvps=${eventRsvps}
-            myInvoices=${myInvoices}
+            myInvoices=${myInvoices} onInvoiceUpdated=${patchMyInvoice}
             onNavigate=${changeTab}
             onOpenEvent=${(ev) => setOpenEventId(ev.id)}
             onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow}
@@ -179,13 +185,14 @@ function Main({ session, membership, profile, patchProfile }) {
         ${activeTab === 'more' ? html`
           <${MoreTab} key=${resetKeys.more} profile=${profile} terms=${terms}
             events=${events} absences=${absences} checkins=${checkins} awayDates=${awayDates}
-            myInvoices=${myInvoices}
+            myInvoices=${myInvoices} onInvoiceUpdated=${patchMyInvoice}
             view=${moreView} setView=${setMoreView}
             onNavigate=${changeTab} onSignOut=${() => supabase.auth.signOut()}
             onProfileSaved=${patchProfile} />
         ` : null}
         ${activeTab === 'admin' && canManage
-          ? html`<${AdminTab} key=${resetKeys.admin} session=${session} view=${adminView} setView=${setAdminView}
+          ? html`<${AdminTab} key=${resetKeys.admin} session=${session} isSuperAdmin=${isSuperAdmin}
+              view=${adminView} setView=${setAdminView}
               events=${events} eventsLoading=${eventsLoading} terms=${terms} onEventSaved=${patchEvent}
               directory=${directory} checkins=${checkins} absences=${absences} awayDates=${awayDates}
               onCheckinSaved=${patchCheckinRow} onCheckinRemoved=${removeCheckinRow} />`

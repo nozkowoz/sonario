@@ -72,25 +72,29 @@ export function isSuper(membership) {
   return membership?.role === 'super';
 }
 
+// Admin OR Super Admin — the boundary for operational (non-financial) choir management: events,
+// attendance, members/approvals, repertoire, recordings, recaps, notifications. Invoicing and
+// role management stay gated on isSuper() specifically. See migration 0028.
+export function isStaff(membership) {
+  return membership?.role === 'admin' || membership?.role === 'super';
+}
+
 // Super-only: the pending-approval queue + every membership for management (deactivate/reactivate).
 export function useAllMemberships() {
   const { rows, loading, patchRow } = useLiveTable('memberships');
   return { memberships: rows, loading, patchMembership: patchRow };
 }
 
-// Role changes only. Kept separate from decideMembership so a promotion can never accidentally
-// rewrite someone's status (or vice versa) by sharing a patch object.
+// Role changes only, via the sonario.set_member_role() RPC (migration 0028) — a raw table update
+// is no longer how this happens. That function is Super-Admin-only (checked server-side, and
+// backstopped by a trigger that blocks a role change even through a raw update from anyone else),
+// and it refuses to let a super change their own role — however many supers demote each other,
+// the last one standing cannot demote themselves. The choir cannot be locked out of its own admin.
 //
-// The database already allowed this — `super decides memberships` is
-// `is_super() AND profile_id <> auth.uid()` — so nothing new is being opened up here; the UI
-// simply never offered it. That policy also gives the system a useful property for free: a super
-// can never change their OWN row, so however many supers demote each other, the last one standing
-// cannot demote themselves. The choir cannot be locked out of its own admin.
-export async function setMemberRole(profileId, role, decidedBy) {
-  return supabase.from('memberships')
-    .update({ role, decided_at: new Date().toISOString(), decided_by: decidedBy })
-    .eq('profile_id', profileId)
-    .select();
+// Returns a single row (not an array, unlike the .select() calls elsewhere in this file) — the
+// function returns sonario.memberships, not setof, so supabase-js hands back one object.
+export async function setMemberRole(profileId, role) {
+  return supabase.rpc('set_member_role', { p_profile_id: profileId, p_role: role });
 }
 
 export async function decideMembership(profileId, { status, role }, decidedBy) {
@@ -744,6 +748,54 @@ export async function updateInvoiceDueDate(invoiceId, dueDate) {
   return supabase.from('invoices').update({ due_date: dueDate }).eq('id', invoiceId).select().maybeSingle();
 }
 
+// Invoice status actions (migration 0030) — every one of these is a thin RPC wrapper; the actual
+// state machine (which transitions are legal, who may make them, and the audit trail) lives
+// entirely server-side. Each returns a single sonario.invoices row, or throws with a message
+// meant to be shown directly (e.g. "Invoice not found or not currently due.").
+export async function reportInvoicePaid(invoiceId) {
+  return supabase.rpc('report_invoice_paid', { p_invoice_id: invoiceId });
+}
+export async function confirmInvoicePayment(invoiceId) {
+  return supabase.rpc('confirm_invoice_payment', { p_invoice_id: invoiceId });
+}
+export async function rejectInvoicePayment(invoiceId) {
+  return supabase.rpc('reject_invoice_payment', { p_invoice_id: invoiceId });
+}
+export async function markInvoicePaid(invoiceId) {
+  return supabase.rpc('mark_invoice_paid', { p_invoice_id: invoiceId });
+}
+export async function holdInvoice(invoiceId) {
+  return supabase.rpc('hold_invoice', { p_invoice_id: invoiceId });
+}
+export async function resumeInvoice(invoiceId) {
+  return supabase.rpc('resume_invoice', { p_invoice_id: invoiceId });
+}
+export async function waiveInvoice(invoiceId) {
+  return supabase.rpc('waive_invoice', { p_invoice_id: invoiceId });
+}
+
+// Super-only (migration 0030's own RLS): every invoice currently awaiting payment confirmation,
+// across all runs/terms — the queue Admin > Invoices surfaces so a super doesn't have to hunt
+// through individual runs to find what needs action.
+export function usePaymentsToConfirm() {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    supabase.from('invoices').select('*').eq('status', 'payment_reported')
+      .order('payment_reported_at', { ascending: true }).then(({ data, error }) => {
+        if (cancelled) return;
+        if (!error && data) setInvoices(data);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  return { invoices, loading, setInvoices };
+}
+
 // Member-facing (2026-09-28, migration 0026): every invoice this member has ever been issued,
 // newest first. Works only because of that migration's new "member reads own invoice" policy —
 // before it, this same query just came back empty under RLS, the same silent-nothing trap as
@@ -766,7 +818,11 @@ export function useMyInvoices(profileId) {
     return () => { cancelled = true; };
   }, [profileId]);
 
-  return { invoices, loading };
+  // patchInvoice exposed for reportInvoicePaid — same "patch in place after every mutation"
+  // pattern as every other hook here, since this table isn't realtime and a member reporting
+  // their own invoice paid should see it reflected immediately, not after a reload.
+  const patchInvoice = (updated) => setInvoices((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+  return { invoices, loading, patchInvoice };
 }
 
 // --- Push notifications, Stage A (migration 0017) ---------------------------

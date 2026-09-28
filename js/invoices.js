@@ -13,6 +13,8 @@ import { parseLocalDate, localDateStr, todayStr } from './lib.js';
 import {
   useInvoiceSettings, updateInvoiceFee, initializeInvoiceNumbering, useInvoiceRuns,
   createInvoiceRun, fetchInvoicesForRun, fetchInvoicedProfileIdsForTerm, updateInvoiceDueDate,
+  usePaymentsToConfirm, confirmInvoicePayment, rejectInvoicePayment, markInvoicePaid,
+  holdInvoice, resumeInvoice, waiveInvoice,
 } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle } from './icons.js';
@@ -38,6 +40,24 @@ const AdminHeadInvoices = ({ title, onBack }) => html`
 
 export const formatCents = (cents) => `$${(cents / 100).toFixed(2)}`;
 const centsFromDollarsInput = (v) => Math.round(Number(v) * 100);
+
+// Invoice status, admin-facing (migration 0030). "payment_reported" reads as "Payment to
+// confirm" here — the member's own screen calls the same status "Payment reported" (Nina,
+// 2026-09-29: different audiences, different framing of the same fact). "due" gets no badge at
+// all in the run/queue lists — an outstanding invoice is the default, unremarkable state, and a
+// badge on every single row would just be noise; it only shows up spelled out on the detail screen.
+const STATUS_LABEL = {
+  payment_reported: 'Payment to confirm',
+  paid: 'Paid',
+  on_hold: 'On hold',
+  waived: 'Waived',
+};
+const STATUS_BADGE_CLASS = {
+  payment_reported: 'status-badge-amber',
+  paid: 'status-badge-green',
+  on_hold: 'status-badge-grey',
+  waived: 'status-badge-grey',
+};
 
 // The real Sonario wordmark (Nina, 2026-09-17 — a clean recreation, black on white, no
 // transparency needed since the invoice page is white too). Fetched once per page load and
@@ -229,10 +249,12 @@ async function downloadRunPdfs(invoices, term) {
 export function AdminInvoices({ terms, directory, profileId, onBack }) {
   const { settings, loading: settingsLoading, setSettings } = useInvoiceSettings();
   const { invoiceRuns, loading: runsLoading, patchInvoiceRun } = useInvoiceRuns();
+  const { invoices: toConfirm, loading: toConfirmLoading, setInvoices: setToConfirm } = usePaymentsToConfirm();
   const [screen, setScreen] = useState('home');
   const [draft, setDraft] = useState(null); // working state for the create-run flow
   const [activeRun, setActiveRun] = useState(null);
   const [activeRunInvoices, setActiveRunInvoices] = useState(null);
+  const [openQueueInvoiceId, setOpenQueueInvoiceId] = useState(null);
 
   const openRun = async (run) => {
     setActiveRun(run);
@@ -240,6 +262,13 @@ export function AdminInvoices({ terms, directory, profileId, onBack }) {
     setScreen('run-detail');
     const { data } = await fetchInvoicesForRun(run.id);
     setActiveRunInvoices(data || []);
+  };
+
+  // A payment-status change can affect an invoice sitting in either the queue or an open run's
+  // list — patch both, whichever actually has it, rather than tracking which one is "live".
+  const patchInvoiceEverywhere = (updated) => {
+    setToConfirm((prev) => prev.filter((i) => i.id !== updated.id || updated.status === 'payment_reported'));
+    setActiveRunInvoices((prev) => (prev ? prev.map((i) => (i.id === updated.id ? updated : i)) : prev));
   };
 
   if (settingsLoading || runsLoading) {
@@ -268,9 +297,43 @@ export function AdminInvoices({ terms, directory, profileId, onBack }) {
   if (screen === 'run-detail' && activeRun) {
     return html`<${RunDetail} run=${activeRun} invoices=${activeRunInvoices}
       term=${terms.find((t) => t.id === activeRun.term_id)}
-      onInvoiceUpdated=${(updated) => setActiveRunInvoices((prev) =>
-        (prev || []).map((i) => (i.id === updated.id ? updated : i)))}
+      onInvoiceUpdated=${(updated) => { setActiveRunInvoices((prev) =>
+        (prev || []).map((i) => (i.id === updated.id ? updated : i))); patchInvoiceEverywhere(updated); }}
       onBack=${() => setScreen('home')} />`;
+  }
+  if (screen === 'payments-queue') {
+    const openInvoice = openQueueInvoiceId ? toConfirm.find((i) => i.id === openQueueInvoiceId) : null;
+    if (openInvoice) {
+      return html`<${InvoiceDetail} invoice=${openInvoice}
+        onBack=${() => setOpenQueueInvoiceId(null)}
+        onSaved=${(updated) => { patchInvoiceEverywhere(updated); setOpenQueueInvoiceId(null); }} />`;
+    }
+    return html`
+      <div class="tab-content">
+        <${AdminHeadInvoices} title="Payments to confirm" onBack=${() => setScreen('home')} />
+        ${toConfirmLoading ? html`<${LoadingState} label="Loading…" />`
+          : toConfirm.length === 0
+          ? html`<${EmptyState} title="Nothing to confirm" body="Invoices a member has marked as paid will show up here." />`
+          : html`<div class="rep-song-list">
+              ${toConfirm.map((inv) => {
+                const term = terms.find((t) => t.id === inv.term_id);
+                const termLabel = term ? parseTermLabel(term) : null;
+                return html`
+                  <button key=${inv.id} class="rep-song-row" onClick=${() => setOpenQueueInvoiceId(inv.id)}>
+                    <span class="rep-song-title">
+                      ${inv.member_name}
+                      <span class="form-hint" style="display:block;margin-top:1px;">
+                        ${termLabel ? `Term ${termLabel.number}` : 'Invoice'} · ${formatCents(inv.amount_cents)}
+                        ${inv.payment_reported_at ? ` · Reported ${formatInvoiceDate(inv.payment_reported_at.slice(0, 10))}` : ''}
+                      </span>
+                    </span>
+                    <${IconChevron} size=${16} />
+                  </button>
+                `;
+              })}
+            </div>`}
+      </div>
+    `;
   }
 
   const numberingReady = !!settings?.numbering_initialized_at;
@@ -298,6 +361,18 @@ export function AdminInvoices({ terms, directory, profileId, onBack }) {
           Finish invoicing setup
         </button>
       `}
+
+      <button class="card" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;margin-bottom:20px;"
+        onClick=${() => setScreen('payments-queue')}>
+        <span class="fee-icon" aria-hidden="true">🧾</span>
+        <div style="flex:1;min-width:0;">
+          <p style="margin:0;font-weight:700;">Payments to confirm</p>
+          <p class="form-hint" style="margin:2px 0 0;">
+            ${toConfirmLoading ? 'Loading…' : `${toConfirm.length} invoice${toConfirm.length === 1 ? '' : 's'} reported paid`}
+          </p>
+        </div>
+        <${IconChevron} size=${18} />
+      </button>
 
       <p class="eyebrow eyebrow-tight">Previous invoice runs</p>
       ${!invoiceRuns.length
@@ -772,7 +847,9 @@ function RunDetail({ run, invoices, term, onInvoiceUpdated, onBack }) {
             ${invoices.map((inv) => html`
               <button key=${inv.id} class="rep-song-row" onClick=${() => setOpenInvoiceId(inv.id)}>
                 <span class="rep-song-title">#${inv.invoice_number} — ${inv.member_name}</span>
-                <span class="form-hint">Due ${formatInvoiceDate(inv.due_date)}</span>
+                ${STATUS_LABEL[inv.status]
+                  ? html`<span class="event-type-badge ${STATUS_BADGE_CLASS[inv.status]}">${STATUS_LABEL[inv.status]}</span>`
+                  : html`<span class="form-hint">Due ${formatInvoiceDate(inv.due_date)}</span>`}
                 <${IconChevron} size=${16} />
               </button>
             `)}
@@ -786,8 +863,9 @@ function InvoiceDetail({ invoice, onBack, onSaved }) {
   const [dueDate, setDueDate] = useState(invoice.due_date);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmingWaive, setConfirmingWaive] = useState(false);
 
-  const save = async () => {
+  const saveDueDate = async () => {
     setBusy(true); setError(null);
     const { data, error: err } = await updateInvoiceDueDate(invoice.id, dueDate);
     setBusy(false);
@@ -796,13 +874,37 @@ function InvoiceDetail({ invoice, onBack, onSaved }) {
     onSaved(data);
   };
 
+  // Every status action shares this shape: call the RPC, show its own error message on failure
+  // (each one already reads like a sentence, e.g. "Invoice not found or not currently due."),
+  // otherwise hand the fresh row straight up.
+  const runAction = (fn) => async () => {
+    setBusy(true); setError(null);
+    const { data, error: err } = await fn(invoice.id);
+    setBusy(false);
+    if (err) { setError(err.message); return; }
+    onSaved(data);
+  };
+  const doConfirm = runAction(confirmInvoicePayment);
+  const doReject = runAction(rejectInvoicePayment);
+  const doMarkPaid = runAction(markInvoicePaid);
+  const doHold = runAction(holdInvoice);
+  const doResume = runAction(resumeInvoice);
+  const doWaive = async () => { await runAction(waiveInvoice)(); setConfirmingWaive(false); };
+
   return html`
     <div class="tab-content">
       <${AdminHeadInvoices} title=${`Invoice #${invoice.invoice_number}`} onBack=${onBack} />
       <div class="card form-card">
-        <p style="margin:0;font-weight:700;">${invoice.member_name}</p>
-        <p class="form-hint" style="margin:0;">${invoice.member_email}</p>
-        <p class="form-hint" style="margin:0;">Invoice date: ${formatInvoiceDate(invoice.invoice_date)}</p>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+          <div>
+            <p style="margin:0;font-weight:700;">${invoice.member_name}</p>
+            <p class="form-hint" style="margin:0;">${invoice.member_email}</p>
+          </div>
+          ${STATUS_LABEL[invoice.status]
+            ? html`<span class="event-type-badge ${STATUS_BADGE_CLASS[invoice.status]}">${STATUS_LABEL[invoice.status]}</span>`
+            : null}
+        </div>
+        <p class="form-hint" style="margin:10px 0 0;">Invoice date: ${formatInvoiceDate(invoice.invoice_date)}</p>
         <p class="form-hint" style="margin:0;">Amount: ${formatCents(invoice.amount_cents)}</p>
 
         ${editingDue ? html`
@@ -811,18 +913,83 @@ function InvoiceDetail({ invoice, onBack, onSaved }) {
             <input type="date" value=${dueDate} onInput=${(e) => setDueDate(e.target.value)} />
           </label>
           <div class="form-actions">
-            <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${save}>${busy ? 'Saving…' : 'Save due date'}</button>
+            <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${saveDueDate}>${busy ? 'Saving…' : 'Save due date'}</button>
             <button class="btn-quiet" disabled=${busy} onClick=${() => { setEditingDue(false); setDueDate(invoice.due_date); }}>Cancel</button>
           </div>
-          ${error ? html`<p class="absence-error">${error}</p>` : null}
         ` : html`
           <p style="margin:0;">Due date: <strong>${formatInvoiceDate(invoice.due_date)}</strong></p>
           ${invoice.due_date_updated_at ? html`
             <p class="form-hint" style="margin:0;">Changed ${formatInvoiceDate(invoice.due_date_updated_at.slice(0, 10))}</p>
           ` : null}
-          <button class="btn btn-outline btn-sm" onClick=${() => setEditingDue(true)}>Change due date</button>
+          <button class="btn btn-outline btn-sm" disabled=${busy || invoice.status === 'paid' || invoice.status === 'waived'}
+            onClick=${() => setEditingDue(true)}>Change due date</button>
         `}
       </div>
+
+      ${error ? html`<p class="absence-error">${error}</p>` : null}
+
+      ${invoice.status === 'payment_reported' ? html`
+        <div class="card" style="margin-top:16px;">
+          <p style="margin:0 0 4px;font-weight:700;">
+            ${invoice.member_name} reported this paid
+            ${invoice.payment_reported_at ? ` on ${formatInvoiceDate(invoice.payment_reported_at.slice(0, 10))}` : ''}.
+          </p>
+          <p class="form-hint" style="margin:0 0 12px;">Confirm once you can see the funds have actually arrived.</p>
+          <div class="form-actions">
+            <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${doConfirm}>Confirm payment</button>
+            <button class="btn-quiet" disabled=${busy} onClick=${doReject}>Not received</button>
+          </div>
+        </div>
+      ` : null}
+
+      ${invoice.status === 'due' ? html`
+        <div class="card" style="margin-top:16px;">
+          <p style="margin:0 0 12px;font-weight:700;">More actions</p>
+          <div class="form-actions" style="flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" disabled=${busy} onClick=${doMarkPaid}>Mark as paid</button>
+            <button class="btn btn-outline btn-sm" disabled=${busy} onClick=${doHold}>Put on hold</button>
+            <button class="btn-quiet" disabled=${busy} onClick=${() => setConfirmingWaive(true)}>Waive invoice</button>
+          </div>
+        </div>
+      ` : null}
+
+      ${invoice.status === 'on_hold' ? html`
+        <div class="card" style="margin-top:16px;background:var(--bg);box-shadow:none;">
+          <p style="margin:0 0 4px;font-weight:700;">Automatic reminders are paused.</p>
+          <p class="form-hint" style="margin:0 0 12px;">Use this for an open-ended arrangement or payment plan.</p>
+          <div class="form-actions">
+            <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${doResume}>Resume reminders</button>
+            <button class="btn-quiet" disabled=${busy} onClick=${() => setConfirmingWaive(true)}>Waive invoice</button>
+          </div>
+        </div>
+      ` : null}
+
+      ${invoice.status === 'paid' ? html`
+        <div class="card" style="margin-top:16px;background:var(--green-bg);box-shadow:none;">
+          <p style="margin:0;font-weight:700;color:var(--green);">
+            Paid${invoice.payment_confirmed_at ? ` · confirmed ${formatInvoiceDate(invoice.payment_confirmed_at.slice(0, 10))}` : ''}
+          </p>
+        </div>
+      ` : null}
+
+      ${invoice.status === 'waived' ? html`
+        <div class="card" style="margin-top:16px;background:var(--bg);box-shadow:none;">
+          <p style="margin:0;font-weight:700;">Waived — no payment required.</p>
+        </div>
+      ` : null}
+
+      ${confirmingWaive ? html`
+        <div class="card" style="background:var(--purple-light);box-shadow:none;margin-top:16px;">
+          <p style="margin:0 0 12px;">
+            Waive this invoice? No payment will be required and reminders stop. This can't be undone
+            here — reversing a waived invoice would need a separate correction later.
+          </p>
+          <div class="form-actions">
+            <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${doWaive}>${busy ? 'Saving…' : 'Yes, waive it'}</button>
+            <button class="btn-quiet" disabled=${busy} onClick=${() => setConfirmingWaive(false)}>Cancel</button>
+          </div>
+        </div>
+      ` : null}
     </div>
   `;
 }

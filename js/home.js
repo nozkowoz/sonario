@@ -142,7 +142,7 @@ function termStats({ term, events, checkins, profileId }) {
 }
 
 export function HomeTab({ profile, events, loading, terms, absences, checkins, awayDates, eventRsvps,
-  myInvoices, onNavigate, onOpenEvent, onCheckinSaved, onCheckinRemoved, onAbsenceSaved, onAbsenceRemoved }) {
+  myInvoices, onInvoiceUpdated, onNavigate, onOpenEvent, onCheckinSaved, onCheckinRemoved, onAbsenceSaved, onAbsenceRemoved }) {
   const [showHistory, setShowHistory] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const next = useMemo(() => nextEvent(events), [events]);
@@ -195,6 +195,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
   // card and More > My Invoices, per Nina's spec.
   if (viewingInvoice) {
     return html`<${MemberInvoiceDetail} invoice=${viewingInvoice} terms=${terms}
+      onInvoiceUpdated=${(updated) => { onInvoiceUpdated?.(updated); setViewingInvoice(updated); }}
       onBack=${() => setViewingInvoice(null)} />`;
   }
 

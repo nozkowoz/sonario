@@ -321,6 +321,12 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .event-type-neutral { background: var(--bg); color: var(--ink-soft); }
 .event-cancelled-badge { background: var(--coral-bg); color: var(--coral); }
 
+/* Invoice status badges (admin side, migration 0030) — same .event-type-badge shape, reusing
+   the app's existing amber/green/neutral tokens rather than inventing new colours. */
+.status-badge-amber { background: var(--butter-bg); color: var(--butter); }
+.status-badge-green { background: var(--green-bg); color: var(--green); }
+.status-badge-grey { background: var(--bg); color: var(--ink-soft); }
+
 /* Absence marking ("I can't make it" — there is no going/maybe/not-going RSVP) */
 .absence-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .absence-noted { margin: 0; font-size: 14px; font-weight: 600; color: var(--purple-dark); }
