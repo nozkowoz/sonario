@@ -1,12 +1,12 @@
 import { html, useState, useMemo, useRef, formatEventDateLong } from './lib.js';
 import {
   displayNameOf, setSongPart, clearSongPart, uploadRecording, getRecordingUrl,
-  saveLyrics, hideLyrics,
+  saveLyrics, hideLyrics, createSong,
 } from './store.js';
 import { LoadingState, EmptyState, Sheet } from './shell.js';
 import {
   IconBack, IconChevron, IconNote2, IconStar, IconMic, IconCheck, IconPlay, IconPause, IconUpload,
-  IconSearch, IconLock, IconLockOpen,
+  IconSearch, IconLock, IconLockOpen, IconPlus,
 } from './icons.js';
 import { PracticeEntryCard, PracticeFlow } from './practice.js';
 
@@ -129,6 +129,74 @@ export function PartPickerSheet({ song, currentPartKey, partLabels, saving, erro
           : null}
       </div>
       ${error ? html`<p class="absence-error">${error}</p>` : null}
+    </${Sheet}>
+  `;
+}
+
+// Super-only. No local patch on success needed — songs/song_collection_items are both realtime
+// (useLiveTable), so the insert this makes comes back the same way any other client's would; this
+// just closes the sheet. Collection is optional at the DB level, but always offering the current
+// one preselected (falling back to the first collection, then to "no collection yet") means the
+// common case — adding a song for what's being worked on right now — needs no extra tap.
+function AddSongSheet({ collections, collectionItems, onClose }) {
+  const [title, setTitle] = useState('');
+  const [composer, setComposer] = useState('');
+  const [voicing, setVoicing] = useState('');
+  const [collectionId, setCollectionId] = useState(
+    () => collections.find((c) => c.is_current)?.id || collections[0]?.id || '',
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const ready = title.trim().length > 0;
+
+  const save = async () => {
+    if (!ready || busy) return;
+    setBusy(true);
+    setError(null);
+    const itemsInCollection = collectionItems.filter((i) => i.collection_id === collectionId);
+    const position = itemsInCollection.length > 0
+      ? Math.max(...itemsInCollection.map((i) => i.position)) + 1 : 1;
+    const { error: err } = await createSong({
+      title: title.trim(), composer: composer.trim(), voicing: voicing.trim(),
+      collectionId: collectionId || null, position,
+    });
+    setBusy(false);
+    if (err) { setError(err.message); return; }
+    onClose();
+  };
+
+  return html`
+    <${Sheet} label="Add a song" onClose=${onClose}>
+      <h3 class="form-heading">Add a song</h3>
+      <label>
+        Title
+        <input type="text" value=${title} disabled=${busy} maxlength="200"
+          placeholder="Song title" onInput=${(e) => setTitle(e.target.value)} />
+      </label>
+      <label>
+        Composer
+        <input type="text" value=${composer} disabled=${busy} maxlength="200"
+          placeholder="Optional" onInput=${(e) => setComposer(e.target.value)} />
+      </label>
+      <label>
+        Voicing
+        <input type="text" value=${voicing} disabled=${busy} maxlength="80"
+          placeholder="e.g. SATB — optional" onInput=${(e) => setVoicing(e.target.value)} />
+      </label>
+      <label>
+        Collection
+        <select value=${collectionId} disabled=${busy} onChange=${(e) => setCollectionId(e.target.value)}>
+          <option value="">No collection yet</option>
+          ${collections.map((c) => html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
+        </select>
+      </label>
+      ${error ? html`<p class="absence-error">${error}</p>` : null}
+      <div class="form-actions">
+        <button class="btn btn-primary" disabled=${!ready || busy} onClick=${save}>
+          ${busy ? 'Adding…' : 'Add song'}
+        </button>
+      </div>
     </${Sheet}>
   `;
 }
@@ -708,6 +776,7 @@ export function RepertoireTab({
 }) {
   const [mode, setMode] = useState('browse'); // 'browse' | 'all'
   const [practiceOpen, setPracticeOpen] = useState(false);
+  const [addingSong, setAddingSong] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const closeSearch = () => { setSearchOpen(false); setQuery(''); };
@@ -838,9 +907,16 @@ export function RepertoireTab({
             </div>
           ` : html`
             <h2 class="cal-title">Repertoire</h2>
-            <button class="icon-btn-on-purple" aria-label="Search repertoire" onClick=${() => setSearchOpen(true)}>
-              <${IconSearch} size=${20} />
-            </button>
+            <div style="display:flex;gap:4px;">
+              ${canManage ? html`
+                <button class="icon-btn-on-purple" aria-label="Add a song" onClick=${() => setAddingSong(true)}>
+                  <${IconPlus} size=${20} />
+                </button>
+              ` : null}
+              <button class="icon-btn-on-purple" aria-label="Search repertoire" onClick=${() => setSearchOpen(true)}>
+                <${IconSearch} size=${20} />
+              </button>
+            </div>
           `}
         </div>
         ${!searchOpen ? html`
@@ -870,6 +946,8 @@ export function RepertoireTab({
               songsById=${songsById} assignments=${assignments} partLabels=${partLabels}
               profileId=${profile.id} recordings=${recordings} onOpenSong=${openSong} />`}
       ${picker}
+      ${addingSong && canManage ? html`<${AddSongSheet} collections=${collections}
+        collectionItems=${collectionItems} onClose=${() => setAddingSong(false)} />` : null}
     </div>
   `;
 }

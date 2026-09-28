@@ -188,10 +188,29 @@ export function useSongs() {
   return { songs: rows, loading };
 }
 
+// Super-only (RLS: "super manage songs"/"super manage collection items"). No local patch needed
+// on success — songs and song_collection_items are both on the realtime useLiveTable pattern
+// above, so the insert this makes comes back through the subscription like any other client's
+// would. collectionId/position are optional — a song can exist with no collection yet.
+export async function createSong({ title, composer, voicing, collectionId, position }) {
+  const { data: songRows, error: songError } = await supabase.from('songs')
+    .insert({ title, composer: composer || '', voicing: voicing || '' })
+    .select();
+  if (songError || !songRows || songRows.length === 0) {
+    return { data: null, error: songError || new Error("That didn't save — reload and try again.") };
+  }
+  const song = songRows[0];
+  if (collectionId) {
+    const { error: itemError } = await supabase.from('song_collection_items')
+      .insert({ collection_id: collectionId, song_id: song.id, position });
+    if (itemError) return { data: null, error: itemError };
+  }
+  return { data: song, error: null };
+}
+
 // ===========================================================================
 // Repertoire collections (Stage 3) — song_collections/song_collection_items are new (migration
-// 0008); songs, song_assignments, rehearsal_songs already existed from 0001. Read-only hooks only
-// at this stage — no mutation helpers yet, since Stage 3 doesn't edit anything.
+// 0008); songs, song_assignments, rehearsal_songs already existed from 0001.
 // ===========================================================================
 export function useSongCollections() {
   const { rows, loading } = useLiveTable('song_collections', {

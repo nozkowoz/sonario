@@ -254,3 +254,8 @@ export const IconRepeat = ({ size }) => svg(html`
   <path d="M17 2l4 4-4 4" /><path d="M3 12V10a4 4 0 0 1 4-4h14" />
   <path d="M7 22l-4-4 4-4" /><path d="M21 12v2a4 4 0 0 1-4 4H3" />
 `, { size });
+
+// Repertoire's super-only "Add song" entry point.
+export const IconPlus = ({ size }) => svg(html`
+  <path d="M12 5v14M5 12h14" />
+`, { size });
