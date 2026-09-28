@@ -268,11 +268,12 @@ export function CalendarTab({
   const FILTERS = [
     ['all', 'All'],
     ['rehearsal', 'Rehearsals'],
-    ['performance', 'Performances'],
+    ['workshop', 'Workshops'],
+    ['social', 'Social'],
     ['other', 'Other'],
   ];
   const matchesFilter = (e) => filter === 'all'
-    || (filter === 'other' ? !['rehearsal', 'performance'].includes(e.event_type) : e.event_type === filter);
+    || (filter === 'other' ? !['rehearsal', 'workshop', 'social'].includes(e.event_type) : e.event_type === filter);
 
   // The list is UPCOMING, grouped by month — not scoped to the week showing in the strip. That's
   // the division of labour the design implies: the strip is a date jumper, the list is the whole
