@@ -1,0 +1,8 @@
+-- 0023_recording_import_sop2_parts.sql
+-- Adds the 'Sop 2' recordings for Rome Wasn't Built In A Day, That's Freedom, and
+-- Wherever I Go as the real sop_2 part_label -- Nina confirmed 2026-09-28 these are a
+-- genuine assignable split part (sonario.part_labels already has sop_2/alto_2/tenor_2),
+-- not a stray duplicate take, so they should NOT be folded into plain 'sop'.
+insert into sonario.recordings (id, song_id, part_label, storage_path, title, uploaded_by, mime_type, file_size_bytes, duration_seconds) values ('04c22fbc-b73f-4f97-a029-f41c668c56a6', 'b0000000-0000-0000-0000-000000000004', 'sop_2', 'b0000000-0000-0000-0000-000000000004/sop_2/3dd34dc1-2ab8-492b-b779-a56626945d15.m4a', 'Rome wasn’t built in a day - sop 2', 'bfe5db43-2a4a-4bf0-a1b3-881b180b6246', 'audio/x-m4a', 1587570, 183.9);
+insert into sonario.recordings (id, song_id, part_label, storage_path, title, uploaded_by, mime_type, file_size_bytes, duration_seconds) values ('353d15d0-0da1-44a2-aee1-c6614c379764', 'b0000000-0000-0000-0000-00000000000e', 'sop_2', 'b0000000-0000-0000-0000-00000000000e/sop_2/1c706d57-6a02-49ae-9e95-7802eecd1abb.m4a', 'That’s Freedom - Sop 2', 'bfe5db43-2a4a-4bf0-a1b3-881b180b6246', 'audio/x-m4a', 2453491, 259.8);
+insert into sonario.recordings (id, song_id, part_label, storage_path, title, uploaded_by, mime_type, file_size_bytes, duration_seconds) values ('56897610-2ba0-4edd-b8c7-ebe99f639c07', 'b0000000-0000-0000-0000-000000000001', 'sop_2', 'b0000000-0000-0000-0000-000000000001/sop_2/72a24ccf-5d9b-4fa5-9b30-e90e05e9af03.m4a', 'Wherever I go - sop 2', 'bfe5db43-2a4a-4bf0-a1b3-881b180b6246', 'audio/x-m4a', 1751021, 189.6);
