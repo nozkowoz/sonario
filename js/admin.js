@@ -4,6 +4,7 @@ import { ApprovalQueue } from './approvals.js';
 import { useAllMemberships, backfillCheckin, removeBackfillCheckin } from './store.js';
 import { EventRow, EventForm } from './events.js';
 import { AdminInvoices } from './invoices.js';
+import { AdminNotifications } from './notifications.js';
 import { EmptyState, LoadingState } from './shell.js';
 import { IconCalendar, IconUsers, IconCheckSquare, IconBell, IconAdmin, IconCrown, IconInvoice,
   IconChevron, IconBack, IconCheck } from './icons.js';
@@ -28,7 +29,7 @@ const SECTIONS = [
   { key: 'invoices', label: 'Invoices', Icon: IconInvoice,
     body: 'Generate term invoices and manage invoice numbering.' },
   { key: 'notifications', label: 'Notifications', Icon: IconBell,
-    body: 'Send and schedule messages to your choir.', soon: true },
+    body: 'Send a push notification to your choir.' },
   { key: 'settings', label: 'Settings', Icon: IconAdmin,
     body: 'Update choir details, term dates and preferences.', soon: true },
 ];
@@ -52,6 +53,9 @@ export function AdminTab({
   if (view?.section === 'invoices') {
     return html`<${AdminInvoices} terms=${terms} directory=${directory} profileId=${session.user.id}
       onBack=${() => setView(null)} />`;
+  }
+  if (view?.section === 'notifications') {
+    return html`<${AdminNotifications} onBack=${() => setView(null)} />`;
   }
   if (view?.section) {
     const section = SECTIONS.find((s) => s.key === view.section);

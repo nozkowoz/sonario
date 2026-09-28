@@ -755,8 +755,9 @@ export async function disablePushNotifications() {
   return { error: null };
 }
 
-// Stage A verification only — see supabase/functions/send-test-notification. Sends to the
-// CALLER's own subscriptions, never anyone else's.
-export async function sendTestNotification() {
-  return supabase.functions.invoke('send-test-notification', { method: 'POST' });
+// Admin > Notifications. Sends to EVERY member with notifications on, not just the caller — see
+// supabase/functions/send-admin-notification. The Edge Function re-checks the caller is a super
+// itself; this is not the security boundary, just the entry point.
+export async function sendAdminNotification({ title, body }) {
+  return supabase.functions.invoke('send-admin-notification', { method: 'POST', body: { title, body } });
 }

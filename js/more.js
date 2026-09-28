@@ -1,6 +1,6 @@
 import { html, useState } from './lib.js';
 import { displayNameOf, updateDisplayName, useMyPushSubscriptions, enablePushNotifications,
-  disablePushNotifications, sendTestNotification } from './store.js';
+  disablePushNotifications } from './store.js';
 import { currentTermOf } from './events.js';
 import { AttendanceHistoryView } from './checkin.js';
 import { EmptyState, LoadingState } from './shell.js';
@@ -8,9 +8,7 @@ import { IconChevron, IconBack } from './icons.js';
 import { CHOIR_NAME, APP_VERSION } from './config.js';
 
 // More, per Nina's Figma (PDF p5). Identical for every member, super or not — role-blindness is a
-// deliberate rule, so nothing here branches on being an organiser, with ONE deliberate exception:
-// NotificationSettings' "Send test notification" button (Nina, 2026-09-28: "only super users
-// should be able to send a test notification"), gated on `canManage` threaded down from app.js.
+// deliberate rule, so nothing here branches on being an organiser.
 //
 // TWO DEPARTURES FROM THE MOCKUP, both because the mockup promises data that doesn't exist:
 //
@@ -38,7 +36,7 @@ const SECTIONS = [
   { key: 'about', label: 'About Sonario', body: 'Version and how this app works' },
 ];
 
-export function MoreTab({ profile, terms, canManage, events, absences, checkins, awayDates,
+export function MoreTab({ profile, terms, events, absences, checkins, awayDates,
   view, setView, onNavigate, onSignOut, onProfileSaved }) {
   const term = currentTermOf(terms);
 
@@ -124,11 +122,10 @@ function MoreHead({ title, onBack }) {
 // actually calls Notification.requestPermission(), only once "Continue" is tapped here) — never on
 // first app load. A denial just leaves the button available to try again; nothing else breaks.
 // ---------------------------------------------------------------------------
-function NotificationSettings({ profile, canManage, onBack }) {
+function NotificationSettings({ profile, onBack }) {
   const { subscriptions, loading, setSubscriptions } = useMyPushSubscriptions(profile.id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [testResult, setTestResult] = useState(null);
   const [showExplain, setShowExplain] = useState(false);
 
   const enabled = subscriptions.length > 0;
@@ -147,15 +144,6 @@ function NotificationSettings({ profile, canManage, onBack }) {
     await disablePushNotifications();
     setBusy(false);
     setSubscriptions([]);
-    setTestResult(null);
-  };
-
-  const sendTest = async () => {
-    setBusy(true); setError(null); setTestResult(null);
-    const { data, error: err } = await sendTestNotification();
-    setBusy(false);
-    if (err) { setError(err.message || 'Could not send a test notification.'); return; }
-    setTestResult(data?.ok ? 'Sent, check this device.' : "Send failed. If this keeps happening, the Edge Function's logs will say why.");
   };
 
   return html`
@@ -193,12 +181,10 @@ function NotificationSettings({ profile, canManage, onBack }) {
 
           ${enabled ? html`
             <div class="form-actions">
-              ${canManage ? html`<button class="btn btn-outline btn-sm" disabled=${busy} onClick=${sendTest}>Send test notification</button>` : null}
               <button class="btn-quiet" disabled=${busy} onClick=${disable}>Turn off on this device</button>
             </div>
           ` : null}
 
-          ${testResult ? html`<p class="form-saved" style="margin-top:10px;">${testResult}</p>` : null}
           ${error ? html`<p class="absence-error" style="margin-top:10px;">${error}</p>` : null}
         </div>
       `}
