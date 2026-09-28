@@ -122,8 +122,11 @@ function SongSelectScreen({ songs, collections, collectionItems, recordings, sel
 // --- Step 2: mode + per-song part resolution ----------------------------------
 function ModeAndPartsScreen({ songs, assignments, partLabels, profileId, mode, onModeChange, onEditPart, onBack, onStart, startError }) {
   const needsParts = mode !== 'whole_choir';
+  // Purely informational now — Nina, 2026-09-28: leaving a song's part unset is a valid choice
+  // (buildPracticeQueue already falls back to the whole-choir recording, or shows it as
+  // unavailable to skip past), not something that should block starting. start() in PracticeFlow
+  // already refuses to open an empty player if literally nothing in the session is playable.
   const remaining = needsParts ? songs.filter((s) => !myAssignment(assignments, s.id, profileId)).length : 0;
-  const ready = !needsParts || remaining === 0;
 
   return html`
     <div class="tab-content practice-screen">
@@ -166,8 +169,8 @@ function ModeAndPartsScreen({ songs, assignments, partLabels, profileId, mode, o
       </div>
       <div class="practice-sticky-footer">
         ${startError ? html`<p class="absence-error" style="margin:0 0 10px;">${startError}</p>` : null}
-        <button class="btn btn-primary" style="width:100%;" disabled=${!ready} onClick=${onStart}>
-          ${ready ? 'Start practicing' : `Choose ${remaining} more part${remaining === 1 ? '' : 's'}`}
+        <button class="btn btn-primary" style="width:100%;" onClick=${onStart}>
+          Start practicing
         </button>
       </div>
     </div>
