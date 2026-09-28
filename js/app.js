@@ -48,7 +48,8 @@ function Gated({ session }) {
     return html`<div class="loading-shell"><div class="spinner"></div><p>Loading…</p></div>`;
   }
   if (!membership || membership.status !== 'active') {
-    return html`<${MembershipStatusScreen} status=${membership?.status} onSignOut=${() => supabase.auth.signOut()} />`;
+    return html`<${MembershipStatusScreen} status=${membership?.status} profile=${profile}
+      onProfileSaved=${patchProfile} onSignOut=${() => supabase.auth.signOut()} />`;
   }
   return html`<${Main} session=${session} membership=${membership} profile=${profile} patchProfile=${patchProfile} />`;
 }

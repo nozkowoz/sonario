@@ -537,6 +537,17 @@ export async function updateDisplayName(profileId, displayName) {
     .select();
 }
 
+// Required once, on the pending-approval screen (see MembershipStatusScreen) — Nina, 2026-09-28:
+// new members type their real first/last name rather than trusting whatever Google's account name
+// happens to be, plus a display name (prefilled from that same Google name, e.g. "KJ") they can
+// keep or change. All three are independently editable later in More > My Profile.
+export async function updateProfileNames(profileId, { firstName, lastName, displayName }) {
+  return supabase.from('profiles')
+    .update({ first_name: firstName, last_name: lastName, display_name: displayName })
+    .eq('id', profileId)
+    .select();
+}
+
 // A member is away for an event if any of their non-cancelled ranges covers its date. Plain
 // string comparison is safe and deliberate: these are all ISO yyyy-mm-dd date strings, so this
 // never goes near a Date object and can't be shifted by a timezone.

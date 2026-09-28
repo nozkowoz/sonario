@@ -1,5 +1,6 @@
 import { html, useState, useEffect } from './lib.js';
 import { supabase } from './supabaseClient.js';
+import { updateProfileNames } from './store.js';
 import { CHOIR_NAME, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 // No more shared passphrase — every member signs in as themselves, and signing in *is*
@@ -174,9 +175,72 @@ export function SignInScreen() {
   `);
 }
 
+// Required once, before a pending member ever sees "waiting for approval" — Nina, 2026-09-28:
+// don't trust whatever Google's account name happens to be (the real roster has plenty of
+// "KJ"/"Livrom"-style Google names that make a poor member list). Display name is prefilled from
+// that same Google name and kept editable — someone can genuinely go by "KJ" — but first/last
+// name start blank and both are required to continue. "Complete" is simply "both columns are
+// non-empty" — no separate flag needed, and it's why this only ever needs to run once: after a
+// successful save, profile.first_name/last_name are non-empty and this step never shows again.
+function NameEntryForm({ profile, onSaved }) {
+  const [firstName, setFirstName] = useState(profile.first_name || '');
+  const [lastName, setLastName] = useState(profile.last_name || '');
+  const [displayName, setDisplayName] = useState(profile.display_name || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const ready = firstName.trim() && lastName.trim() && displayName.trim();
+
+  const save = async () => {
+    if (!ready) return;
+    setBusy(true);
+    setError(null);
+    const { data, error: err } = await updateProfileNames(profile.id, {
+      firstName: firstName.trim(), lastName: lastName.trim(), displayName: displayName.trim(),
+    });
+    setBusy(false);
+    if (err) { setError(err.message); return; }
+    if (!data || data.length === 0) { setError("That didn't save — reload and try again."); return; }
+    onSaved(data[0]);
+  };
+
+  return html`
+    <div class="auth-shell">
+      <div class="auth-card">
+        <h1 class="auth-title">${CHOIR_NAME}</h1>
+        <p class="auth-sub" style=${{ fontWeight: 700, color: 'var(--ink)' }}>What should we call you?</p>
+        <p class="auth-sub">Before we send your request to an organiser, tell us your name.</p>
+
+        <label style="display:block;text-align:left;margin-bottom:10px;">
+          First name
+          <input type="text" value=${firstName} disabled=${busy} onInput=${(e) => setFirstName(e.target.value)} />
+        </label>
+        <label style="display:block;text-align:left;margin-bottom:10px;">
+          Last name
+          <input type="text" value=${lastName} disabled=${busy} onInput=${(e) => setLastName(e.target.value)} />
+        </label>
+        <label style="display:block;text-align:left;margin-bottom:14px;">
+          Display name
+          <input type="text" value=${displayName} disabled=${busy} onInput=${(e) => setDisplayName(e.target.value)} />
+          <span class="form-hint" style="display:block;margin-top:4px;">What other members see — keep it as a nickname, or change it.</span>
+        </label>
+
+        ${error ? html`<p class="absence-error" style="margin:0 0 12px;">${error}</p>` : null}
+        <button class="btn btn-primary" disabled=${!ready || busy} onClick=${save} style=${{ width: '100%' }}>
+          ${busy ? 'Saving…' : 'Continue'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 // Shown once signed in but not yet an active member — covers pending/declined/deactivated so
 // there's one place that reads as "here's where you stand", not a dead end or a confusing error.
-export function MembershipStatusScreen({ status, onSignOut }) {
+export function MembershipStatusScreen({ status, profile, onProfileSaved, onSignOut }) {
+  if (status === 'pending' && profile && (!profile.first_name || !profile.last_name)) {
+    return html`<${NameEntryForm} profile=${profile} onSaved=${onProfileSaved} />`;
+  }
+
   const copy = {
     pending: {
       heading: "You're nearly in!",

@@ -1,5 +1,5 @@
 import { html, useState } from './lib.js';
-import { displayNameOf, updateDisplayName, useMyPushSubscriptions, enablePushNotifications,
+import { displayNameOf, updateProfileNames, useMyPushSubscriptions, enablePushNotifications,
   disablePushNotifications } from './store.js';
 import { currentTermOf } from './events.js';
 import { AttendanceHistoryView } from './checkin.js';
@@ -193,25 +193,33 @@ function NotificationSettings({ profile, onBack }) {
 }
 
 // ---------------------------------------------------------------------------
-// My Profile. Only the display name is editable, because it's the only thing about a profile a
-// member owns: `google_email` comes from the identity provider and `avatar_url` is whatever
-// Google returned. The mockup's "contact info" has no column behind it and one was NOT added —
-// adding schema to make a mockup render is exactly what Nina asked not to happen.
+// My Profile. First/last name (added 0021, filled in once on the pending-approval screen — see
+// NameEntryForm in auth.js) stay editable here too, alongside the display name shown everywhere
+// else in the app. `google_email` and `avatar_url` are whatever Google returned and aren't
+// editable. The mockup's "contact info" has no column behind it and one was NOT added — adding
+// schema to make a mockup render is exactly what Nina asked not to happen.
 // ---------------------------------------------------------------------------
 function MyProfile({ profile, onBack, onProfileSaved }) {
+  const [firstName, setFirstName] = useState(profile.first_name || '');
+  const [lastName, setLastName] = useState(profile.last_name || '');
   const [name, setName] = useState(displayNameOf(profile));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
 
   const trimmed = name.trim();
-  const dirty = trimmed && trimmed !== displayNameOf(profile);
+  const trimmedFirst = firstName.trim();
+  const trimmedLast = lastName.trim();
+  const dirty = trimmedFirst && trimmedLast && trimmed
+    && (trimmedFirst !== (profile.first_name || '') || trimmedLast !== (profile.last_name || '') || trimmed !== displayNameOf(profile));
 
   const save = async () => {
     setBusy(true);
     setError(null);
     setSaved(false);
-    const { data, error: err } = await updateDisplayName(profile.id, trimmed);
+    const { data, error: err } = await updateProfileNames(profile.id, {
+      firstName: trimmedFirst, lastName: trimmedLast, displayName: trimmed,
+    });
     setBusy(false);
     if (err) { setError(err.message); return; }
     // The recurring trap in this app: an UPDATE filtered out by RLS returns no error and no rows.
@@ -231,11 +239,21 @@ function MyProfile({ profile, onBack, onProfileSaved }) {
       <${MoreHead} title="My Profile" onBack=${onBack} />
       <div class="card form-card">
         <label>
-          Name
+          First name
+          <input type="text" value=${firstName} maxlength="80"
+            onInput=${(e) => { setFirstName(e.target.value); setSaved(false); }} />
+        </label>
+        <label>
+          Last name
+          <input type="text" value=${lastName} maxlength="80"
+            onInput=${(e) => { setLastName(e.target.value); setSaved(false); }} />
+        </label>
+        <label>
+          Display name
           <input type="text" value=${name} maxlength="80"
             onInput=${(e) => { setName(e.target.value); setSaved(false); }} />
         </label>
-        <p class="form-hint">This is the name other members and the organisers see.</p>
+        <p class="form-hint">Display name is what other members and the organisers see.</p>
         <label>
           Email
           <input type="text" value=${profile.google_email || '—'} disabled />
@@ -247,7 +265,7 @@ function MyProfile({ profile, onBack, onProfileSaved }) {
         ${saved ? html`<p class="form-saved">Saved.</p>` : null}
         <div class="form-actions">
           <button class="btn btn-primary" disabled=${busy || !dirty} onClick=${save}>
-            ${busy ? 'Saving…' : 'Save name'}
+            ${busy ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
