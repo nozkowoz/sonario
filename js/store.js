@@ -419,6 +419,27 @@ export function useAbsences() {
   return { absences: rows, loading, patchAbsence: patchRow, removeAbsence: removeRow };
 }
 
+// Admin-only counterpart to useMemberDirectory below: a direct `profiles` select, which only
+// returns rows for a super (RLS: "own profile or super") — a member calling this gets nothing
+// back for anyone but themselves, silently, per the same RLS shape the comment below warns about.
+// Never use this on member-facing UI; it exists for Admin screens (Members, Attendance) that
+// genuinely need email/first_name/last_name, which useMemberDirectory's RPC deliberately omits.
+export function useProfilesById(ids) {
+  const [byId, setById] = useState({});
+  const key = ids.slice().sort().join(',');
+
+  useEffect(() => {
+    if (!ids.length) return;
+    let cancelled = false;
+    supabase.from('profiles').select('*').in('id', ids).then(({ data }) => {
+      if (!cancelled && data) setById(Object.fromEntries(data.map((p) => [p.id, p])));
+    });
+    return () => { cancelled = true; };
+  }, [key]);
+
+  return byId;
+}
+
 // The ONLY way member-facing UI may resolve another member's name. `profiles` is own-row-or-super
 // under RLS, so a direct `profiles` select silently returns nothing for a non-super — see
 // HANDOVER.md §3. This RPC returns id/display_name/avatar_url for active members only, and only

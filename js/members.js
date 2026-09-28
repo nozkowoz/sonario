@@ -1,6 +1,5 @@
-import { html, useState, useEffect } from './lib.js';
-import { supabase } from './supabaseClient.js';
-import { displayNameOf, decideMembership, setMemberRole, useAllMemberships } from './store.js';
+import { html, useState } from './lib.js';
+import { displayNameOf, decideMembership, setMemberRole, useAllMemberships, useProfilesById } from './store.js';
 import { EmptyState } from './shell.js';
 import { IconBack, IconChevron, IconSearch } from './icons.js';
 
@@ -24,22 +23,6 @@ import { IconBack, IconChevron, IconSearch } from './icons.js';
 // existing two-step promote/demote confirm was built to prevent. Same actions as before
 // (Approve/Decline/Deactivate/Reactivate), just grouped under one "Access & status" card instead
 // of scattered, plus a distinct danger-zone card for the irreversible-feeling ones.
-
-function useProfilesById(ids) {
-  const [byId, setById] = useState({});
-  const key = ids.slice().sort().join(',');
-
-  useEffect(() => {
-    if (!ids.length) return;
-    let cancelled = false;
-    supabase.from('profiles').select('*').in('id', ids).then(({ data }) => {
-      if (!cancelled && data) setById(Object.fromEntries(data.map((p) => [p.id, p])));
-    });
-    return () => { cancelled = true; };
-  }, [key]);
-
-  return byId;
-}
 
 const initialsOf = (profile) => {
   const first = (profile?.first_name || displayNameOf(profile) || '?').trim()[0] || '?';
