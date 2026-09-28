@@ -52,8 +52,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const authHeader = req.headers.get('Authorization') ?? '';
-  const bearer = authHeader.replace('Bearer ', '');
-  const isSystemCaller = bearer === SERVICE_ROLE_KEY;
+  const bearer = authHeader.replace('Bearer ', '').trim();
+  const isSystemCaller = bearer === SERVICE_ROLE_KEY.trim();
 
   if (!isSystemCaller) {
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(bearer);
