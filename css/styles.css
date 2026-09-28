@@ -1214,6 +1214,22 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .rep-recording-body { flex: 1; min-width: 0; }
 .rep-recording-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--fig-ink); }
 
+/* --- Admin > Notifications redesign ------------------------------------- */
+.step-row { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.step-num {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--purple-light); color: var(--purple);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+}
+.notif-preview { display: flex; gap: 12px; padding: 14px; border-radius: var(--radius-lg); background: var(--purple-light); }
+.notif-preview-icon { width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; }
+.notif-preview-text { flex: 1; min-width: 0; }
+.notif-preview-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.notif-preview-title { font-weight: 700; font-size: 14px; color: var(--fig-ink); }
+.notif-preview-now { font-size: 12px; color: var(--fig-mute); flex-shrink: 0; }
+.notif-preview-body { margin: 2px 0 0; font-size: 14px; color: var(--fig-ink); word-break: break-word; }
+.field-label-row { display: flex; justify-content: space-between; align-items: baseline; }
+
 @media (max-width: 480px) {
   /* Must be a real rule, and --main-pad must be the ONLY place the body padding is set: the Home
      hero cancels it with negative margins, so a hardcoded .app-main padding here would leave the

@@ -745,6 +745,28 @@ export function useMyPushSubscriptions(profileId) {
   return { subscriptions, loading, setSubscriptions };
 }
 
+// Admin > Notifications' live recipient-count preview. Super-only in practice (RLS: "super reads
+// all subscriptions", migration 0025) — a member calling this just gets their own row back via
+// the pre-existing own-row policy, which is harmless since nothing renders this outside the
+// super-gated Admin screen. Counts distinct PEOPLE, not devices, matching how the send function
+// itself groups by profile_id.
+export function useNotifiableMemberCount() {
+  const [count, setCount] = useState(null); // null = still loading
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from('push_subscriptions').select('profile_id').then(({ data, error: err }) => {
+      if (cancelled) return;
+      if (err) { setError(err.message); return; }
+      setCount(new Set((data || []).map((r) => r.profile_id)).size);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  return { count, error };
+}
+
 // PushManager.subscribe() needs the VAPID public key as a raw Uint8Array, not the base64url
 // string it's stored/shipped as.
 const urlBase64ToUint8Array = (base64String) => {

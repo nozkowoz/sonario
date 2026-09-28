@@ -259,3 +259,8 @@ export const IconRepeat = ({ size }) => svg(html`
 export const IconPlus = ({ size }) => svg(html`
   <path d="M12 5v14M5 12h14" />
 `, { size });
+
+// Admin > Notifications' "Send notification" button.
+export const IconSend = ({ size }) => svg(html`
+  <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7Z" />
+`, { size });
