@@ -57,7 +57,9 @@ Deno.serve(async (req) => {
 
   if (!isSystemCaller) {
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(bearer);
-    if (userError || !userData?.user) return json({ error: 'Not authenticated' }, 401);
+    if (userError || !userData?.user) {
+      return json({ error: 'Not authenticated' }, 401);
+    }
     const { data: membership } = await supabaseAdmin
       .from('memberships').select('role').eq('profile_id', userData.user.id).single();
     if (!['admin', 'super'].includes(membership?.role)) {
