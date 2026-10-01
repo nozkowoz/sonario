@@ -350,6 +350,15 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .absence-reason-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .absence-reason-form input { width: 100%; }
 
+/* "Can't make it" row badge (Nina's mockup, 2026-10-01) — exact spec, not approximated. */
+.cant-make-it-badge {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  background: #FEF3C7; color: var(--chocolate);
+  font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px;
+  padding: 8px 12px; border-radius: 999px; white-space: nowrap;
+}
+.cant-make-it-badge svg { flex-shrink: 0; }
+
 /* --- "Where you stand" status + the quiet way out ----------------------- */
 /* Green carries the settled, default case (you're coming) with a button's visual weight but
    without a button's implied action — there is nothing to confirm under the absence-only model. */

@@ -2,7 +2,7 @@ import { html, useMemo, useState } from './lib.js';
 import { formatDateRail, formatWeekdayLong, formatDayMonthLong, formatTimeRange,
   parseLocalDate, relativeDayLabel, todayStr } from './lib.js';
 import { displayNameOf } from './store.js';
-import { EVENT_TYPE_LABEL, nextEvent, currentTermOf, AbsenceToggle, RailRow } from './events.js';
+import { EVENT_TYPE_LABEL, nextEvent, currentTermOf, AbsenceToggle, RailRow, CantMakeItBadge } from './events.js';
 import { CheckInPanel, AttendanceStatus, AttendanceHistoryView, isCheckInDay } from './checkin.js';
 import { TermFeesCard, MemberInvoiceDetail } from './memberinvoices.js';
 import { IconMegaphone, IconPinFilled } from './icons.js';
@@ -237,6 +237,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
                 ${next.location ? html`
                   <p class="next-loc"><${IconPinFilled} size=${11} />${next.location}</p>
                 ` : null}
+                ${myAbsence && !myCheckin ? html`<${CantMakeItBadge} />` : null}
                 <${AttendanceStatus} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence} myRsvp=${myRsvp} />
                 <${CheckInPanel} event=${next} myCheckin=${myCheckin} myAbsence=${myAbsence}
                   profileId=${profile.id} onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved} />
@@ -309,9 +310,13 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
           <button class="btn-quiet" onClick=${() => onNavigate('calendar')}>See all</button>
         </div>
         <div class="rail-list">
-          ${upcoming.map((e) => html`
-            <${RailRow} key=${e.id} event=${e} onOpen=${onOpenEvent} />
-          `)}
+          ${upcoming.map((e) => {
+            const absent = absences.some((a) => a.rehearsal_id === e.id && a.profile_id === profile.id);
+            return html`
+              <${RailRow} key=${e.id} event=${e} onOpen=${onOpenEvent}
+                trailing=${absent ? html`<${CantMakeItBadge} />` : null} />
+            `;
+          })}
         </div>
       ` : null}
 

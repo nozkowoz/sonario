@@ -86,6 +86,18 @@ export function RailRow({ event, onOpen = null, trailing = null }) {
   `;
 }
 
+// Nina's mockup, 2026-10-01: a member should see at a glance, right on the row, that they've
+// already said they can't make an upcoming event — without tapping in. Exact spec from the
+// mockup's colour panel: bg #FEF3C7, icon+text #806448 (the official Chocolate — its first real
+// use anywhere in the app), calendar-outline icon, uppercase 12-14px medium text, pill shape.
+export function CantMakeItBadge() {
+  return html`
+    <span class="cant-make-it-badge">
+      <${IconCalendar} size=${14} /><span>Can't make it</span>
+    </span>
+  `;
+}
+
 // ---------------------------------------------------------------------------
 // Absence marking — the entire member-side attendance interaction at this step.
 // There is no Going/Maybe/Not-going: everyone is assumed to be coming, and the only action a

@@ -1,7 +1,7 @@
 import { html, useState, useMemo } from './lib.js';
 import { formatEventDate, formatEventDateLong, parseLocalDate, todayStr, localDateStr } from './lib.js';
 import { logLeave, cancelLeave, awayRangeFor } from './store.js';
-import { RailRow, currentTermOf } from './events.js';
+import { RailRow, currentTermOf, CantMakeItBadge } from './events.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { IconChevron, IconBack, IconCheckCircle, IconMinusCircle } from './icons.js';
 
@@ -319,8 +319,7 @@ export function CalendarTab({
         <${IconMinusCircle} size=${16} /></span>`;
     }
     if (myAbsenceByEvent[e.id]) {
-      return html`<span class="rail-mark rail-mark-off" role="img" aria-label="You can't make it">
-        <${IconMinusCircle} size=${16} /></span>`;
+      return html`<${CantMakeItBadge} />`;
     }
     return null;
   };
