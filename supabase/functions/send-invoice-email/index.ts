@@ -89,17 +89,16 @@ Deno.serve(async (req) => {
     },
   });
 
-  // Decode the base64 PDF to raw bytes ourselves rather than relying on denomailer's own
-  // encoding flag for attachments — one less assumption about exactly how it interprets that flag.
-  const pdfBytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
-
   try {
     await client.send({
       from: `Sonario <${GMAIL_ADDRESS}>`,
       to: toEmail,
       subject,
       content: message,
-      attachments: [{ filename: pdfFilename, content: pdfBytes, contentType: 'application/pdf' }],
+      // `encoding` is required (not optional) on denomailer's attachment type — leaving it out
+      // previously meant the PDF bytes got sent corrupted, even though the function itself
+      // didn't error. 'base64' matches the shape the client already sends pdfBase64 in.
+      attachments: [{ filename: pdfFilename, content: pdfBase64, encoding: 'base64', contentType: 'application/pdf' }],
     });
   } catch (err) {
     return json({ error: `Couldn't send the email: ${String(err?.message ?? err)}` }, 502);
