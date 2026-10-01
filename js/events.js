@@ -99,6 +99,11 @@ export function RailRow({ event, onOpen = null, trailing = null }) {
 export function AbsenceToggle({ event, myAbsence, profileId, onAbsenceSaved, onAbsenceRemoved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // Nina, 2026-10-01: the option to say why, alongside "Can't make it?" — optional, so tapping
+  // "Can't make it?" opens this rather than writing immediately. Cancelling here writes nothing
+  // at all, same "mistap costs nothing" guarantee the one-tap version had.
+  const [addingReason, setAddingReason] = useState(false);
+  const [reason, setReason] = useState('');
 
   if (event.status === 'cancelled' || event.status === 'not_scheduled' || isPast(event)) return null;
 
@@ -117,6 +122,8 @@ export function AbsenceToggle({ event, myAbsence, profileId, onAbsenceSaved, onA
     }
     if (patch) onAbsenceSaved?.(Array.isArray(data) ? data[0] : data);
     if (removedId) onAbsenceRemoved?.(removedId);
+    setAddingReason(false);
+    setReason('');
   };
 
   return html`
@@ -128,10 +135,23 @@ export function AbsenceToggle({ event, myAbsence, profileId, onAbsenceSaved, onA
             ${busy ? 'Saving…' : 'Actually, I can make it'}
           </button>
         `
+        : addingReason
+        ? html`
+          <div class="absence-reason-form">
+            <input type="text" value=${reason} maxlength="140" placeholder="Reason (optional)"
+              onInput=${(e) => setReason(e.target.value)} />
+            <div class="form-actions">
+              <button class="btn-quiet" disabled=${busy}
+                onClick=${() => run(() => markAbsent(event.id, profileId, reason.trim()), { patch: true })}>
+                ${busy ? 'Saving…' : "Can't make it"}
+              </button>
+              <button class="btn-quiet" disabled=${busy} onClick=${() => { setAddingReason(false); setReason(''); }}>Cancel</button>
+            </div>
+          </div>
+        `
         : html`
-          <button class="btn-quiet" disabled=${busy}
-            onClick=${() => run(() => markAbsent(event.id, profileId), { patch: true })}>
-            ${busy ? 'Saving…' : "Can't make it?"}
+          <button class="btn-quiet" disabled=${busy} onClick=${() => setAddingReason(true)}>
+            Can't make it?
           </button>
         `}
       ${error ? html`<p class="absence-error">${error}</p>` : null}
@@ -149,13 +169,18 @@ function AbsenceSummary({ event, absencesForEvent, directory }) {
     if (isPast(event) || event.status === 'cancelled' || event.status === 'not_scheduled') return null;
     return html`<p class="absence-summary">Nobody has said they can't make it.</p>`;
   }
-  const names = absencesForEvent
-    .map((a) => directory[a.profile_id]?.display_name || 'Unknown member')
-    .sort((a, b) => a.localeCompare(b));
+  const rows = absencesForEvent
+    .map((a) => ({ name: directory[a.profile_id]?.display_name || 'Unknown member', reason: a.reason }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   return html`
-    <p class="absence-summary">
-      <strong>${names.length} can't make it:</strong> ${names.join(', ')}
-    </p>
+    <div class="absence-summary">
+      <p class="absence-summary-count"><strong>${rows.length} can't make it</strong></p>
+      ${rows.map((r) => html`
+        <p key=${r.name} class="absence-summary-row">
+          ${r.name}${r.reason ? html`: <span class="absence-summary-reason">${r.reason}</span>` : ''}
+        </p>
+      `)}
+    </div>
   `;
 }
 

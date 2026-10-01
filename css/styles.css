@@ -340,9 +340,15 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .absence-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .absence-noted { margin: 0; font-size: 14px; font-weight: 600; color: var(--purple-dark); }
 .absence-error { margin: 0; font-size: 13px; color: var(--error); }
-/* Super-only line. Members never see anyone else's absence (RLS returns only their own row). */
+/* Super-only list. Members never see anyone else's absence (RLS returns only their own row). */
 .absence-summary { margin: 12px 0 0; font-size: 13px; color: var(--ink-soft); }
-.absence-summary strong { color: var(--ink); }
+.absence-summary-count { margin: 0 0 4px; }
+.absence-summary-count strong { color: var(--ink); }
+.absence-summary-row { margin: 0; line-height: 1.5; }
+.absence-summary-reason { color: var(--ink-soft); }
+/* The optional reason step between tapping "Can't make it?" and it actually saving. */
+.absence-reason-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.absence-reason-form input { width: 100%; }
 
 /* --- "Where you stand" status + the quiet way out ----------------------- */
 /* Green carries the settled, default case (you're coming) with a button's visual weight but

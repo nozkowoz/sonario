@@ -506,8 +506,9 @@ function eventPayload(f) {
 
 // --- Absence marking (the whole "can't make it" model — a row exists or it doesn't) -------
 
-export async function markAbsent(eventId, profileId) {
-  return supabase.from('rehearsal_absences').insert({ rehearsal_id: eventId, profile_id: profileId }).select().maybeSingle();
+export async function markAbsent(eventId, profileId, reason = '') {
+  return supabase.from('rehearsal_absences')
+    .insert({ rehearsal_id: eventId, profile_id: profileId, reason }).select().maybeSingle();
 }
 
 export async function clearAbsence(eventId, profileId) {
