@@ -17,7 +17,7 @@ import {
   holdInvoice, resumeInvoice, waiveInvoice, sendInvoiceEmail,
 } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
-import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle } from './icons.js';
+import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle, IconSend } from './icons.js';
 
 // --- Sonario's fixed invoice details --------------------------------------------------------
 // Nina, 2026-09-17: real details from the current invoices, not placeholders. The fee itself is
@@ -302,15 +302,34 @@ export function AdminInvoices({ terms, directory, profileId, onBack }) {
       onGenerated=${async (run) => {
         patchInvoiceRun(run);
         const { data } = await fetchInvoicesForRun(run.id);
-        await downloadRunPdfs(data || [], terms.find((t) => t.id === run.term_id));
-        openRun(run);
+        setActiveRun(run);
+        setActiveRunInvoices(data || []);
+        setScreen('run-created');
       }} />`;
+  }
+  // A handful of invoices just generated — email-them-all is the thing Nina actually does next
+  // almost every time, so it gets its own screen rather than only being reachable by opening the
+  // run and finding the bulk-email entry point buried there (2026-10-01, per Nina's mockup).
+  if (screen === 'run-created' && activeRun) {
+    const term = terms.find((t) => t.id === activeRun.term_id);
+    return html`<${RunCreated} run=${activeRun} invoices=${activeRunInvoices || []} term=${term}
+      onEmail=${() => setScreen('email-run')}
+      onDownload=${() => downloadRunPdfs(activeRunInvoices || [], term)}
+      onDone=${() => openRun(activeRun)} />`;
+  }
+  if (screen === 'email-run' && activeRun) {
+    const term = terms.find((t) => t.id === activeRun.term_id);
+    return html`<${EmailRunWizard} run=${activeRun} invoices=${activeRunInvoices || []} term=${term}
+      onDone=${() => openRun(activeRun)}
+      onInvoiceUpdated=${(updated) => { setActiveRunInvoices((prev) =>
+        (prev || []).map((i) => (i.id === updated.id ? updated : i))); patchInvoiceEverywhere(updated); }} />`;
   }
   if (screen === 'run-detail' && activeRun) {
     return html`<${RunDetail} run=${activeRun} invoices=${activeRunInvoices}
       term=${terms.find((t) => t.id === activeRun.term_id)}
       onInvoiceUpdated=${(updated) => { setActiveRunInvoices((prev) =>
         (prev || []).map((i) => (i.id === updated.id ? updated : i))); patchInvoiceEverywhere(updated); }}
+      onEmailAll=${() => setScreen('email-run')}
       onBack=${() => setScreen('home')} />`;
   }
   if (screen === 'payments-queue') {
@@ -818,12 +837,225 @@ function CreateRunPreview({ draft, directory, terms, onBack, onGenerated }) {
 }
 
 // ---------------------------------------------------------------------------
+// Run created — the landing screen right after generate(), replacing what used to be an automatic
+// ZIP download + straight-into-run-detail. Nina's mockup (2026-10-01): make emailing everyone the
+// obvious next step rather than something only reachable by opening the run and finding it. Every
+// invoice here always has an email (profiles.google_email is NOT NULL — see 0001/0015), so unlike
+// the mockup this never needs a "N members have no email address" callout.
+// ---------------------------------------------------------------------------
+function RunCreated({ run, invoices, term, onEmail, onDownload, onDone }) {
+  const [downloading, setDownloading] = useState(false);
+  const totalCents = invoices.reduce((sum, i) => sum + i.amount_cents, 0);
+  const first = invoices[0]?.invoice_number;
+  const last = invoices[invoices.length - 1]?.invoice_number;
+
+  const download = async () => { setDownloading(true); await onDownload(); setDownloading(false); };
+
+  return html`
+    <div class="tab-content">
+      <div class="state-block" style="padding-top:20px;">
+        <div class="run-success-icon"><${IconCheckCircle} size=${32} /></div>
+        <p class="state-title" style="font-size:18px;">${invoices.length} invoice${invoices.length === 1 ? '' : 's'} created!</p>
+        ${first ? html`<p class="state-body">
+          Invoice #${first}${last !== first ? `–#${last}` : ''} · Total ${formatCents(totalCents)}
+        </p>` : null}
+      </div>
+
+      <div class="fee-card card" style="margin:16px 0 20px;cursor:default;">
+        <span class="fee-icon" aria-hidden="true">✉️</span>
+        <div class="fee-body">
+          <p style="margin:0;font-weight:700;">${invoices.length} ready to email</p>
+          <p class="form-hint" style="margin:2px 0 0;">Every member here has an email address on file.</p>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onClick=${onEmail}>
+        Email invoices to ${invoices.length} member${invoices.length === 1 ? '' : 's'}
+      </button>
+      <button class="btn btn-outline" style="width:100%;margin-bottom:10px;" disabled=${downloading} onClick=${download}>
+        ${downloading ? 'Preparing ZIP…' : 'Download all PDFs'}
+      </button>
+      <button class="btn-quiet" style="width:100%;" onClick=${onDone}>Done</button>
+    </div>
+  `;
+}
+
+const EMAIL_STATUS_LABEL = { pending: 'Pending', sending: 'Sending…', sent: 'Sent', failed: 'Not sent' };
+
+// ---------------------------------------------------------------------------
+// Bulk-email wizard — compose once, personalised per recipient only by swapping "[First name]"
+// (Nina's mockup shows that literal token in the editable text), then send one at a time so
+// progress is real rather than a fake animated bar. Reachable both right after generating a run
+// (RunCreated above) and from a past run's own detail screen (RunDetail's "Email invoices to N
+// members" button) — same component either way, since "send/resend to everyone in this run" is
+// the same operation in both cases.
+// ---------------------------------------------------------------------------
+function EmailRunWizard({ run, invoices, term, onDone, onInvoiceUpdated }) {
+  const termLabel = term ? parseTermLabel(term) : { number: '?', year: new Date(run.invoice_date).getFullYear() };
+  const defaultSubject = `Sonario invoice — Term ${termLabel.number} ${termLabel.year}`;
+  const defaultMessage = `Hi [First name],\n\nHere's your Sonario invoice for Term ${termLabel.number} ${termLabel.year} — ${formatCents(run.fee_cents)}, due ${formatInvoiceDate(run.due_date)}.\n\nYour invoice PDF is attached.\n\nThanks,\nSonario`;
+
+  const [step, setStep] = useState('compose'); // compose | confirm | sending | results
+  const [subject, setSubject] = useState(defaultSubject);
+  const [message, setMessage] = useState(defaultMessage);
+  const [statuses, setStatuses] = useState(() => Object.fromEntries(invoices.map((i) => [i.id, { status: 'pending' }])));
+  const [sentSoFar, setSentSoFar] = useState(0);
+  const [sendTotal, setSendTotal] = useState(invoices.length);
+
+  const firstNameOf = (inv) => (inv.member_name || '').trim().split(/\s+/)[0] || 'there';
+  const personalize = (tmpl, inv) => tmpl.replace(/\[First name\]/g, firstNameOf(inv));
+
+  const sendOne = async (inv) => {
+    setStatuses((prev) => ({ ...prev, [inv.id]: { status: 'sending' } }));
+    try {
+      const pdfBytes = await buildInvoicePdfBytes({
+        invoiceNumberLabel: String(inv.invoice_number),
+        memberName: inv.member_name,
+        memberEmail: inv.member_email,
+        invoiceDateStr: formatInvoiceDate(inv.invoice_date),
+        dueDateStr: formatInvoiceDate(inv.due_date),
+        amountCents: inv.amount_cents,
+        termLabel,
+      });
+      const { data, error: err } = await sendInvoiceEmail({
+        invoiceId: inv.id,
+        toEmail: inv.member_email,
+        subject,
+        message: personalize(message, inv),
+        pdfBase64: bytesToBase64(pdfBytes),
+        pdfFilename: invoiceFilename(inv),
+      });
+      if (err || data?.error) {
+        setStatuses((prev) => ({ ...prev, [inv.id]: { status: 'failed', error: err?.message || data?.error } }));
+        return;
+      }
+      setStatuses((prev) => ({ ...prev, [inv.id]: { status: 'sent' } }));
+      if (data?.invoice) onInvoiceUpdated(data.invoice);
+    } catch (err) {
+      setStatuses((prev) => ({ ...prev, [inv.id]: { status: 'failed', error: String(err?.message ?? err) } }));
+    }
+  };
+
+  // Sequential, not Promise.all — denomailer opens one SMTP connection per function call, and this
+  // also gives the progress bar a real, honest count rather than everything finishing at once.
+  const runSend = async (list) => {
+    setSendTotal(list.length);
+    setSentSoFar(0);
+    setStep('sending');
+    for (const inv of list) {
+      await sendOne(inv);
+      setSentSoFar((n) => n + 1);
+    }
+    setStep('results');
+  };
+
+  if (step === 'compose') {
+    return html`
+      <div class="tab-content">
+        <${AdminHeadInvoices} title="Send invoices" onBack=${onDone} />
+        <p class="form-hint" style="margin:0 0 12px;">Each member will receive their individual invoice PDF.</p>
+        <div class="card form-card">
+          <p style="margin:0;"><strong>${invoices.length}</strong> recipient${invoices.length === 1 ? '' : 's'}</p>
+          <label>
+            Subject
+            <input type="text" value=${subject} onInput=${(e) => setSubject(e.target.value)} />
+          </label>
+          <label>
+            Message
+            <textarea rows="8" style="font-family:inherit;" value=${message}
+              onInput=${(e) => setMessage(e.target.value)}></textarea>
+          </label>
+          <p class="form-hint" style="margin:0;">
+            Each email is personalised — [First name] is swapped for the member's own first name.
+          </p>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:16px;" disabled=${invoices.length === 0}
+          onClick=${() => setStep('confirm')}>
+          Review and send
+        </button>
+      </div>
+    `;
+  }
+
+  if (step === 'confirm') {
+    return html`
+      <div class="tab-content">
+        <${AdminHeadInvoices} title="Confirm send" onBack=${() => setStep('compose')} />
+        <div class="state-block" style="padding-top:20px;">
+          <div class="run-success-icon" style="background:var(--purple-light);color:var(--purple);">
+            <${IconSend} size=${26} />
+          </div>
+          <p class="state-title" style="font-size:18px;">
+            Send ${invoices.length} invoice email${invoices.length === 1 ? '' : 's'}?
+          </p>
+          <p class="state-body">
+            Each member will receive their individual invoice PDF. Emails are sent immediately — this may take a few moments.
+          </p>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onClick=${() => runSend(invoices)}>Send now</button>
+        <button class="btn-quiet" style="width:100%;" onClick=${() => setStep('compose')}>Cancel</button>
+      </div>
+    `;
+  }
+
+  if (step === 'sending') {
+    const pct = sendTotal ? Math.round((sentSoFar / sendTotal) * 100) : 0;
+    return html`
+      <div class="tab-content">
+        <div class="detail-head"><h2 class="admin-head-title">Sending invoices</h2></div>
+        <p style="margin:0 0 8px;font-weight:700;">Sending ${sentSoFar} of ${sendTotal}…</p>
+        <div class="progress-track" style="margin-bottom:18px;"><div class="progress-fill" style=${`width:${pct}%`}></div></div>
+        <div class="rep-song-list">
+          ${invoices.map((inv) => html`
+            <div key=${inv.id} class="rep-song-row" style="cursor:default;">
+              <span class="rep-song-title">${inv.member_name}</span>
+              <span class="form-hint">${EMAIL_STATUS_LABEL[statuses[inv.id]?.status] || ''}</span>
+            </div>
+          `)}
+        </div>
+      </div>
+    `;
+  }
+
+  // results
+  const failed = invoices.filter((inv) => statuses[inv.id]?.status === 'failed');
+  const sentOk = invoices.length - failed.length;
+  return html`
+    <div class="tab-content">
+      <${AdminHeadInvoices} title="Send results" onBack=${onDone} />
+      <div class="state-block" style="padding-top:20px;">
+        <div class="run-success-icon" style=${failed.length ? 'background:var(--butter-bg);color:var(--butter);' : ''}>
+          <${IconCheckCircle} size=${32} />
+        </div>
+        <p class="state-title" style="font-size:18px;">${failed.length ? 'Invoices sent' : 'Invoices sent!'}</p>
+        <p class="state-body">${sentOk} of ${invoices.length} email${invoices.length === 1 ? '' : 's'} sent successfully.</p>
+      </div>
+
+      ${failed.length > 0 ? html`
+        <div class="card" style="margin-bottom:16px;background:var(--error-bg);box-shadow:none;">
+          <p style="margin:0 0 8px;font-weight:700;">Couldn't be sent</p>
+          ${failed.map((inv) => html`
+            <p key=${inv.id} class="form-hint" style="margin:0 0 4px;">
+              ${inv.member_name} — ${statuses[inv.id]?.error || 'Unknown error'}
+            </p>
+          `)}
+        </div>
+        <button class="btn btn-outline" style="width:100%;margin-bottom:10px;" onClick=${() => runSend(failed)}>
+          Try again (${failed.length})
+        </button>
+      ` : null}
+      <button class="btn btn-primary" style="width:100%;" onClick=${onDone}>Done</button>
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
 // A past run's detail: every invoice in it, a repeatable Download PDFs button (regenerates fresh
 // from stored data every time, so a failed browser download never means "go create another run" —
 // see 0015's header on why nothing here needs the PDF bytes to have been stored anywhere), and a
 // way into each invoice's own Change due date action.
 // ---------------------------------------------------------------------------
-function RunDetail({ run, invoices, term, onInvoiceUpdated, onBack }) {
+function RunDetail({ run, invoices, term, onInvoiceUpdated, onEmailAll, onBack }) {
   const [openInvoiceId, setOpenInvoiceId] = useState(null);
   const [downloading, setDownloading] = useState(false);
 
@@ -848,7 +1080,11 @@ function RunDetail({ run, invoices, term, onInvoiceUpdated, onBack }) {
         <p class="form-hint" style="margin:0;">Fee: ${formatCents(run.fee_cents)}</p>
       </div>
 
-      <button class="btn btn-primary" style="width:100%;margin-bottom:16px;" disabled=${downloading || !invoices}
+      <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" disabled=${!invoices || invoices.length === 0}
+        onClick=${onEmailAll}>
+        Email invoices to ${invoices ? invoices.length : 0} member${invoices?.length === 1 ? '' : 's'}
+      </button>
+      <button class="btn btn-outline" style="width:100%;margin-bottom:16px;" disabled=${downloading || !invoices}
         onClick=${download}>
         ${downloading ? 'Preparing ZIP…' : `Download PDFs${invoices ? ` (${invoices.length})` : ''}`}
       </button>
