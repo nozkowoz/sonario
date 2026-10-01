@@ -921,3 +921,13 @@ export async function disablePushNotifications() {
 export async function sendAdminNotification({ title, body }) {
   return supabase.functions.invoke('send-admin-notification', { method: 'POST', body: { title, body } });
 }
+
+// Admin > Invoices > an invoice's own detail screen. The Edge Function re-checks Super Admin
+// itself, same "not the real security boundary" note as above. pdfBase64 is generated client-side
+// by the same buildInvoicePdfBytes() "Download PDF invoice" already uses — never regenerated
+// server-side, so there's only one place the PDF's actual layout logic lives.
+export async function sendInvoiceEmail({ invoiceId, toEmail, subject, message, pdfBase64, pdfFilename }) {
+  return supabase.functions.invoke('send-invoice-email', {
+    method: 'POST', body: { invoiceId, toEmail, subject, message, pdfBase64, pdfFilename },
+  });
+}

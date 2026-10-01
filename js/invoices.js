@@ -14,7 +14,7 @@ import {
   useInvoiceSettings, updateInvoiceFee, initializeInvoiceNumbering, useInvoiceRuns,
   createInvoiceRun, fetchInvoicesForRun, fetchInvoicedProfileIdsForTerm, updateInvoiceDueDate,
   usePaymentsToConfirm, confirmInvoicePayment, rejectInvoicePayment, markInvoicePaid,
-  holdInvoice, resumeInvoice, waiveInvoice,
+  holdInvoice, resumeInvoice, waiveInvoice, sendInvoiceEmail,
 } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle } from './icons.js';
@@ -99,6 +99,18 @@ export function parseTermLabel(term) {
 
 const slug = (s) => String(s || '').replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '');
 export const invoiceFilename = (invoice) => `Invoice-${invoice.invoice_number}-${slug(invoice.member_name)}.pdf`;
+
+// Browser-safe bytes -> base64, chunked so a large PDF doesn't blow the call-stack limit that a
+// naive String.fromCharCode(...bytes) hits on bigger invoices. Used to hand the already-generated
+// PDF to send-invoice-email as JSON, rather than re-generating it server-side.
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
 
 export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -304,7 +316,7 @@ export function AdminInvoices({ terms, directory, profileId, onBack }) {
   if (screen === 'payments-queue') {
     const openInvoice = openQueueInvoiceId ? toConfirm.find((i) => i.id === openQueueInvoiceId) : null;
     if (openInvoice) {
-      return html`<${InvoiceDetail} invoice=${openInvoice}
+      return html`<${InvoiceDetail} invoice=${openInvoice} terms=${terms}
         onBack=${() => setOpenQueueInvoiceId(null)}
         onSaved=${(updated) => { patchInvoiceEverywhere(updated); setOpenQueueInvoiceId(null); }} />`;
     }
@@ -823,7 +835,7 @@ function RunDetail({ run, invoices, term, onInvoiceUpdated, onBack }) {
 
   const openInvoice = openInvoiceId ? (invoices || []).find((i) => i.id === openInvoiceId) : null;
   if (openInvoice) {
-    return html`<${InvoiceDetail} invoice=${openInvoice} onBack=${() => setOpenInvoiceId(null)}
+    return html`<${InvoiceDetail} invoice=${openInvoice} terms=${term ? [term] : []} onBack=${() => setOpenInvoiceId(null)}
       onSaved=${(updated) => { onInvoiceUpdated(updated); setOpenInvoiceId(null); }} />`;
   }
 
@@ -858,12 +870,56 @@ function RunDetail({ run, invoices, term, onInvoiceUpdated, onBack }) {
   `;
 }
 
-function InvoiceDetail({ invoice, onBack, onSaved }) {
+function InvoiceDetail({ invoice, terms, onBack, onSaved }) {
   const [editingDue, setEditingDue] = useState(false);
   const [dueDate, setDueDate] = useState(invoice.due_date);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [confirmingWaive, setConfirmingWaive] = useState(false);
+
+  // --- Send invoice email ---------------------------------------------------------------
+  const term = terms?.find((t) => t.id === invoice.term_id);
+  const termLabel = term ? parseTermLabel(term) : { number: '?', year: new Date(invoice.invoice_date).getFullYear() };
+  const firstName = (invoice.member_name || '').trim().split(/\s+/)[0] || 'there';
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailMessage, setEmailMessage] = useState(
+    `Hi ${firstName},\n\nHere's your invoice for Term ${termLabel.number} ${termLabel.year} — ${formatCents(invoice.amount_cents)}, due ${formatInvoiceDate(invoice.due_date)}.\n\nThanks,\nSonario`,
+  );
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailError, setEmailError] = useState(null);
+  const [emailSentJustNow, setEmailSentJustNow] = useState(false);
+
+  const sendEmail = async () => {
+    setEmailBusy(true); setEmailError(null);
+    try {
+      const pdfBytes = await buildInvoicePdfBytes({
+        invoiceNumberLabel: String(invoice.invoice_number),
+        memberName: invoice.member_name,
+        memberEmail: invoice.member_email,
+        invoiceDateStr: formatInvoiceDate(invoice.invoice_date),
+        dueDateStr: formatInvoiceDate(invoice.due_date),
+        amountCents: invoice.amount_cents,
+        termLabel,
+      });
+      const { data, error: err } = await sendInvoiceEmail({
+        invoiceId: invoice.id,
+        toEmail: invoice.member_email,
+        subject: `Sonario invoice — Term ${termLabel.number} ${termLabel.year}`,
+        message: emailMessage,
+        pdfBase64: bytesToBase64(pdfBytes),
+        pdfFilename: invoiceFilename(invoice),
+      });
+      setEmailBusy(false);
+      if (err) { setEmailError(err.message || 'Failed to send'); return; }
+      if (data?.error) { setEmailError(data.error); return; }
+      setSendingEmail(false);
+      setEmailSentJustNow(true);
+      if (data?.invoice) onSaved(data.invoice);
+    } catch (err) {
+      setEmailBusy(false);
+      setEmailError(String(err?.message ?? err));
+    }
+  };
 
   const saveDueDate = async () => {
     setBusy(true); setError(null);
@@ -923,6 +979,34 @@ function InvoiceDetail({ invoice, onBack, onSaved }) {
           ` : null}
           <button class="btn btn-outline btn-sm" disabled=${busy || invoice.status === 'paid' || invoice.status === 'waived'}
             onClick=${() => setEditingDue(true)}>Change due date</button>
+        `}
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        ${sendingEmail ? html`
+          <p style="margin:0 0 8px;font-weight:700;">Send invoice email</p>
+          <p class="form-hint" style="margin:0 0 10px;">To ${invoice.member_email}, from the Sonario Gmail.</p>
+          <label>
+            Message
+            <textarea rows="7" style="font-family:inherit;" value=${emailMessage}
+              onInput=${(e) => setEmailMessage(e.target.value)}></textarea>
+          </label>
+          ${emailError ? html`<p class="absence-error" style="margin:8px 0 0;">${emailError}</p>` : null}
+          <div class="form-actions" style="margin-top:10px;">
+            <button class="btn btn-primary btn-sm" disabled=${emailBusy} onClick=${sendEmail}>
+              ${emailBusy ? 'Sending…' : 'Send email'}
+            </button>
+            <button class="btn-quiet" disabled=${emailBusy} onClick=${() => { setSendingEmail(false); setEmailError(null); }}>Cancel</button>
+          </div>
+        ` : html`
+          <p style="margin:0 0 4px;font-weight:700;">Invoice email</p>
+          ${invoice.email_sent_at
+            ? html`<p class="form-hint" style="margin:0 0 10px;">Last sent ${formatInvoiceDate(invoice.email_sent_at.slice(0, 10))}.</p>`
+            : html`<p class="form-hint" style="margin:0 0 10px;">Not sent yet.</p>`}
+          ${emailSentJustNow ? html`<p class="form-saved" style="margin:0 0 10px;">Sent ✓</p>` : null}
+          <button class="btn btn-outline btn-sm" onClick=${() => setSendingEmail(true)}>
+            ${invoice.email_sent_at ? 'Send again' : 'Send invoice email'}
+          </button>
         `}
       </div>
 
