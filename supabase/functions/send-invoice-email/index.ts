@@ -13,7 +13,13 @@
 //
 // Deploy:  supabase functions deploy send-invoice-email
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import nodemailer from 'npm:nodemailer@6.9.14';
+// nodemailer (tried first) crashes the whole Deno isolate mid-request here — confirmed via
+// function_logs showing "booted" then "shutdown" ~440ms later, no JS error ever reaching this
+// file's own try/catch, which the gateway then reports to the client as a bare 503. Nodemailer
+// leans on Node's native net/tls socket internals, which Deno's `npm:` compat layer only partially
+// polyfills. denomailer is a Deno-native SMTP client built for exactly this case (Gmail app
+// passwords from a Deno edge runtime) and doesn't go through that polyfill at all.
+import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 
 const GMAIL_ADDRESS = Deno.env.get('SONARIO_GMAIL_ADDRESS') ?? 'sonario.au@gmail.com';
 const GMAIL_APP_PASSWORD = Deno.env.get('SONARIO_GMAIL_APP_PASSWORD');
@@ -74,23 +80,31 @@ Deno.serve(async (req) => {
     return json({ error: 'invoiceId, toEmail, subject, message and pdfBase64 are all required.' }, 400);
   }
 
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: GMAIL_ADDRESS, pass: GMAIL_APP_PASSWORD },
+  const client = new SMTPClient({
+    connection: {
+      hostname: 'smtp.gmail.com',
+      port: 465,
+      tls: true,
+      auth: { username: GMAIL_ADDRESS, password: GMAIL_APP_PASSWORD },
+    },
   });
 
+  // Decode the base64 PDF to raw bytes ourselves rather than relying on denomailer's own
+  // encoding flag for attachments — one less assumption about exactly how it interprets that flag.
+  const pdfBytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
+
   try {
-    await transporter.sendMail({
+    await client.send({
       from: `Sonario <${GMAIL_ADDRESS}>`,
       to: toEmail,
       subject,
-      text: message,
-      attachments: [{ filename: pdfFilename, content: pdfBase64, encoding: 'base64' }],
+      content: message,
+      attachments: [{ filename: pdfFilename, content: pdfBytes, contentType: 'application/pdf' }],
     });
   } catch (err) {
     return json({ error: `Couldn't send the email: ${String(err?.message ?? err)}` }, 502);
+  } finally {
+    await client.close();
   }
 
   const { data: updated, error: updateError } = await supabaseAdmin
