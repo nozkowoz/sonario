@@ -89,7 +89,9 @@ function PendingPreviewCard({ pending, profilesById, onViewAll }) {
 
 export function AdminMembers({ session, isSuperAdmin, onBack }) {
   const { memberships, patchMembership } = useAllMemberships();
-  const [tab, setTab] = useState('active'); // 'active' | 'pending' | 'deactivated'
+  // Nina, 2026-10-01: land on everyone, not pre-filtered to Active — Pending/Active/Deactivated
+  // are refinements from here, not the only way in.
+  const [tab, setTab] = useState('all'); // 'all' | 'active' | 'pending' | 'deactivated'
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState(null);
 
@@ -101,7 +103,7 @@ export function AdminMembers({ session, isSuperAdmin, onBack }) {
   const active = memberships.filter((m) => m.status === 'active');
   const deactivated = memberships.filter((m) => m.status === 'declined' || m.status === 'deactivated');
 
-  const byTab = tab === 'active' ? active : tab === 'pending' ? pending : deactivated;
+  const byTab = tab === 'all' ? memberships : tab === 'active' ? active : tab === 'pending' ? pending : deactivated;
   const q = query.trim().toLowerCase();
   const visible = q
     ? byTab.filter((m) => {
@@ -127,6 +129,7 @@ export function AdminMembers({ session, isSuperAdmin, onBack }) {
       </p>
 
       <div class="chips" style="margin-bottom:14px;">
+        <button class=${`chip ${tab === 'all' ? 'chip-on' : ''}`} onClick=${() => setTab('all')}>All</button>
         <button class=${`chip ${tab === 'active' ? 'chip-on' : ''}`} onClick=${() => setTab('active')}>Active</button>
         <button class=${`chip ${tab === 'pending' ? 'chip-on' : ''}`} onClick=${() => setTab('pending')}>
           Pending${pending.length > 0 ? ` (${pending.length})` : ''}
@@ -142,12 +145,12 @@ export function AdminMembers({ session, isSuperAdmin, onBack }) {
           onInput=${(e) => setQuery(e.target.value)} />
       </div>
 
-      ${tab === 'active' ? html`<${PendingPreviewCard} pending=${pending} profilesById=${profilesById}
+      ${tab === 'all' || tab === 'active' ? html`<${PendingPreviewCard} pending=${pending} profilesById=${profilesById}
         onViewAll=${() => setTab('pending')} />` : null}
 
       <div class="section-header" style="margin-bottom:10px;">
         <p style="margin:0;font-weight:700;">
-          ${tab === 'active' ? 'Active members' : tab === 'pending' ? 'Pending requests' : 'Declined / deactivated'}
+          ${tab === 'all' ? 'All members' : tab === 'active' ? 'Active members' : tab === 'pending' ? 'Pending requests' : 'Declined / deactivated'}
         </p>
         <span class="form-hint">${visible.length} member${visible.length === 1 ? '' : 's'}</span>
       </div>
