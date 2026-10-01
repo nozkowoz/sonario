@@ -1,11 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 :root {
-  --purple: #7052CD;
-  --purple-dark: #5b3fac;
+  /* Official Sonario brand palette, supplied by Jo 2026-10-01 (Sonario_Palette.pdf). --purple was
+     already a close eyeball match to Violet; these are the exact values now. --purple-dark/-light
+     stay as functional UI shades (hover states, pale washes) derived from Violet rather than being
+     literally Lavender, which is its own distinct swatch, not a tint — see --lavender below. */
+  --violet: #6F52CA;
+  --lavender: #CAC5F1;
+  --beige: #E7D6C2;      /* reserved — not yet applied anywhere, see Nina re: where to use warmth */
+  --chocolate: #806448;  /* reserved — not yet applied anywhere, see Nina re: where to use warmth */
+  --grey: #848688;
+  --purple: var(--violet);
+  --purple-dark: #5941A1;
   --purple-light: #F1EEFA;
   --ink: #201c2e;
-  --ink-soft: #5a5470;
+  --ink-soft: var(--grey);
   --border: #e3ddf5;
   --bg: #f5f2fb;
   --error: #b5342e;
