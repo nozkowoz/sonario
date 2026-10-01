@@ -26,7 +26,7 @@ const SECTIONS = [
   // Listed but not built, deliberately: showing the shape of the console is useful, and each of
   // these is real work rather than a screen waiting to be drawn.
   { key: 'attendance', label: 'Attendance', Icon: IconCheckSquare,
-    body: 'Backfill past attendance for a member, week by week.' },
+    body: 'View and manage member attendance.' },
   { key: 'invoices', label: 'Invoices', Icon: IconInvoice,
     body: 'Generate term invoices and manage invoice numbering.', superOnly: true },
   { key: 'notifications', label: 'Notifications', Icon: IconBell,
@@ -48,7 +48,7 @@ export function AdminTab({
   }
   if (view?.section === 'attendance') {
     return html`<${AdminAttendance} session=${session} events=${events} checkins=${checkins}
-      absences=${absences} awayDates=${awayDates}
+      absences=${absences} awayDates=${awayDates} terms=${terms}
       onCheckinSaved=${onCheckinSaved} onCheckinRemoved=${onCheckinRemoved}
       onBack=${() => setView(null)} />`;
   }

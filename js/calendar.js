@@ -1,7 +1,7 @@
 import { html, useState, useMemo } from './lib.js';
 import { formatEventDate, formatEventDateLong, parseLocalDate, todayStr, localDateStr } from './lib.js';
 import { logLeave, cancelLeave, awayRangeFor } from './store.js';
-import { RailRow, currentTermOf, CantMakeItBadge } from './events.js';
+import { RailRow, currentTermOf, CantMakeItBadge, GoingBadge } from './events.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { IconChevron, IconBack, IconCheckCircle, IconMinusCircle } from './icons.js';
 
@@ -305,10 +305,10 @@ export function CalendarTab({
 
   const dayEvents = dayFilter ? (eventsByDate[dayFilter] || []).filter(matchesFilter) : [];
 
-  // Where a member stands on an event, as a marker in the row's trailing slot. Only rendered when
-  // there IS something to say — the default "you're expected" is the whole point of the
-  // absence-only model and would be noise on every row. The words live on the detail screen; this
-  // is deliberately just a mark, because the row is 358px wide and the title has to fit.
+  // Where a member stands on an event, as a marker in the row's trailing slot. Checked-in/away
+  // outrank an absence the same way AttendanceStatus orders them; otherwise it's the Going/Can't
+  // make it pair Home already shows (2026-10-01, Nina: the Calendar list should say so too, not
+  // just Home — the "would be noise on every row" call this screen originally made is superseded).
   const stateMark = (e) => {
     if (myCheckinByEvent[e.id]) {
       return html`<span class="rail-mark rail-mark-in" role="img" aria-label="You checked in">
@@ -321,12 +321,11 @@ export function CalendarTab({
     if (myAbsenceByEvent[e.id]) {
       return html`<${CantMakeItBadge} />`;
     }
-    return null;
+    return html`<${GoingBadge} />`;
   };
 
   const row = (e) => html`
-    <${RailRow} key=${e.id} event=${e} onOpen=${onOpenEvent}
-      trailing=${stateMark(e) || html`<span class="rail-chev"><${IconChevron} size=${14} /></span>`} />
+    <${RailRow} key=${e.id} event=${e} onOpen=${onOpenEvent} trailing=${stateMark(e)} />
   `;
 
   return html`

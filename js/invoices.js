@@ -15,6 +15,7 @@ import {
   createInvoiceRun, fetchInvoicesForRun, fetchInvoicedProfileIdsForTerm, updateInvoiceDueDate,
   usePaymentsToConfirm, confirmInvoicePayment, rejectInvoicePayment, markInvoicePaid,
   holdInvoice, resumeInvoice, waiveInvoice, sendInvoiceEmail, createTerm,
+  markInvoiceUnpaid, fetchInvoiceStatusHistory,
 } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle, IconSend } from './icons.js';
@@ -1226,6 +1227,42 @@ function RunDetail({ run, invoices, term, onInvoiceUpdated, onEmailAll, onBack }
   `;
 }
 
+const STATUS_HISTORY_LABEL = {
+  due: 'Due', payment_reported: 'Payment reported', paid: 'Paid', on_hold: 'On hold', waived: 'Waived',
+};
+
+// The audit trail Nina asked for (2026-10-01, alongside "Mark as unpaid") already exists for every
+// status change ever made, on every invoice, back to 0030 — the trigger there writes it
+// unconditionally regardless of which RPC (or even a raw UPDATE) caused the change. This is purely
+// a read-only view of that; nothing here writes anything.
+function InvoiceStatusHistory({ invoiceId }) {
+  const [events, setEvents] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchInvoiceStatusHistory(invoiceId).then(({ data }) => { if (!cancelled) setEvents(data || []); });
+    return () => { cancelled = true; };
+  }, [invoiceId]);
+
+  if (!events || events.length === 0) return null;
+
+  return html`
+    <div class="card" style="margin-top:16px;">
+      <p style="margin:0 0 8px;font-weight:700;">History</p>
+      ${events.map((ev) => html`
+        <div key=${ev.id} style="padding:6px 0;border-bottom:1px solid var(--border);">
+          <p style="margin:0;font-size:13.5px;">
+            ${STATUS_HISTORY_LABEL[ev.from_status] || ev.from_status} → ${STATUS_HISTORY_LABEL[ev.to_status] || ev.to_status}
+          </p>
+          <p class="form-hint" style="margin:0;">
+            ${ev.profiles?.display_name || 'Someone'} · ${formatInvoiceDate(ev.changed_at.slice(0, 10))}
+          </p>
+        </div>
+      `)}
+    </div>
+  `;
+}
+
 function InvoiceDetail({ invoice, terms, onBack, onSaved }) {
   const [editingDue, setEditingDue] = useState(false);
   const [dueDate, setDueDate] = useState(invoice.due_date);
@@ -1299,6 +1336,7 @@ function InvoiceDetail({ invoice, terms, onBack, onSaved }) {
   const doConfirm = runAction(confirmInvoicePayment);
   const doReject = runAction(rejectInvoicePayment);
   const doMarkPaid = runAction(markInvoicePaid);
+  const doMarkUnpaid = runAction(markInvoiceUnpaid);
   const doHold = runAction(holdInvoice);
   const doResume = runAction(resumeInvoice);
   const doWaive = async () => { await runAction(waiveInvoice)(); setConfirmingWaive(false); };
@@ -1406,9 +1444,10 @@ function InvoiceDetail({ invoice, terms, onBack, onSaved }) {
 
       ${invoice.status === 'paid' ? html`
         <div class="card" style="margin-top:16px;background:var(--green-bg);box-shadow:none;">
-          <p style="margin:0;font-weight:700;color:var(--green);">
+          <p style="margin:0 0 10px;font-weight:700;color:var(--green);">
             Paid${invoice.payment_confirmed_at ? ` · confirmed ${formatInvoiceDate(invoice.payment_confirmed_at.slice(0, 10))}` : ''}
           </p>
+          <button class="btn-quiet" disabled=${busy} onClick=${doMarkUnpaid}>Mark as unpaid</button>
         </div>
       ` : null}
 
@@ -1430,6 +1469,8 @@ function InvoiceDetail({ invoice, terms, onBack, onSaved }) {
           </div>
         </div>
       ` : null}
+
+      <${InvoiceStatusHistory} invoiceId=${invoice.id} />
     </div>
   `;
 }

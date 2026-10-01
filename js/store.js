@@ -781,6 +781,20 @@ export async function resumeInvoice(invoiceId) {
 export async function waiveInvoice(invoiceId) {
   return supabase.rpc('waive_invoice', { p_invoice_id: invoiceId });
 }
+// 0043 — the one deliberate exception to "paid is terminal", for a super correcting a mistake.
+export async function markInvoiceUnpaid(invoiceId) {
+  return supabase.rpc('mark_invoice_unpaid', { p_invoice_id: invoiceId });
+}
+
+// The audit trail every status change already gets written to (0030's trigger, not this call) —
+// this just reads it back for display. `profiles(display_name)` rides the existing
+// invoice_status_events.changed_by -> profiles(id) FK, so PostgREST embeds it in one round trip
+// rather than a second query to resolve whose name goes with each row.
+export async function fetchInvoiceStatusHistory(invoiceId) {
+  return supabase.from('invoice_status_events')
+    .select('id, from_status, to_status, changed_at, changed_by, profiles(display_name)')
+    .eq('invoice_id', invoiceId).order('changed_at', { ascending: false });
+}
 
 // Super-only (migration 0030's own RLS): every invoice currently awaiting payment confirmation,
 // across all runs/terms — the queue Admin > Invoices surfaces so a super doesn't have to hunt

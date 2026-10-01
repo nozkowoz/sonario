@@ -1,9 +1,10 @@
 import { html, useState, useMemo } from './lib.js';
-import { formatEventDateLong, formatTimeRange } from './lib.js';
+import { formatEventDateLong, formatTimeRange, todayStr } from './lib.js';
 import { displayNameOf, useProfilesById, useAllMemberships, backfillCheckin, removeBackfillCheckin } from './store.js';
 import { AttendanceHistoryView } from './checkin.js';
+import { currentTermOf } from './events.js';
 import { EmptyState, Sheet } from './shell.js';
-import { IconBack, IconChevron, IconSearch, IconCalendar, IconUser, IconList, IconCheck } from './icons.js';
+import { IconBack, IconChevron, IconSearch, IconCalendar, IconList, IconCheck } from './icons.js';
 
 // Admin > Attendance (2026-09-28 redesign, per Nina's mockup). Three entry points on the home
 // screen; only the first two are real — "View all attendance" has no mockup detail behind it (the
@@ -249,8 +250,8 @@ function BackfillRehearsalSelect({ member, profile, events, checkins, session, o
 }
 
 // --- Home + router ---------------------------------------------------------------
-export function AdminAttendance({ session, events, checkins, absences, awayDates, onCheckinSaved, onCheckinRemoved, onBack }) {
-  const [screen, setScreen] = useState('home'); // 'home' | 'backfill-pick' | 'backfill-select' | 'history-pick' | 'history'
+export function AdminAttendance({ session, events, checkins, absences, awayDates, terms, onCheckinSaved, onCheckinRemoved, onBack }) {
+  const [screen, setScreen] = useState('home'); // 'home' | 'insights' | 'backfill-pick' | 'backfill-select' | 'history'
   const [chosen, setChosen] = useState(null); // { membership, profile }
 
   const { memberships } = useAllMemberships();
@@ -258,6 +259,49 @@ export function AdminAttendance({ session, events, checkins, absences, awayDates
   const ids = activeMembers.map((m) => m.profile_id);
   const profilesById = useProfilesById(ids);
 
+  // Attendance insights (2026-10-01, replacing the old "View all attendance" Soon stub): this
+  // term's rehearsals/workshops that have actually happened so far, same denominator rule as
+  // Home's own My Term card — only what's already past counts, never the whole term scheduled.
+  const term = useMemo(() => currentTermOf(terms || []), [terms]);
+  const today = todayStr();
+  const soFarEvents = useMemo(() => (term
+    ? events.filter((e) => e.term_id === term.id && e.counts_towards_attendance
+        && e.status !== 'cancelled' && e.rehearsal_date < today)
+    : []), [events, term, today]);
+  const insights = useMemo(() => activeMembers.map((m) => {
+    const attended = checkins.filter((c) => c.profile_id === m.profile_id
+      && soFarEvents.some((e) => e.id === c.rehearsal_id)).length;
+    const soFar = soFarEvents.length;
+    const pct = soFar ? Math.round((attended / soFar) * 100) : null;
+    return { membership: m, profile: profilesById[m.profile_id], attended, soFar, pct };
+    // Lowest attendance first — that's the actionable end of the list for a super to look at;
+    // members with no data yet (pct null) sort to the bottom rather than the top.
+  }).sort((a, b) => (a.pct ?? 101) - (b.pct ?? 101)), [activeMembers, checkins, soFarEvents, profilesById]);
+
+  if (screen === 'insights') {
+    return html`
+      <div class="tab-content">
+        <${AdminHeadAttendance} title="Attendance insights" onBack=${() => setScreen('home')} />
+        ${!term ? html`<${EmptyState} title="No current term" body="Insights need an active term with at least one past rehearsal." />`
+          : soFarEvents.length === 0 ? html`<${EmptyState} title="Nothing yet this term" body="Insights will show up once a rehearsal has happened this term." />`
+          : html`
+            <p class="form-hint" style="margin:0 0 14px;">
+              ${term.name} · ${soFarEvents.length} rehearsal${soFarEvents.length === 1 ? '' : 's'} so far. Tap a member for their full history.
+            </p>
+            <div class="rep-song-list">
+              ${insights.map(({ membership, profile, attended, soFar, pct }) => html`
+                <button key=${membership.id} class="rep-song-row"
+                  onClick=${() => { setChosen({ membership, profile }); setScreen('history'); }}>
+                  <span class="rep-song-title">${displayNameOf(profile)}</span>
+                  <span class="form-hint">${pct === null ? 'No data' : `${pct}% (${attended}/${soFar})`}</span>
+                  <${IconChevron} size=${16} />
+                </button>
+              `)}
+            </div>
+          `}
+      </div>
+    `;
+  }
   if (screen === 'backfill-pick') {
     return html`<${MemberPicker} title="Backfill attendance" subtitle="Choose a member to mark past attendance for."
       activeMembers=${activeMembers} profilesById=${profilesById}
@@ -269,27 +313,20 @@ export function AdminAttendance({ session, events, checkins, absences, awayDates
       events=${events} checkins=${checkins} session=${session} onCheckinSaved=${onCheckinSaved}
       onCheckinRemoved=${onCheckinRemoved} onBack=${() => setScreen('backfill-pick')} />`;
   }
-  if (screen === 'history-pick') {
-    return html`<${MemberPicker} title="Attendance history" subtitle="Choose a member to see their attendance record."
-      activeMembers=${activeMembers} profilesById=${profilesById}
-      onPick=${(m, p) => { setChosen({ membership: m, profile: p }); setScreen('history'); }}
-      onBack=${() => setScreen('home')} />`;
-  }
   if (screen === 'history' && chosen) {
     return html`<${AttendanceHistoryView} events=${events} checkins=${checkins} absences=${absences}
       awayDates=${awayDates} profile=${chosen.profile} subjectName=${displayNameOf(chosen.profile)}
-      onBack=${() => setScreen('history-pick')} />`;
+      onBack=${() => setScreen('insights')} />`;
   }
 
   return html`
     <div class="tab-content">
       <${AdminHeadAttendance} title="Attendance" onBack=${onBack} />
       <p class="form-hint" style="margin:0 0 16px;">Manage attendance and view history.</p>
+      <${HomeCard} Icon=${IconList} title="View attendance insights" body="See attendance rates across all members, this term."
+        onOpen=${() => setScreen('insights')} />
       <${HomeCard} Icon=${IconCalendar} title="Backfill attendance" body="Mark past attendance for a member."
         onOpen=${() => setScreen('backfill-pick')} />
-      <${HomeCard} Icon=${IconUser} title="View member history" body="See a member's attendance record."
-        onOpen=${() => setScreen('history-pick')} />
-      <${HomeCard} Icon=${IconList} title="View all attendance" body="Browse attendance across all members." soon />
     </div>
   `;
 }

@@ -57,7 +57,7 @@
   --tint-rehearsal: #FFFFFF;
   --tint-workshop: var(--sky-bg);
   --tint-performance: var(--sky-bg);
-  --tint-social: #E0F2FE;
+  --tint-social: var(--sky-bg);
   --tint-other: #E5E7EB;
   --tint-cancelled: #FEE2E2;
   --radius-lg: 16px;
@@ -324,7 +324,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .event-type-rehearsal { background: var(--purple-light); color: var(--purple-dark); }
 .event-type-workshop { background: var(--sky-bg); color: var(--sky); }
 .event-type-performance { background: var(--sky-bg); color: var(--sky); }
-.event-type-social { background: var(--teal-bg); color: var(--teal); }
+.event-type-social { background: var(--sky-bg); color: var(--sky); }
 .event-type-other { background: var(--fig-hair); color: var(--fig-meta); }
 .event-type-tentative { background: var(--butter-bg); color: var(--butter); }
 .event-type-neutral { background: var(--bg); color: var(--ink-soft); }
@@ -544,9 +544,15 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .notice-body { margin: 2px 0 0; font-size: 13px; color: var(--fig-meta); white-space: pre-wrap; }
 /* Butter = heads-up, not alarm: provisional or time-sensitive. Distinct from coral, which means
    something has gone wrong or changed. See DESIGN-RULES.md. */
+/* Nina, 2026-10-01: title was still the default --fig-ink (a dark near-black WITH a blue cast —
+   that's the "dark blue" she was seeing), while only the body had been pulled over to brown. Both
+   now use the official Chocolate (see --chocolate in :root), not the ad-hoc #6f5205 the body used
+   before that variable existed. Icon stays --butter — amber reads as "heads up", which is the icon's
+   job; the complaint was about the text being inconsistent with itself, not the icon. */
 .notice-butter { background: var(--butter-bg); }
 .notice-butter .notice-icon { color: var(--butter); }
-.notice-butter .notice-body { color: #6f5205; }
+.notice-butter .notice-title { color: var(--chocolate); }
+.notice-butter .notice-body { color: var(--chocolate); }
 
 /* --- Home: My Term ------------------------------------------------------ */
 .term-stats {
@@ -751,7 +757,7 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .sheet-type-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .sheet-type-workshop { background: var(--tint-workshop); color: var(--sky); }
 .sheet-type-performance { background: var(--tint-performance); color: var(--sky); }
-.sheet-type-social { background: var(--tint-social); color: var(--teal); }
+.sheet-type-social { background: var(--tint-social); color: var(--sky); }
 .sheet-type-other { background: var(--tint-other); color: var(--fig-meta); }
 .sheet-type-cancelled { background: var(--tint-cancelled); color: var(--coral); }
 
