@@ -943,6 +943,25 @@ export async function sendAdminNotification({ title, body }) {
   return supabase.functions.invoke('send-admin-notification', { method: 'POST', body: { title, body } });
 }
 
+// Admin > Notifications > History. Every push any automated rule or manual send has ever
+// attempted, newest first — reading sonario.notification_log, which every rule already writes to
+// via claim/finalize_notification_send (0031), regardless of which rule it was. Staff-readable per
+// 0029's RLS sweep.
+export async function fetchNotificationLog(limit = 100) {
+  return supabase.from('notification_log')
+    .select('id, type, status, created_at, sent_at, profiles(display_name)')
+    .order('created_at', { ascending: false }).limit(limit);
+}
+
+// Admin > Notifications > Upcoming. Every invoice still 'due' (so already excludes paid/waived/
+// on_hold/payment_reported) — send-invoice-reminders' own eligibility query, read back here so the
+// admin screen can show what's coming without re-running the Edge Function.
+export async function fetchDueInvoicesForReminders() {
+  return supabase.from('invoices')
+    .select('id, member_name, due_date, amount_cents, terms(name)')
+    .eq('status', 'due').order('due_date');
+}
+
 // Admin > Invoices > an invoice's own detail screen. The Edge Function re-checks Super Admin
 // itself, same "not the real security boundary" note as above. pdfBase64 is generated client-side
 // by the same buildInvoicePdfBytes() "Download PDF invoice" already uses — never regenerated
