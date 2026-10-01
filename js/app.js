@@ -15,7 +15,7 @@ import { CalendarTab } from './calendar.js';
 import { RepertoireTab } from './repertoire.js';
 import { AdminTab } from './admin.js';
 import { MoreTab } from './more.js';
-import { CHOIR_NAME } from './config.js';
+import { SonarioWordmark } from './icons.js';
 
 // Home and More are deliberately role-blind: a super sees exactly what an ordinary member sees,
 // so Nina can judge the member experience without switching accounts. Organiser controls live on
@@ -136,7 +136,7 @@ function Main({ session, membership, profile, patchProfile }) {
     <div>
       <header class="app-header">
         <div class="app-header-inner">
-          <h1 class="app-title">${CHOIR_NAME}</h1>
+          <span class="app-title"><${SonarioWordmark} height=${22} /></span>
           <button class="avatar-btn" title=${displayNameOf(profile)}
             aria-label=${`${displayNameOf(profile)} — open My Profile`}
             onClick=${() => { setMoreView('profile'); setTab('more'); }}>

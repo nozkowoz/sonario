@@ -80,7 +80,7 @@ export function RailRow({ event, onOpen = null, trailing = null }) {
         ${event.location ? html`<span class="rail-loc">${event.location}</span>` : null}
       </span>
       ${trailing !== null
-        ? trailing
+        ? html`<span class="rail-trailing">${trailing}</span>`
         : onOpen ? html`<span class="rail-chev"><${IconChevron} size=${14} /></span>` : null}
     <//>
   `;
@@ -88,14 +88,19 @@ export function RailRow({ event, onOpen = null, trailing = null }) {
 
 // Nina's mockup, 2026-10-01: a member should see at a glance, right on the row, that they've
 // already said they can't make an upcoming event — without tapping in. Exact spec from the
-// mockup's colour panel: bg #FEF3C7, icon+text #806448 (the official Chocolate — its first real
-// use anywhere in the app), calendar-outline icon, uppercase 12-14px medium text, pill shape.
+// mockup's colour panel: bg #FEF3C7, text #806448 (the official Chocolate — its first real use
+// anywhere in the app), uppercase 12-14px medium text, pill shape. No icon (Nina, 2026-10-01: the
+// calendar-outline icon it launched with was dropped — the pill reads fine as text alone).
 export function CantMakeItBadge() {
-  return html`
-    <span class="cant-make-it-badge">
-      <${IconCalendar} size=${14} /><span>Can't make it</span>
-    </span>
-  `;
+  return html`<span class="cant-make-it-badge"><span>Can't make it</span></span>`;
+}
+
+// Same slot, the opposite answer — Going is the common case so it's never the first thing a
+// member tapped on this row, but once there's an explicit RSVP of 'going' the row should say so
+// just as plainly as an absence does. Green (positive/expected), not purple — purple on rail-row
+// here already means "rehearsal", not "status". 2026-10-01, Nina's own follow-up to the mockup.
+export function GoingBadge() {
+  return html`<span class="going-badge"><span>Going</span></span>`;
 }
 
 // ---------------------------------------------------------------------------

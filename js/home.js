@@ -2,7 +2,7 @@ import { html, useMemo, useState } from './lib.js';
 import { formatDateRail, formatWeekdayLong, formatDayMonthLong, formatTimeRange,
   parseLocalDate, relativeDayLabel, todayStr } from './lib.js';
 import { displayNameOf } from './store.js';
-import { EVENT_TYPE_LABEL, nextEvent, currentTermOf, AbsenceToggle, RailRow, CantMakeItBadge } from './events.js';
+import { EVENT_TYPE_LABEL, nextEvent, currentTermOf, AbsenceToggle, RailRow, CantMakeItBadge, GoingBadge } from './events.js';
 import { CheckInPanel, AttendanceStatus, AttendanceHistoryView, isCheckInDay } from './checkin.js';
 import { TermFeesCard, MemberInvoiceDetail } from './memberinvoices.js';
 import { IconMegaphone, IconPinFilled } from './icons.js';
@@ -314,7 +314,7 @@ export function HomeTab({ profile, events, loading, terms, absences, checkins, a
             const absent = absences.some((a) => a.rehearsal_id === e.id && a.profile_id === profile.id);
             return html`
               <${RailRow} key=${e.id} event=${e} onOpen=${onOpenEvent}
-                trailing=${absent ? html`<${CantMakeItBadge} />` : null} />
+                trailing=${absent ? html`<${CantMakeItBadge} />` : html`<${GoingBadge} />`} />
             `;
           })}
         </div>

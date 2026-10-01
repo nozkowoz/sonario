@@ -253,6 +253,28 @@ async function downloadRunPdfs(invoices, term) {
     `Sonario-Term-${termLabel.number}-${termLabel.year}-Invoices.zip`);
 }
 
+// Opens a blank tab SYNCHRONOUSLY on the click, before the (async) PDF is even built, then points
+// it at the real file once ready — the usual workaround for a popup blocker, which only allows
+// window.open in direct response to the click itself, not after an await. Lets a super sanity-check
+// an individual invoice's PDF before emailing it out, without it landing in Downloads like the
+// sample/ZIP buttons do (2026-10-01, Nina: "let me check before it goes out").
+async function viewInvoicePdf(invoice, term) {
+  const win = window.open('', '_blank');
+  const termLabel = parseTermLabel(term);
+  const bytes = await buildInvoicePdfBytes({
+    invoiceNumberLabel: String(invoice.invoice_number),
+    memberName: invoice.member_name,
+    memberEmail: invoice.member_email,
+    invoiceDateStr: formatInvoiceDate(invoice.invoice_date),
+    dueDateStr: formatInvoiceDate(invoice.due_date),
+    amountCents: invoice.amount_cents,
+    termLabel,
+  });
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  if (win) win.location = url; else window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 // ---------------------------------------------------------------------------
 // Top-level router for the whole Invoices admin section. Own internal `screen` state, same
 // pattern as AdminAttendance's own memberId drill-down — not lifted into admin.js's shared view
@@ -723,7 +745,17 @@ function CreateRunSetup({ terms, settings, onBack, onContinue }) {
   const sortedTerms = useMemo(() => [...terms].sort((a, b) => b.starts_on.localeCompare(a.starts_on)), [terms]);
   const [termId, setTermId] = useState(sortedTerms[0]?.id || '');
   const [invoiceDate, setInvoiceDate] = useState(todayStr());
-  const dueDate = addDays(invoiceDate, 7);
+  const [dueDate, setDueDate] = useState(addDays(todayStr(), 7));
+  // Due date defaults to invoice date + 7 days and follows it automatically — until the admin
+  // actually edits the due date field directly, at which point it's theirs and stops following
+  // (2026-10-01, Nina: this run's grace period isn't always the standard 7 days).
+  const [dueDateTouched, setDueDateTouched] = useState(false);
+
+  const changeInvoiceDate = (v) => {
+    setInvoiceDate(v);
+    if (!dueDateTouched) setDueDate(addDays(v, 7));
+  };
+  const changeDueDate = (v) => { setDueDate(v); setDueDateTouched(true); };
 
   return html`
     <div class="tab-content">
@@ -737,9 +769,15 @@ function CreateRunSetup({ terms, settings, onBack, onContinue }) {
         </label>
         <label>
           Invoice date
-          <input type="date" value=${invoiceDate} onInput=${(e) => setInvoiceDate(e.target.value)} />
+          <input type="date" value=${invoiceDate} onInput=${(e) => changeInvoiceDate(e.target.value)} />
         </label>
-        <p class="form-hint" style="margin:0;">Due date: <strong>${formatInvoiceDate(dueDate)}</strong> (invoice date + 7 days)</p>
+        <label>
+          Due date
+          <input type="date" value=${dueDate} onInput=${(e) => changeDueDate(e.target.value)} />
+        </label>
+        <p class="form-hint" style="margin:0;">
+          ${dueDateTouched ? 'Set manually for this run.' : 'Defaults to invoice date + 7 days — edit it above if this run needs a different grace period.'}
+        </p>
         <p class="form-hint" style="margin:0;">Fee: <strong>${formatCents(settings?.fee_cents ?? 0)}</strong> per member</p>
         <div class="form-actions">
           <button class="btn btn-primary" disabled=${!termId}
@@ -867,6 +905,16 @@ function RunCreated({ run, invoices, term, onEmail, onDownload, onDone }) {
           <p style="margin:0;font-weight:700;">${invoices.length} ready to email</p>
           <p class="form-hint" style="margin:2px 0 0;">Every member here has an email address on file.</p>
         </div>
+      </div>
+
+      <p class="eyebrow eyebrow-tight">Check a PDF before sending</p>
+      <div class="rep-song-list" style="margin-bottom:20px;">
+        ${invoices.map((inv) => html`
+          <div key=${inv.id} class="rep-song-row" style="cursor:default;">
+            <span class="rep-song-title">#${inv.invoice_number} — ${inv.member_name}</span>
+            <button class="btn-quiet" onClick=${() => viewInvoicePdf(inv, term)}>View PDF</button>
+          </div>
+        `)}
       </div>
 
       <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onClick=${onEmail}>

@@ -1,7 +1,8 @@
 import { html, useState, useEffect } from './lib.js';
 import { supabase } from './supabaseClient.js';
 import { updateProfileNames } from './store.js';
-import { CHOIR_NAME, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { SonarioWordmark } from './icons.js';
 
 // No more shared passphrase — every member signs in as themselves, and signing in *is*
 // requesting: a database trigger (sonario.handle_new_auth_user) creates a profile + a pending
@@ -93,7 +94,7 @@ export function SignInScreen() {
   const shell = (children) => html`
     <div class="auth-shell">
       <div class="auth-card">
-        <h1 class="auth-title">${CHOIR_NAME}</h1>
+        <div class="auth-title"><${SonarioWordmark} height=${34} /></div>
         ${children}
       </div>
     </div>
@@ -207,7 +208,7 @@ function NameEntryForm({ profile, onSaved }) {
   return html`
     <div class="auth-shell">
       <div class="auth-card">
-        <h1 class="auth-title">${CHOIR_NAME}</h1>
+        <div class="auth-title"><${SonarioWordmark} height=${34} /></div>
         <p class="auth-sub" style=${{ fontWeight: 700, color: 'var(--ink)' }}>What should we call you?</p>
         <p class="auth-sub">Before we send your request to an organiser, tell us your name.</p>
 
@@ -262,7 +263,7 @@ export function MembershipStatusScreen({ status, profile, onProfileSaved, onSign
   return html`
     <div class="auth-shell">
       <div class="auth-card">
-        <h1 class="auth-title">${CHOIR_NAME}</h1>
+        <div class="auth-title"><${SonarioWordmark} height=${34} /></div>
         <p class="auth-sub" style=${{ fontWeight: 700, color: 'var(--ink)' }}>${copy.heading}</p>
         <p class="auth-sub">${copy.body}</p>
         <button class="btn btn-outline" onClick=${onSignOut} style=${{ width: '100%' }}>Sign out</button>

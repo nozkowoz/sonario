@@ -350,14 +350,14 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
 .absence-reason-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .absence-reason-form input { width: 100%; }
 
-/* "Can't make it" row badge (Nina's mockup, 2026-10-01) — exact spec, not approximated. */
-.cant-make-it-badge {
+/* "Can't make it" / "Going" row badges (Nina's mockup, 2026-10-01, icon dropped 2026-10-01). */
+.cant-make-it-badge, .going-badge {
   display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
-  background: #FEF3C7; color: var(--chocolate);
   font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px;
   padding: 8px 12px; border-radius: 999px; white-space: nowrap;
 }
-.cant-make-it-badge svg { flex-shrink: 0; }
+.cant-make-it-badge { background: #FEF3C7; color: var(--chocolate); }
+.going-badge { background: var(--green-bg); color: var(--green); }
 
 /* --- "Where you stand" status + the quiet way out ----------------------- */
 /* Green carries the settled, default case (you're coming) with a button's visual weight but
@@ -624,6 +624,11 @@ label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-w
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rail-chev { color: var(--fig-mute); opacity: 0.5; flex-shrink: 0; display: grid; place-items: center; padding: 0 12px; }
+/* Same right-hand breathing room a chevron gets (padding: 0 12px above) — a status badge in this
+   slot had none of its own, so it sat closer to the row's rounded corner than the chevron ever
+   does. One wrapper, not a margin baked into each badge, since any future trailing content here
+   should land in the same place without re-deriving this number. */
+.rail-trailing { flex-shrink: 0; display: flex; align-items: center; padding-right: 12px; }
 /* A row that is only ever read (no detail screen behind it) shouldn't advertise a tap. */
 .rail-row-static { cursor: default; }
 .rail-row-static:hover { transform: none; }
