@@ -14,7 +14,7 @@ import {
   useInvoiceSettings, updateInvoiceFee, initializeInvoiceNumbering, useInvoiceRuns,
   createInvoiceRun, fetchInvoicesForRun, fetchInvoicedProfileIdsForTerm, updateInvoiceDueDate,
   usePaymentsToConfirm, confirmInvoicePayment, rejectInvoicePayment, markInvoicePaid,
-  holdInvoice, resumeInvoice, waiveInvoice, sendInvoiceEmail,
+  holdInvoice, resumeInvoice, waiveInvoice, sendInvoiceEmail, createTerm,
 } from './store.js';
 import { LoadingState, EmptyState } from './shell.js';
 import { IconBack, IconChevron, IconMail, IconKey, IconCheckCircle, IconSend } from './icons.js';
@@ -737,13 +737,80 @@ function InvoicingSetup({ settings, terms, profileId, onSettingsSaved, onBack })
   `;
 }
 
+// A term's actual start/end dates are real-world facts (whatever the school term calendar says
+// that year) — nothing here can derive them from just "Term 2, 2027", so they're still two plain
+// date fields. What this saves is typing "Term 2 2027" as free text and hoping it matches the
+// "Term N YYYY" shape every other screen's parseTermLabel() regex expects.
+function AddTermInlineForm({ onCreated, onCancel }) {
+  const [num, setNum] = useState('1');
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [startsOn, setStartsOn] = useState('');
+  const [endsOn, setEndsOn] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const save = async () => {
+    if (!startsOn || !endsOn) { setError('Enter both a start and end date.'); return; }
+    if (endsOn < startsOn) { setError('End date needs to be after the start date.'); return; }
+    setBusy(true); setError(null);
+    const { data, error: err } = await createTerm({ name: `Term ${num} ${year}`, startsOn, endsOn });
+    setBusy(false);
+    if (err) { setError(err.message); return; }
+    if (!data) { setError("That didn't save — reload and try again."); return; }
+    onCreated(data);
+  };
+
+  return html`
+    <div class="card" style="margin:2px 0 4px;background:var(--bg);box-shadow:none;">
+      <p style="margin:0 0 10px;font-weight:700;">Add a term</p>
+      <div class="form-row">
+        <label style="flex:0 0 110px;">
+          Term
+          <select value=${num} onChange=${(e) => setNum(e.target.value)}>
+            ${['1', '2', '3', '4'].map((n) => html`<option key=${n} value=${n}>Term ${n}</option>`)}
+          </select>
+        </label>
+        <label style="flex:0 0 90px;">
+          Year
+          <input type="number" step="1" value=${year} onInput=${(e) => setYear(e.target.value)} />
+        </label>
+      </div>
+      <label>
+        Starts on
+        <input type="date" value=${startsOn} onInput=${(e) => setStartsOn(e.target.value)} />
+      </label>
+      <label>
+        Ends on
+        <input type="date" value=${endsOn} onInput=${(e) => setEndsOn(e.target.value)} />
+      </label>
+      ${error ? html`<p class="absence-error">${error}</p>` : null}
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" disabled=${busy} onClick=${save}>
+          ${busy ? 'Adding…' : `Add Term ${num} ${year}`}
+        </button>
+        <button class="btn-quiet" disabled=${busy} onClick=${onCancel}>Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
 // ---------------------------------------------------------------------------
 // Create term invoices — Setup step. Fee is shown, not edited here (edit it from Invoices home
 // first) — one place to change the fee, not two.
 // ---------------------------------------------------------------------------
 function CreateRunSetup({ terms, settings, onBack, onContinue }) {
-  const sortedTerms = useMemo(() => [...terms].sort((a, b) => b.starts_on.localeCompare(a.starts_on)), [terms]);
+  // A term just created here hasn't necessarily arrived back through useTerms()'s realtime
+  // subscription yet (there's always a round trip) — held locally and merged in so the dropdown
+  // and the auto-select below don't have to wait on that.
+  const [justAdded, setJustAdded] = useState([]);
+  const allTerms = useMemo(() => {
+    const byId = new Map(terms.map((t) => [t.id, t]));
+    for (const t of justAdded) if (!byId.has(t.id)) byId.set(t.id, t);
+    return [...byId.values()];
+  }, [terms, justAdded]);
+  const sortedTerms = useMemo(() => [...allTerms].sort((a, b) => b.starts_on.localeCompare(a.starts_on)), [allTerms]);
   const [termId, setTermId] = useState(sortedTerms[0]?.id || '');
+  const [addingTerm, setAddingTerm] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(todayStr());
   const [dueDate, setDueDate] = useState(addDays(todayStr(), 7));
   // Due date defaults to invoice date + 7 days and follows it automatically — until the admin
@@ -767,6 +834,11 @@ function CreateRunSetup({ terms, settings, onBack, onContinue }) {
             ${sortedTerms.map((t) => html`<option key=${t.id} value=${t.id}>${t.name}</option>`)}
           </select>
         </label>
+        ${addingTerm
+          ? html`<${AddTermInlineForm}
+              onCreated=${(term) => { setJustAdded((prev) => [...prev, term]); setTermId(term.id); setAddingTerm(false); }}
+              onCancel=${() => setAddingTerm(false)} />`
+          : html`<button type="button" class="btn-quiet" style="align-self:flex-start;" onClick=${() => setAddingTerm(true)}>+ Add a term</button>`}
         <label>
           Invoice date
           <input type="date" value=${invoiceDate} onInput=${(e) => changeInvoiceDate(e.target.value)} />

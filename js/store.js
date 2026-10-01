@@ -415,6 +415,13 @@ export function useTerms() {
   return { terms: rows, loading };
 }
 
+// RLS already lets a super write to `terms` directly ("super manage terms", migration 0001) —
+// this was simply never wired up to a screen until now (2026-10-01), unlike every other table
+// here which got its UI the same migration it was created in.
+export async function createTerm({ name, startsOn, endsOn }) {
+  return supabase.from('terms').insert({ name, starts_on: startsOn, ends_on: endsOn }).select().maybeSingle();
+}
+
 // One hook for both audiences, because RLS already draws the line: "own absence or super reads"
 // means an ordinary member gets back only their own rows here and a super gets everybody's.
 // The client never has to decide who's allowed to see what — it just renders what came back.
