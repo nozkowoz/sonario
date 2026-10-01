@@ -20,11 +20,20 @@
 -- ============================================================================
 -- 1. Drop the tables this migration replaces. No real data exists in any of them
 --    (confirmed) — this is a clean replacement, not a data migration.
+--
+-- 2026-10-01 INCIDENT: `rehearsals` and `songs` were REMOVED from this list after this exact
+-- statement wiped both tables' real data — TWICE — whenever this migration got replayed (which
+-- keeps happening because the remote migration-history bookkeeping keeps falling out of sync
+-- with what's actually applied, via the dashboard/MCP tools bypassing the CLI's tracking, or a
+-- PITR restore resetting that tracking table). The comment above was true ONCE, the very first
+-- time this ran against a genuinely empty pre-rebuild project — it has been false ever since the
+-- rebuild actually shipped, because the NEW rehearsals/songs tables reuse those exact names. This
+-- migration can never need to drop its OWN live tables again; the old `rehearsal_checkins` /
+-- `rehearsal_rsvps` / `members` tables below are a different, genuinely-retired set of names that
+-- don't exist in the new schema at all, so dropping those (if they exist) stays permanently safe.
 -- ============================================================================
 drop table if exists sonario.rehearsal_checkins cascade;
 drop table if exists sonario.rehearsal_rsvps cascade;
-drop table if exists sonario.rehearsals cascade;
-drop table if exists sonario.songs cascade;
 drop table if exists sonario.members cascade;
 
 -- ============================================================================
